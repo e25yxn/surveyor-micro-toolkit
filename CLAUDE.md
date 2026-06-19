@@ -46,17 +46,22 @@ SAFE - SMALL - STABLE - MODULAR.
 - Don't change public signatures of passing modules; add, don't break.
 
 ## Module map (.gs -> .py)
-| reference (.gs)      | src/smt (.py)                  |
-|----------------------|--------------------------------|
-| FPMath.gs            | fpmath.py        [DONE]        |
-| WCB.gs               | wcb.py           [DONE]        |
-| Alignment.gs         | alignment.py     [TODO next]   |
-| Vertical.gs          | vertical.py                    |
-| CrossFall.gs         | crossfall.py                   |
-| Surface3D.gs         | surface.py                     |
-| AlignmentBuilder.gs  | builders/alignment_builder.py  |
-| VerticalBuilder.gs   | builders/vertical_builder.py   |
-| HorCheck/VerCheck    | check.py                       |
+## Status
+Core engine complete: 250/250 tests passing across 7 commits. Next steps are
+extension work (CLI, notebooks, LandXML I/O) — see docs/blueprint.md.
+
+## Module map (.gs -> .py)
+| reference (.gs)      | src/smt (.py)                  | status |
+|-----------------------|--------------------------------|--------|
+| FPMath.gs             | fpmath.py                      | [DONE] |
+| WCB.gs                | wcb.py                         | [DONE] |
+| Alignment.gs          | alignment.py                   | [DONE] |
+| Vertical.gs           | vertical.py                    | [DONE] |
+| CrossFall.gs          | crossfall.py                   | [DONE] |
+| Surface3D.gs          | surface.py                     | [DONE] |
+| AlignmentBuilder.gs   | builders/alignment_builder.py  | [DONE] |
+| VerticalBuilder.gs    | builders/vertical_builder.py   | [DONE] |
+| HorCheck.gs/VerCheck.gs | check.py                     | [DONE] |
 
 ## Known limits (carry over + document)
 - spiral + compound combination unsupported.
