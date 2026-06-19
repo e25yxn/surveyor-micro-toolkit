@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "surveyor-micro-toolkit"
+version = "0.1.0"
+description = "SMT - core engine for road/highway alignment math (pure, typed, tested)"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "SMT" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "hypothesis>=6", "mypy>=1.5", "ruff>=0.4"]
+docs = ["mkdocs-material"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/smt"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src/smt"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
