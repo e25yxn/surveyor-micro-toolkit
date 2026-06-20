@@ -17,6 +17,7 @@ smt = "smt.cli:main"
 [project.optional-dependencies]
 dev = ["pytest>=7", "hypothesis>=6", "mypy>=1.5", "ruff>=0.4"]
 docs = ["mkdocs-material"]
+notebook = ["jupyter", "matplotlib"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/smt"]
