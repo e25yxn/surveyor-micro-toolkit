@@ -11,6 +11,9 @@ requires-python = ">=3.10"
 authors = [{ name = "SMT" }]
 dependencies = []
 
+[project.scripts]
+smt = "smt.cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=7", "hypothesis>=6", "mypy>=1.5", "ruff>=0.4"]
 docs = ["mkdocs-material"]
