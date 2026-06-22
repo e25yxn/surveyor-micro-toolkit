@@ -140,7 +140,7 @@ def _end_displacement(subs: list[dict], az_in: float, sgn: float) -> tuple[float
             sgn * s['R'], None, s.get('trans'),
         )
         state = calculate_exit_state(el)
-        cur_n, cur_e, cur_az = state.n, state.e, state.az
+        cur_n, cur_e, cur_az = state.n, state.e, state.azimuth
         sta += s['len']
     return cur_n, cur_e
 
@@ -219,7 +219,7 @@ def build_alignment_from_pi(vertices: list[dict]) -> BuildResult:
             )
             elements.append(el)
             state = calculate_exit_state(el)
-            cur_n, cur_e, cur_az = state.n, state.e, state.az
+            cur_n, cur_e, cur_az = state.n, state.e, state.azimuth
             sta += s['len']
             pt_name = nm['jct'][i] if i < len(subs) - 1 else nm['end']
             control.append(ControlPoint(name=pt_name, sta=sta, n=cur_n, e=cur_e))

@@ -52,8 +52,8 @@ def test_parse_xlt_first_segment(segs_lt):
     s = segs_lt[0]
     assert s.sta_start == 0
     assert s.sta_end == 1000
-    assert s.x_start == -2.5
-    assert s.x_end == -2.5
+    assert s.crossfall_start == -2.5
+    assert s.crossfall_end == -2.5
     assert s.type == 'N'
 
 
@@ -61,8 +61,8 @@ def test_parse_xlt_s_curve_segment(segs_lt):
     s = segs_lt[1]
     assert s.sta_start == 1000
     assert s.sta_end == 1060
-    assert s.x_start == -2.5
-    assert s.x_end == 4.0
+    assert s.crossfall_start == -2.5
+    assert s.crossfall_end == 4.0
     assert s.type == 'S'
 
 
@@ -70,8 +70,8 @@ def test_parse_xrt_single_segment(segs_rt):
     s = segs_rt[0]
     assert s.sta_start == 0
     assert s.sta_end == 2000
-    assert s.x_start == -2.5
-    assert s.x_end == -2.5
+    assert s.crossfall_start == -2.5
+    assert s.crossfall_end == -2.5
     assert s.type == 'N'
 
 
@@ -121,7 +121,7 @@ def test_s_curve_shape_function(segs_lt, t, expected_f):
     seg = segs_lt[1]   # L=60, x1=-2.5, x2=4.0
     sta = seg.sta_start + t * (seg.sta_end - seg.sta_start)
     result = cf.calculate_crossfall_at(seg, sta)
-    expected = seg.x_start + (seg.x_end - seg.x_start) * expected_f
+    expected = seg.crossfall_start + (seg.crossfall_end - seg.crossfall_start) * expected_f
     assert math.isclose(result, expected, abs_tol=1e-9)
 
 
@@ -130,14 +130,14 @@ def test_s_curve_shape_function(segs_lt, t, expected_f):
 # ---------------------------------------------------------------------------
 
 def test_type_v_linear():
-    seg = cf.CrossfallSegment(sta_start=0, sta_end=100, x_start=-2.5, x_end=4.0, type='V')
+    seg = cf.CrossfallSegment(sta_start=0, sta_end=100, crossfall_start=-2.5, crossfall_end=4.0, type='V')
     assert math.isclose(cf.calculate_crossfall_at(seg, 0), -2.5, abs_tol=1e-9)
     assert math.isclose(cf.calculate_crossfall_at(seg, 50), 0.75, abs_tol=1e-9)
     assert math.isclose(cf.calculate_crossfall_at(seg, 100), 4.0, abs_tol=1e-9)
 
 
 def test_type_v_is_default_for_unknown_type():
-    seg = cf.CrossfallSegment(sta_start=0, sta_end=100, x_start=0.0, x_end=10.0, type='X')
+    seg = cf.CrossfallSegment(sta_start=0, sta_end=100, crossfall_start=0.0, crossfall_end=10.0, type='X')
     assert math.isclose(cf.calculate_crossfall_at(seg, 50), 5.0, abs_tol=1e-9)
 
 
@@ -147,7 +147,7 @@ def test_type_v_is_default_for_unknown_type():
 
 def test_equal_endpoints_gives_constant():
     for t_type in ('N', 'V', 'S'):
-        seg = cf.CrossfallSegment(sta_start=0, sta_end=200, x_start=3.0, x_end=3.0, type=t_type)
+        seg = cf.CrossfallSegment(sta_start=0, sta_end=200, crossfall_start=3.0, crossfall_end=3.0, type=t_type)
         for sta in (0, 100, 200):
             assert math.isclose(cf.calculate_crossfall_at(seg, sta), 3.0, abs_tol=1e-9), (
                 f'type={t_type} sta={sta}'
@@ -225,14 +225,14 @@ def test_rate_type_s_max_at_midpoint(segs_lt):
 
 
 def test_rate_type_v_constant():
-    seg = cf.CrossfallSegment(sta_start=0, sta_end=100, x_start=0.0, x_end=10.0, type='V')
+    seg = cf.CrossfallSegment(sta_start=0, sta_end=100, crossfall_start=0.0, crossfall_end=10.0, type='V')
     # rate = dx/L = 10/100 = 0.1 at any station
     for sta in (0, 50, 100):
         assert math.isclose(cf.calculate_crossfall_rate_at(seg, sta), 0.1, abs_tol=1e-9)
 
 
 def test_rate_equal_endpoints_is_zero():
-    seg = cf.CrossfallSegment(sta_start=0, sta_end=100, x_start=3.0, x_end=3.0, type='S')
+    seg = cf.CrossfallSegment(sta_start=0, sta_end=100, crossfall_start=3.0, crossfall_end=3.0, type='S')
     assert cf.calculate_crossfall_rate_at(seg, 50) == 0.0
 
 
@@ -241,6 +241,6 @@ def test_rate_equal_endpoints_is_zero():
 # ---------------------------------------------------------------------------
 
 def test_zero_length_segment_returns_x_start():
-    seg = cf.CrossfallSegment(sta_start=100, sta_end=100, x_start=-2.5, x_end=4.0, type='S')
+    seg = cf.CrossfallSegment(sta_start=100, sta_end=100, crossfall_start=-2.5, crossfall_end=4.0, type='S')
     assert cf.calculate_crossfall_at(seg, 100) == -2.5
     assert cf.calculate_crossfall_rate_at(seg, 100) == 0.0

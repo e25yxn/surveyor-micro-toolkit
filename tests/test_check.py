@@ -58,23 +58,23 @@ def test_check_horizontal_result_type(golden: dict, elements: list) -> None:
     results = ck.check_horizontal(elements, golden['controls'])
     for r in results:
         assert isinstance(r, ck.HorizontalCheckResult)
-        assert isinstance(r.ok, bool)
+        assert isinstance(r.is_ok, bool)
 
 
 def test_check_horizontal_gap_equals_hypot(golden: dict, elements: list) -> None:
-    """gap_m must equal hypot(d_n, d_e) for every result."""
+    """gap_metres must equal hypot(delta_n, delta_e) for every result."""
     results = ck.check_horizontal(elements, golden['controls'])
     for r in results:
-        assert abs(r.gap_m - math.hypot(r.d_n, r.d_e)) < 1e-12
+        assert abs(r.gap_metres - math.hypot(r.delta_n, r.delta_e)) < 1e-12
 
 
 def test_check_horizontal_all_pass(golden: dict, elements: list) -> None:
     """All 31 control points must fall within 2 mm of the alignment engine."""
     results = ck.check_horizontal(elements, golden['controls'], tol=2e-3)
-    failures = [r for r in results if not r.ok]
+    failures = [r for r in results if not r.is_ok]
     assert failures == [], (
         f'{len(failures)} point(s) exceeded 2 mm: '
-        + ', '.join(f'{r.name}@{r.sta} gap={r.gap_m:.6f} m' for r in failures)
+        + ', '.join(f'{r.name}@{r.sta} gap={r.gap_metres:.6f} m' for r in failures)
     )
 
 
@@ -99,7 +99,7 @@ def test_check_vertical_result_type(golden: dict, segs: list) -> None:
     results = ck.check_vertical(segs, golden['vchecks'])
     for r in results:
         assert isinstance(r, ck.VerticalCheckResult)
-        assert isinstance(r.ok, bool)
+        assert isinstance(r.is_ok, bool)
 
 
 def test_check_vertical_curve_points_pass(golden: dict, segs: list) -> None:
@@ -109,10 +109,10 @@ def test_check_vertical_curve_points_pass(golden: dict, segs: list) -> None:
     d_elev is the mid-ordinate; ok=True is not expected and not asserted.
     """
     results = ck.check_vertical(segs, golden['vchecks'], tol=1e-3)
-    failures = [r for r in results if r.name != 'PVI' and not r.ok]
+    failures = [r for r in results if r.name != 'PVI' and not r.is_ok]
     assert failures == [], (
         f'{len(failures)} curve point(s) exceeded 1 mm: '
-        + ', '.join(f'{r.name}@{r.sta} d_elev={r.d_elev:.6f} m' for r in failures)
+        + ', '.join(f'{r.name}@{r.sta} delta_elevation={r.delta_elevation:.6f} m' for r in failures)
     )
 
 
@@ -128,8 +128,8 @@ def test_check_vertical_pvi_nonzero_d_elev(golden: dict, segs: list) -> None:
     results = ck.check_vertical(segs, golden['vchecks'])
     for r in results:
         if r.name == 'PVI':
-            assert abs(r.d_elev) > 0.1, (
-                f'PVI@{r.sta}: expected non-zero mid-ordinate, got d_elev={r.d_elev}'
+            assert abs(r.delta_elevation) > 0.1, (
+                f'PVI@{r.sta}: expected non-zero mid-ordinate, got delta_elevation={r.delta_elevation}'
             )
 
 

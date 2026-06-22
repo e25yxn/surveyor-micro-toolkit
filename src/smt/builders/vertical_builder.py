@@ -30,17 +30,17 @@ from typing import NamedTuple
 class VerticalRow:
     """One vertical alignment segment.
 
-    level : elevation at sta_start (PVC level for curve rows).
-    g1    : entry grade (%).
-    g2    : exit grade  (%).
-    lvc   : 0 for tangent; total L for symmetric VC; L1 for asymmetric VC.
-    lvc2  : None for tangent or symmetric VC; L2 for asymmetric VC.
+    level    : elevation at sta_start (PVC level for curve rows).
+    grade_in : entry grade (%).
+    grade_out: exit grade  (%).
+    lvc      : 0 for tangent; total L for symmetric VC; L1 for asymmetric VC.
+    lvc2     : None for tangent or symmetric VC; L2 for asymmetric VC.
     """
     sta_start: float
     sta_end: float
     level: float
-    g1: float
-    g2: float
+    grade_in: float
+    grade_out: float
     lvc: float
     lvc2: float | None
 
@@ -103,7 +103,7 @@ def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
         if pvc_sta > end_sta + 1e-9:
             rows.append(VerticalRow(
                 sta_start=end_sta, sta_end=pvc_sta, level=end_elev,
-                g1=g_in, g2=g_in, lvc=0, lvc2=None,
+                grade_in=g_in, grade_out=g_in, lvc=0, lvc2=None,
             ))
         elif pvc_sta < end_sta - 1e-6:
             issues.append(
@@ -113,7 +113,7 @@ def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
         control.append(VControlPoint(name='PVC', sta=pvc_sta, elev=pvc_elev))
         rows.append(VerticalRow(
             sta_start=pvc_sta, sta_end=pvt_sta, level=pvc_elev,
-            g1=g_in, g2=g_out,
+            grade_in=g_in, grade_out=g_out,
             lvc=float(v.get('L') or 0) if sym else L1,
             lvc2=None if sym else L2,
         ))
@@ -130,7 +130,7 @@ def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
         g_end = (ep_elev - end_elev) / (ep_sta - end_sta) * 100
         rows.append(VerticalRow(
             sta_start=end_sta, sta_end=ep_sta, level=end_elev,
-            g1=g_end, g2=g_end, lvc=0, lvc2=None,
+            grade_in=g_end, grade_out=g_end, lvc=0, lvc2=None,
         ))
     control.append(VControlPoint(name='EVP', sta=ep_sta, elev=ep_elev))
 
@@ -147,7 +147,7 @@ def to_table(rows: list[VerticalRow]) -> list[list]:
     lvc2 is '' when None, matching the spreadsheet column convention.
     """
     return [
-        [r.sta_start, r.sta_end, r.level, r.g1, r.g2, r.lvc,
+        [r.sta_start, r.sta_end, r.level, r.grade_in, r.grade_out, r.lvc,
          '' if r.lvc2 is None else r.lvc2]
         for r in rows
     ]

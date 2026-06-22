@@ -83,7 +83,7 @@ def calculate_point_3d(
     Raises ValueError when sta lies outside the alignment (propagated from alignment).
     """
     off = float(offset)
-    ne = alignment.calculate_station_to_coord(elements, sta, off)
+    ne = alignment.calculate_station_to_coordinate(elements, sta, off)
     cl = vertical.calculate_elevation(v_segs, sta)
 
     xf: float | None = None

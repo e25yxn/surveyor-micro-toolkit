@@ -55,7 +55,7 @@ def _read_alignment(path: str) -> list[alignment.Element]:
 def _run_fwd(args: argparse.Namespace) -> int:
     """fwd: station (+offset) -> grid coordinate N,E."""
     elements = _read_alignment(args.table)
-    pt = alignment.calculate_station_to_coord(elements, args.sta, args.offset)
+    pt = alignment.calculate_station_to_coordinate(elements, args.sta, args.offset)
     print(f'{pt.n},{pt.e}')
     return 0
 
@@ -63,7 +63,7 @@ def _run_fwd(args: argparse.Namespace) -> int:
 def _run_inv(args: argparse.Namespace) -> int:
     """inv: grid coordinate N,E -> station,offset."""
     elements = _read_alignment(args.table)
-    so = alignment.calculate_coord_to_station(elements, args.n, args.e)
+    so = alignment.calculate_coordinate_to_station(elements, args.n, args.e)
     print(f'{so.sta},{so.offset}')
     return 0
 

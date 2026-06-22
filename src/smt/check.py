@@ -11,8 +11,8 @@ parabolic profile elevation at that station and reports the elevation error.
 
 Note on PVI points: a PVI (Vertical Point of Intersection) is the tangent-
 intersection of two grades; it does NOT lie on the parabolic curve.  check_vertical
-reports its d_elev as the mid-ordinate of the vertical curve (always non-zero for
-a crest or sag).  Filter by name != 'PVI' when asserting ok=True.
+reports its delta_elevation as the mid-ordinate of the vertical curve (always
+non-zero for a crest or sag).  Filter by name != 'PVI' when asserting is_ok=True.
 
 Depends on: alignment, vertical.
 """
@@ -32,29 +32,29 @@ from . import vertical as vt
 class HorizontalCheckResult(NamedTuple):
     """Cross-check result for one horizontal control point.
 
-    d_n   : computed_n − drawing_n  (m; + = engine is north of drawing)
-    d_e   : computed_e − drawing_e  (m; + = engine is east of drawing)
-    gap_m : hypot(d_n, d_e)  — positional closure in metres
-    ok    : True when gap_m ≤ tolerance
+    delta_n    : computed_n − drawing_n  (m; + = engine is north of drawing)
+    delta_e    : computed_e − drawing_e  (m; + = engine is east of drawing)
+    gap_metres : hypot(delta_n, delta_e)  — positional closure in metres
+    is_ok      : True when gap_metres ≤ tolerance
     """
     name: str
     sta: float
-    d_n: float
-    d_e: float
-    gap_m: float
-    ok: bool
+    delta_n: float
+    delta_e: float
+    gap_metres: float
+    is_ok: bool
 
 
 class VerticalCheckResult(NamedTuple):
     """Cross-check result for one vertical check point.
 
-    d_elev : computed_elev − drawing_elev  (m; + = engine is higher)
-    ok     : True when |d_elev| ≤ tolerance
+    delta_elevation : computed_elev − drawing_elev  (m; + = engine is higher)
+    is_ok           : True when |delta_elevation| ≤ tolerance
     """
     name: str
     sta: float
-    d_elev: float
-    ok: bool
+    delta_elevation: float
+    is_ok: bool
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ def check_horizontal(
 
     controls : list of dicts — keys 'name' (str), 'sta', 'n', 'e' (float).
                Matches the 'controls' array in tests/golden/tables.json.
-    tol      : pass/fail threshold on gap_m (metres; default 0.05 m).
+    tol      : pass/fail threshold on gap_metres (metres; default 0.05 m).
     Returns  : one HorizontalCheckResult per input point.
     Raises   : ValueError when a station is outside the alignment by more than
                the snap tolerance (0.01 m).
@@ -120,14 +120,14 @@ def check_horizontal(
         n_draw = float(cp['n'])
         e_draw = float(cp['e'])
         sta_eff = _snap_to_alignment_ends(sta_draw, elements)
-        calc = al.calculate_station_to_coord(elements, sta_eff, 0.0)
-        d_n = calc.n - n_draw
-        d_e = calc.e - e_draw
-        gap_m = math.hypot(d_n, d_e)
+        calc = al.calculate_station_to_coordinate(elements, sta_eff, 0.0)
+        delta_n = calc.n - n_draw
+        delta_e = calc.e - e_draw
+        gap_metres = math.hypot(delta_n, delta_e)
         results.append(HorizontalCheckResult(
             name=name, sta=sta_draw,
-            d_n=d_n, d_e=d_e, gap_m=gap_m,
-            ok=gap_m <= tol,
+            delta_n=delta_n, delta_e=delta_e, gap_metres=gap_metres,
+            is_ok=gap_metres <= tol,
         ))
     return results
 
@@ -144,12 +144,12 @@ def check_vertical(
     end) and reports the discrepancy against the drawing elevation.
 
     PVI entries are tangent-intersection points, not points on the parabolic
-    curve.  Their d_elev equals the mid-ordinate of the vertical curve.
-    Filter by name != 'PVI' when checking ok=True.
+    curve.  Their delta_elevation equals the mid-ordinate of the vertical curve.
+    Filter by name != 'PVI' when checking is_ok=True.
 
     vchecks : list of dicts — keys 'name' (str), 'sta', 'elev' (float).
               Matches the 'vchecks' array in tests/golden/tables.json.
-    tol     : pass/fail threshold on |d_elev| (metres; default 0.005 m).
+    tol     : pass/fail threshold on |delta_elevation| (metres; default 0.005 m).
     Returns : one VerticalCheckResult per input point.
     Raises  : ValueError when a station lies outside the profile.
     """
@@ -162,10 +162,10 @@ def check_vertical(
         calc_elev = vt.calculate_elevation(segs, sta_eff)
         if calc_elev is None:
             raise ValueError(f'station {sta_draw} lies outside the vertical profile')
-        d_elev = calc_elev - elev_draw
+        delta_elevation = calc_elev - elev_draw
         results.append(VerticalCheckResult(
             name=name, sta=sta_draw,
-            d_elev=d_elev,
-            ok=abs(d_elev) <= tol,
+            delta_elevation=delta_elevation,
+            is_ok=abs(delta_elevation) <= tol,
         ))
     return results

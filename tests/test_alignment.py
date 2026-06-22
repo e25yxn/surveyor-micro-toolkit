@@ -73,7 +73,7 @@ def test_control_points(elements, golden):
     failures = []
     for cp in golden['controls']:
         sta = elements[-1].sta_end if cp['name'] == 'EP' else cp['sta']
-        pt = al.calculate_station_to_coord(elements, sta, 0.0)
+        pt = al.calculate_station_to_coordinate(elements, sta, 0.0)
         err_n = abs(pt.n - cp['n'])
         err_e = abs(pt.e - cp['e'])
         if err_n > tol or err_e > tol:
@@ -102,7 +102,7 @@ def test_control_point_parametrized(elements, sta, exp_n, exp_e, name):
     # EP station in the fixture is a 3-decimal rounding of elements[-1].sta_end;
     # use the full-precision element boundary to avoid the 1e-4 tolerance edge.
     actual_sta = elements[-1].sta_end if name == 'EP' else sta
-    pt = al.calculate_station_to_coord(elements, actual_sta, 0.0)
+    pt = al.calculate_station_to_coordinate(elements, actual_sta, 0.0)
     assert abs(pt.n - exp_n) <= 1e-3, (
         f'{name}@{actual_sta}: N got {pt.n:.4f} expected {exp_n:.4f}'
     )
@@ -119,7 +119,7 @@ def _roundtrip_stations(elements: list[al.Element]) -> list[tuple[str, float]]:
     """One station per element type, solidly inside (not at a boundary)."""
     cases = []
     for el in elements:
-        label = f'{el.type}({el.trans})@{el.sta_start:.1f}'
+        label = f'{el.type}({el.transition})@{el.sta_start:.1f}'
         cases.append((label, _mid(el)))
     return cases
 
@@ -129,8 +129,8 @@ def test_roundtrip_all_element_types(elements):
     tol = 1e-3
     failures = []
     for label, sta in _roundtrip_stations(elements):
-        pt = al.calculate_station_to_coord(elements, sta, 0.0)
-        result = al.calculate_coord_to_station(elements, pt.n, pt.e)
+        pt = al.calculate_station_to_coordinate(elements, sta, 0.0)
+        result = al.calculate_coordinate_to_station(elements, pt.n, pt.e)
         err_sta = abs(result.sta - sta)
         err_off = abs(result.offset)
         if err_sta > tol or err_off > tol:
@@ -147,8 +147,8 @@ def test_roundtrip_all_element_types(elements):
     )),
 )
 def test_roundtrip_parametrized(elements, label, sta):
-    pt = al.calculate_station_to_coord(elements, sta, 0.0)
-    result = al.calculate_coord_to_station(elements, pt.n, pt.e)
+    pt = al.calculate_station_to_coordinate(elements, sta, 0.0)
+    result = al.calculate_coordinate_to_station(elements, pt.n, pt.e)
     assert abs(result.sta - sta) <= 1e-3, (
         f'{label}: sta got {result.sta:.4f} expected {sta:.4f}'
     )
@@ -226,7 +226,7 @@ def test_exit_state_matches_next_entry(elements):
             f'Element {i}->{i+1} position gap: '
             f'exit=({ex.n:.4f},{ex.e:.4f}) next=({nxt.n:.4f},{nxt.e:.4f})'
         )
-        assert abs(al.fpmath.angle_diff(ex.az, nxt.az)) < tol_az, (
+        assert abs(al.fpmath.angle_diff(ex.azimuth, nxt.azimuth)) < tol_az, (
             f'Element {i}->{i+1} azimuth gap: '
-            f'exit_az={math.degrees(ex.az):.6f} next_az={math.degrees(nxt.az):.6f}'
+            f'exit_az={math.degrees(ex.azimuth):.6f} next_az={math.degrees(nxt.azimuth):.6f}'
         )

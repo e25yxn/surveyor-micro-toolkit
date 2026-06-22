@@ -124,7 +124,7 @@ def test_point3d_all_components_consistent(
     p = sf.calculate_point_3d(elements, v_segs, xlt_segs, xrt_segs, sta, off)
 
     # N, E must match alignment directly
-    ne = al.calculate_station_to_coord(elements, sta, off)
+    ne = al.calculate_station_to_coordinate(elements, sta, off)
     assert math.isclose(p.n, ne.n, abs_tol=1e-9), f'N mismatch at sta={sta} off={off}'
     assert math.isclose(p.e, ne.e, abs_tol=1e-9), f'E mismatch at sta={sta} off={off}'
 

@@ -49,7 +49,7 @@ def test_parse_first_segment(segs):
     assert s.sta_start == 0
     assert s.sta_end == 1100
     assert s.level == 100
-    assert s.g1 == 1.5
+    assert s.grade_in == 1.5
     assert s.lvc == 0
     assert s.lvc2 is None
 
@@ -138,7 +138,7 @@ def test_vcheck_pvi_tangent_grade(segs, sta, exp_elev):
     """PVI elevation in vchecks is the tangent-grade intersection height (G1 from PVC)."""
     seg = _find_seg(segs, sta)
     assert seg is not None, f'VPI station {sta} not found in any segment'
-    tangent_elev = seg.level + (seg.g1 / 100.0) * (sta - seg.sta_start)
+    tangent_elev = seg.level + (seg.grade_in / 100.0) * (sta - seg.sta_start)
     assert abs(tangent_elev - exp_elev) <= 1e-3, (
         f'PVI@{sta}: tangent elev {tangent_elev:.6f} expected {exp_elev}'
     )
@@ -161,14 +161,14 @@ def test_elevation_outside_returns_none(segs):
 def test_grade_at_pvc_equals_g1(segs, idx):
     seg = segs[idx]
     grade = vt.calculate_grade_at(seg, seg.sta_start)
-    assert math.isclose(grade, seg.g1, abs_tol=1e-9)
+    assert math.isclose(grade, seg.grade_in, abs_tol=1e-9)
 
 
 @pytest.mark.parametrize('idx', [1, 3, 5])
 def test_grade_at_pvt_equals_g2(segs, idx):
     seg = segs[idx]
     grade = vt.calculate_grade_at(seg, seg.sta_end)
-    assert math.isclose(grade, seg.g2, abs_tol=1e-9)
+    assert math.isclose(grade, seg.grade_out, abs_tol=1e-9)
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ def test_grade_continuity_at_junctions(segs):
     """Exit grade of seg[n] must equal entry grade of seg[n+1]."""
     for i in range(len(segs) - 1):
         g_exit = vt.calculate_grade_at(segs[i], segs[i].sta_end)
-        g_entry = segs[i + 1].g1
+        g_entry = segs[i + 1].grade_in
         assert math.isclose(g_exit, g_entry, abs_tol=1e-6), (
             f'Grade gap between seg {i} and {i+1}: '
             f'exit={g_exit:.6f} entry_g1={g_entry:.6f}'

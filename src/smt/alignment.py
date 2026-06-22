@@ -37,27 +37,27 @@ SPIRAL_STEPS: int = 48   # Simpson intervals for spiral numerical integration (m
 class Element:
     """One horizontal alignment element (tangent, circular, or spiral/transition).
 
-    az   : entry tangent azimuth (radians).
-    k_in : curvature at entry = 1/R_in  (0 for tangent end).
-    k_out: curvature at exit  = 1/R_out (0 for tangent end).
-    trans: transition shape string; only affects spiral integration.
+    azimuth   : entry tangent azimuth (radians).
+    k_in      : curvature at entry = 1/R_in  (0 for tangent end).
+    k_out     : curvature at exit  = 1/R_out (0 for tangent end).
+    transition: transition shape string; only affects spiral integration.
     """
     type: str
     sta_start: float
     sta_end: float
     n: float
     e: float
-    az: float
+    azimuth: float
     k_in: float
     k_out: float
-    trans: str
+    transition: str
 
 
 class ElementState(NamedTuple):
     """Tangent state at a point on an element: position + tangent azimuth."""
     n: float
     e: float
-    az: float   # tangent azimuth (radians)
+    azimuth: float   # tangent azimuth (radians)
 
 
 class Projection(NamedTuple):
@@ -78,18 +78,18 @@ class StationOffset(NamedTuple):
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _shape_integral(trans: str, tau: float) -> float:
+def _shape_integral(transition: str, tau: float) -> float:
     """F(τ) = ∫₀^τ f(u) du  (curvature-shape integral for spiral elements).
 
     f defines how curvature changes with normalised arc position τ = s/L.
     Every shape satisfies f(0)=0, f(1)=1, ∫₀¹ f = 1/2 (equal total turning angle).
     """
     pi = math.pi
-    if trans == 'BLOSS':
+    if transition == 'BLOSS':
         return tau ** 3 - tau ** 4 / 2
-    if trans == 'COSINE':
+    if transition == 'COSINE':
         return tau / 2 - math.sin(pi * tau) / (2 * pi)
-    if trans == 'SINE':
+    if transition == 'SINE':
         return tau ** 2 / 2 - (1 - math.cos(2 * pi * tau)) / (4 * pi ** 2)
     # CLOTHOID (default): f(τ) = τ  →  F(τ) = τ²/2
     return tau ** 2 / 2
@@ -102,7 +102,7 @@ def _theta_at(el: Element, s: float) -> float:
     """
     L = el.sta_end - el.sta_start
     tau = 0.0 if L == 0 else s / L
-    return el.k_in * s + (el.k_out - el.k_in) * L * _shape_integral(el.trans, tau)
+    return el.k_in * s + (el.k_out - el.k_in) * L * _shape_integral(el.transition, tau)
 
 
 # ---------------------------------------------------------------------------
@@ -163,10 +163,10 @@ def make_element(
         sta_end=sta_end,
         n=n,
         e=e,
-        az=fpmath.deg_to_rad(az_deg),
+        azimuth=fpmath.deg_to_rad(az_deg),
         k_in=k_in,
         k_out=k_out,
-        trans=tr,
+        transition=tr,
     )
 
 
@@ -193,21 +193,21 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
     """Position and tangent azimuth at arc distance d from element start.
 
     d is measured along the element's centre line.
-    Returns ElementState(n, e, az) where az is the tangent direction (radians).
+    Returns ElementState(n, e, azimuth) where azimuth is the tangent direction (radians).
     """
     # Tangent: k_in == k_out == 0 → straight line
     if el.k_in == 0 and el.k_out == 0:
-        pt = wcb.calculate_forward(el.n, el.e, el.az, d)
-        return ElementState(n=pt.n, e=pt.e, az=el.az)
+        pt = wcb.calculate_forward(el.n, el.e, el.azimuth, d)
+        return ElementState(n=pt.n, e=pt.e, azimuth=el.azimuth)
 
     # Circular: constant curvature → chord-and-half-angle formula
     if el.k_in == el.k_out:
         k = el.k_in
         theta = k * d                                         # signed arc angle
         chord = 2.0 / abs(k) * abs(math.sin(theta / 2))     # chord length
-        chord_az = el.az + theta / 2                         # chord bisects arc angle
+        chord_az = el.azimuth + theta / 2                    # chord bisects arc angle
         pt = wcb.calculate_forward(el.n, el.e, chord_az, chord)
-        return ElementState(n=pt.n, e=pt.e, az=fpmath.normalize_angle(el.az + theta))
+        return ElementState(n=pt.n, e=pt.e, azimuth=fpmath.normalize_angle(el.azimuth + theta))
 
     # Spiral: variable curvature → Simpson integration of (cos θ, sin θ)
     #   Local frame: x along entry tangent, y perpendicular (left).
@@ -223,11 +223,11 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
         sum_y += w * math.sin(th)
     x = sum_x * h / 3
     y = sum_y * h / 3
-    ca, sa = math.cos(el.az), math.sin(el.az)
+    ca, sa = math.cos(el.azimuth), math.sin(el.azimuth)
     return ElementState(
         n=el.n + x * ca - y * sa,
         e=el.e + x * sa + y * ca,
-        az=fpmath.normalize_angle(el.az + _theta_at(el, d)),
+        azimuth=fpmath.normalize_angle(el.azimuth + _theta_at(el, d)),
     )
 
 
@@ -248,7 +248,7 @@ def get_element_index(elements: list[Element], sta: float) -> int:
     return -1
 
 
-def calculate_station_to_coord(
+def calculate_station_to_coordinate(
     elements: list[Element],
     sta: float,
     offset: float = 0.0,
@@ -264,7 +264,7 @@ def calculate_station_to_coord(
     st = calculate_point_on_element(elements[i], sta - elements[i].sta_start)
     if not offset:
         return wcb.Point(n=st.n, e=st.e)
-    off_az = fpmath.normalize_angle(st.az + math.pi / 2.0)
+    off_az = fpmath.normalize_angle(st.azimuth + math.pi / 2.0)
     pt = wcb.calculate_forward(st.n, st.e, off_az, offset)
     return wcb.Point(n=pt.n, e=pt.e)
 
@@ -281,7 +281,7 @@ def calculate_projection_to_element(el: Element, pn: float, pe: float) -> Projec
     # Tangent: foot via dot-product projection
     if el.k_in == 0 and el.k_out == 0:
         dn, de = pn - el.n, pe - el.e
-        ca, sa = math.cos(el.az), math.sin(el.az)
+        ca, sa = math.cos(el.azimuth), math.sin(el.azimuth)
         d = dn * ca + de * sa
         off = -dn * sa + de * ca
         return Projection(
@@ -295,8 +295,8 @@ def calculate_projection_to_element(el: Element, pn: float, pe: float) -> Projec
     if el.k_in == el.k_out:
         k = el.k_in
         R = 1.0 / k
-        cn = el.n - R * math.sin(el.az)
-        ce = el.e + R * math.cos(el.az)
+        cn = el.n - R * math.sin(el.azimuth)
+        ce = el.e + R * math.cos(el.azimuth)
         rho = math.hypot(pn - cn, pe - ce)
         phi0 = math.atan2(el.e - ce, el.n - cn)
         phi_p = math.atan2(pe - ce, pn - cn)
@@ -312,7 +312,7 @@ def calculate_projection_to_element(el: Element, pn: float, pe: float) -> Projec
     # Spiral: bisection on g(s) = (P - Q(s)) · tangent(s) = 0
     def g(s: float) -> float:
         q = calculate_point_on_element(el, s)
-        return (pn - q.n) * math.cos(q.az) + (pe - q.e) * math.sin(q.az)
+        return (pn - q.n) * math.cos(q.azimuth) + (pe - q.e) * math.sin(q.azimuth)
 
     g0, g_L = g(0.0), g(L)
     in_range = (g0 == 0.0) or (g_L == 0.0) or ((g0 > 0) != (g_L > 0))
@@ -331,11 +331,11 @@ def calculate_projection_to_element(el: Element, pn: float, pe: float) -> Projec
     else:
         s_star = 0.0 if abs(g0) < abs(g_L) else L
     qs = calculate_point_on_element(el, s_star)
-    off = -(pn - qs.n) * math.sin(qs.az) + (pe - qs.e) * math.cos(qs.az)
+    off = -(pn - qs.n) * math.sin(qs.azimuth) + (pe - qs.e) * math.cos(qs.azimuth)
     return Projection(sta=el.sta_start + s_star, offset=off, d=s_star, in_range=in_range)
 
 
-def calculate_coord_to_station(
+def calculate_coordinate_to_station(
     elements: list[Element],
     pn: float,
     pe: float,
@@ -373,7 +373,7 @@ def check_chain(
         a, b = elements[i], elements[i + 1]
         ex = calculate_exit_state(a)
         gap = math.hypot(ex.n - b.n, ex.e - b.e)
-        d_az = abs(fpmath.rad_to_deg(fpmath.angle_diff(ex.az, b.az)) * 3600)
+        d_az = abs(fpmath.rad_to_deg(fpmath.angle_diff(ex.azimuth, b.azimuth)) * 3600)
         if gap > tolerance or d_az > 5:
             issues.append({
                 'between': f'{i + 1}->{i + 2}',

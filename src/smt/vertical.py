@@ -11,7 +11,7 @@ LVC conventions
   lvc > 0, lvc2 > 0    : asymmetric (unequal-tangent) VC — arms lvc (L1) and lvc2 (L2)
 
 Segment table column order (matches tables.json "vtable"):
-  [index] | sta_start | sta_end | level | g1 | g2 | lvc | (lvc2)
+  [index] | sta_start | sta_end | level | grade_in | grade_out | lvc | (lvc2)
 
 Standalone module (no dependency on fpmath, wcb, or alignment).
 """
@@ -29,18 +29,18 @@ from dataclasses import dataclass
 class VerticalSegment:
     """One vertical alignment segment.
 
-    level : elevation at sta_start (PVC level).
-    g1    : entry grade (%).
-    g2    : exit grade  (%).
-    lvc   : vertical curve length (0 = tangent grade; >0 = VC length).
-            For asymmetric VC this is the first arm L1.
-    lvc2  : second arm L2 for asymmetric VC; None for symmetric or tangent.
+    level    : elevation at sta_start (PVC level).
+    grade_in : entry grade (%).
+    grade_out: exit grade  (%).
+    lvc      : vertical curve length (0 = tangent grade; >0 = VC length).
+               For asymmetric VC this is the first arm L1.
+    lvc2     : second arm L2 for asymmetric VC; None for symmetric or tangent.
     """
     sta_start: float
     sta_end: float
     level: float
-    g1: float
-    g2: float
+    grade_in: float
+    grade_out: float
     lvc: float
     lvc2: float | None
 
@@ -63,31 +63,31 @@ def calculate_elevation_at(seg: VerticalSegment, sta: float) -> float:
     Lx = sta - seg.sta_start (arc distance from segment start).
     Returns the parabolic (or tangent) elevation at sta.
 
-    For symmetric VC: level = base + (g2-g1)/(200*L) * Lx²
+    For symmetric VC: level = base + (grade_out-grade_in)/(200*L) * Lx²
     For asymmetric VC (two arms L1, L2):
       arm 1 (Lx ≤ L1): level = base + e*(Lx/L1)²
-      arm 2 (Lx > L1): level = levPVT - (g2/100)*Lx2 + e*(Lx2/L2)²
-      where e = L1*L2/(200*(L1+L2)) * (g2-g1)  [middle ordinate at VPI, signed]
+      arm 2 (Lx > L1): level = levPVT - (grade_out/100)*Lx2 + e*(Lx2/L2)²
+      where e = L1*L2/(200*(L1+L2)) * (grade_out-grade_in)  [middle ordinate at VPI, signed]
     """
     Lx = sta - seg.sta_start
-    base = seg.level + (seg.g1 / 100.0) * Lx   # tangent grade from PVC
+    base = seg.level + (seg.grade_in / 100.0) * Lx   # tangent grade from PVC
 
     L1 = seg.lvc
     if not L1:
         return base                              # tangent grade segment
 
     if not _has_second_arm(seg):                # symmetric VC
-        return base + (seg.g2 - seg.g1) / (200.0 * L1) * Lx * Lx
+        return base + (seg.grade_out - seg.grade_in) / (200.0 * L1) * Lx * Lx
 
     # Asymmetric (unequal-tangent) VC
     L2 = seg.lvc2
     Ltot = L1 + L2
-    e = (L1 * L2) / (200.0 * Ltot) * (seg.g2 - seg.g1)   # VPI middle ordinate (signed)
+    e = (L1 * L2) / (200.0 * Ltot) * (seg.grade_out - seg.grade_in)   # VPI middle ordinate (signed)
     if Lx <= L1:
         return base + e * (Lx / L1) * (Lx / L1)           # arm 1: PVC → VPI
-    lev_pvt = seg.level + (seg.g1 / 100.0) * L1 + (seg.g2 / 100.0) * L2
+    lev_pvt = seg.level + (seg.grade_in / 100.0) * L1 + (seg.grade_out / 100.0) * L2
     Lx2 = seg.sta_end - sta
-    return lev_pvt - (seg.g2 / 100.0) * Lx2 + e * (Lx2 / L2) * (Lx2 / L2)   # arm 2: VPI → PVT
+    return lev_pvt - (seg.grade_out / 100.0) * Lx2 + e * (Lx2 / L2) * (Lx2 / L2)   # arm 2: VPI → PVT
 
 
 def calculate_grade_at(seg: VerticalSegment, sta: float) -> float:
@@ -97,19 +97,19 @@ def calculate_grade_at(seg: VerticalSegment, sta: float) -> float:
     """
     L1 = seg.lvc
     if not L1:
-        return seg.g1
+        return seg.grade_in
 
     Lx = sta - seg.sta_start
     if not _has_second_arm(seg):                # symmetric VC
-        return seg.g1 + (seg.g2 - seg.g1) * (Lx / L1)
+        return seg.grade_in + (seg.grade_out - seg.grade_in) * (Lx / L1)
 
     L2 = seg.lvc2
     Ltot = L1 + L2
-    e = (L1 * L2) / (200.0 * Ltot) * (seg.g2 - seg.g1)
+    e = (L1 * L2) / (200.0 * Ltot) * (seg.grade_out - seg.grade_in)
     if Lx <= L1:
-        return seg.g1 + 200.0 * e * Lx / (L1 * L1)        # arm 1
+        return seg.grade_in + 200.0 * e * Lx / (L1 * L1)        # arm 1
     Lx2 = seg.sta_end - sta
-    return seg.g2 - 200.0 * e * Lx2 / (L2 * L2)           # arm 2
+    return seg.grade_out - 200.0 * e * Lx2 / (L2 * L2)           # arm 2
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ def calculate_elevation(segs: list[VerticalSegment], sta: float) -> float | None
 def parse_vertical_table(rows: list) -> list[VerticalSegment]:
     """Parse a row-table (first row = headers) into a list of VerticalSegment.
 
-    Expected columns: index, sta_start, sta_end, level, g1(%), g2(%), lvc, (lvc2).
+    Expected columns: index, sta_start, sta_end, level, grade_in(%), grade_out(%), lvc, (lvc2).
     Rows where sta_start is empty / non-numeric are skipped.
     Matches the format used in tests/golden/tables.json ["vtable"].
     """
@@ -158,8 +158,8 @@ def parse_vertical_table(rows: list) -> list[VerticalSegment]:
             sta_start=sta_start,
             sta_end=float(row[2]),
             level=float(row[3]),
-            g1=float(row[4]),
-            g2=float(row[5]),
+            grade_in=float(row[4]),
+            grade_out=float(row[5]),
             lvc=lvc,
             lvc2=lvc2,
         ))

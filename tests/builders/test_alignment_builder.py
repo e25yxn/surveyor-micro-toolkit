@@ -90,8 +90,8 @@ def _make_vertices(elements, controls):
     for ts_i, st_i, az_in_i, az_out_i, params in groups:
         ts = controls[ts_i]
         st = controls[st_i]
-        az_in  = elements[az_in_i].az      # radians
-        az_out = elements[az_out_i].az
+        az_in  = elements[az_in_i].azimuth      # radians
+        az_out = elements[az_out_i].azimuth
         pi_n, pi_e = _tangent_intersection(
             ts['n'], ts['e'], az_in,
             st['n'], st['e'], az_out,
@@ -313,8 +313,8 @@ class TestGoldenStructure:
     def test_spiral_trans_match(self, result, golden_elements):
         for i, (b_el, g_el) in enumerate(zip(result.elements, golden_elements)):
             if b_el.type in ('SPIN', 'SPOUT'):
-                assert b_el.trans == g_el.trans, (
-                    f'element[{i}] trans mismatch: built={b_el.trans!r} golden={g_el.trans!r}'
+                assert b_el.transition == g_el.transition, (
+                    f'element[{i}] transition mismatch: built={b_el.transition!r} golden={g_el.transition!r}'
                 )
 
     def test_control_names_match(self, result, golden_controls):
@@ -340,11 +340,11 @@ class TestGoldenElementGeometry:
 
     def test_element_azimuth_within_tolerance(self, result, golden_elements):
         for i, (b, g) in enumerate(zip(result.elements, golden_elements)):
-            az_diff = abs(b.az - g.az)
+            az_diff = abs(b.azimuth - g.azimuth)
             # handle wrap-around (should not occur here but guard it)
             az_diff = min(az_diff, 2 * math.pi - az_diff)
             assert az_diff <= 1e-4, (
-                f'element[{i}] az: built={math.degrees(b.az):.6f}° golden={math.degrees(g.az):.6f}°'
+                f'element[{i}] azimuth: built={math.degrees(b.azimuth):.6f}° golden={math.degrees(g.azimuth):.6f}°'
             )
 
     def test_element_curvature_correct(self, result, golden_elements):

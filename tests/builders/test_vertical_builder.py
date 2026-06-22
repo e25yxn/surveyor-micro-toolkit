@@ -73,8 +73,8 @@ def test_rows_match_vtable(result: vb.VerticalBuildResult, golden: dict) -> None
         assert abs(row.sta_start - g_start) <= tol_sta,   f'row {idx}: sta_start'
         assert abs(row.sta_end   - g_end)   <= tol_sta,   f'row {idx}: sta_end'
         assert abs(row.level     - g_level) <= tol_level, f'row {idx}: level'
-        assert abs(row.g1        - g_g1)    <= tol_grade, f'row {idx}: g1'
-        assert abs(row.g2        - g_g2)    <= tol_grade, f'row {idx}: g2'
+        assert abs(row.grade_in  - g_g1)    <= tol_grade, f'row {idx}: grade_in'
+        assert abs(row.grade_out - g_g2)    <= tol_grade, f'row {idx}: grade_out'
         assert abs(row.lvc       - g_lvc)   <= tol_sta,   f'row {idx}: lvc'
 
         if g_lvc2 == '' or g_lvc2 is None:
