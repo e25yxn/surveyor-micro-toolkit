@@ -1,0 +1,317 @@
+=== SMT Naming Convention Audit ===
+Date: 2026-06-22
+
+มาตรฐานที่ใช้ตรวจ (docs/naming_convention.md):
+  ชั้น 1 — Semantic : ขึ้นต้นกริยาจากคลัง (calculate_, get_, make_, build_, parse_,
+            normalize_, round_/trunc_, check_, is_/has_/in_); ยกเว้น idiom x_to_y
+            และชื่ออัลกอริทึมสากล (kahan_sum)
+  ชั้น 2 — Casing   : snake_case ฟังก์ชัน/เมธอด/ตัวแปร; PascalCase คลาส;
+            UPPER_SNAKE_CASE ค่าคงที่
+  ตัวย่อที่อนุญาตเท่านั้น: N, E, sta, R, k, PI, VPI, PC, PT, SC, CS, TS, ST,
+            WCB, LVC, dms (นอกนี้สะกดเต็ม)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: fpmath.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  ค่าคงที่  : EPS, TWO_PI
+  ฟังก์ชัน  : round_to, trunc_to (กริยา round_/trunc_ ✓)
+             is_almost_equal, is_in_range (boolean is_ ✓)
+             floor_mod (approved ในเอกสาร §6 ✓)
+             normalize_angle (normalize_ ✓)
+             kahan_sum (ชื่ออัลกอริทึมสากล ✓)
+             deg_to_rad, rad_to_deg, packed_dms_to_rad,
+             rad_to_packed_dms, rad_to_dms_string, dms_to_rad (idiom x_to_y ✓)
+
+⚠️  ควรพิจารณา:
+  DEG2RAD   → DEG_TO_RAD
+    (ค่าคงที่ใช้ตัวเลข "2" แทน "_TO_" ผิด idiom การตั้งชื่อของโปรเจกต์)
+  RAD2DEG   → RAD_TO_DEG
+    (เหตุผลเดียวกับ DEG2RAD)
+  angle_diff  → calculate_angle_diff
+    (คำนวณค่าทางคณิตศาสตร์ต้องขึ้นต้น calculate_; ปัจจุบันไม่มีกริยานำ)
+  r1  (local ใน packed_dms_to_rad)  → mm_ss หรือ minutes_with_seconds
+    (ตัวอักษร+ตัวเลขไม่สื่อความหมาย; r1 แทน "MM.SSsss" ซึ่งควรมีชื่อชัดเจน)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: wcb.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  คลาส    : Point, Inverse (PascalCase ✓)
+  field   : Point.n, Point.e (N, E อนุญาต ✓)
+             Inverse.azimuth, Inverse.distance (สะกดเต็ม ✓)
+  ฟังก์ชัน: calculate_azimuth, calculate_distance_2d, calculate_distance_3d,
+             calculate_forward, calculate_inverse, calculate_offset_point
+             (calculate_ ✓)
+
+⚠️  ควรพิจารณา:
+  cl  (local ใน calculate_offset_point)  → centerline_point
+    ("cl" ย่อ "centerline" ไม่อยู่ในรายการอนุญาต)
+  off_az  (local ใน calculate_offset_point)  → offset_azimuth
+    ("az" ไม่ในรายการอนุญาต เอกสาร §4 ระบุชัดว่า "azimuth ไม่ใช่ az")
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: alignment.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  ค่าคงที่ : SPIRAL_STEPS (UPPER_SNAKE_CASE ✓)
+  คลาส    : Element, ElementState, Projection, StationOffset (PascalCase ✓)
+  field   : Element.type, .sta_start, .sta_end, .n, .e, .k_in, .k_out
+             (sta, N, E, k อนุญาต ✓)
+             ElementState.n, .e (N, E อนุญาต ✓)
+             Projection.sta, .offset, .in_range (sta อนุญาต; boolean in_ ✓)
+             StationOffset.sta, .offset ✓
+  ฟังก์ชัน: make_element, parse_alignment_table (make_/parse_ ✓)
+             calculate_point_on_element, calculate_exit_state (calculate_ ✓)
+             get_element_index (get_ ✓)
+             calculate_projection_to_element (calculate_ ✓)
+             check_chain (check_ ✓)
+
+⚠️  ควรพิจารณา:
+  Element.az  → azimuth
+    ("az" ไม่ในรายการอนุญาต; ควรสะกดเต็ม)
+  Element.trans  → transition
+    ("trans" ย่อ transition ไม่ในรายการอนุญาต)
+  ElementState.az  → azimuth
+    (เหตุผลเดียวกับ Element.az)
+  Projection.d  → arc_distance
+    (ตัวเดียว "d" ไม่สื่อความหมาย; ไม่ในรายการอนุญาต)
+  curvature_from_radius  → radius_to_curvature
+    (ไม่มีกริยานำ + ใช้ "from" ผิด idiom x_to_y ของโปรเจกต์)
+  radius_from_curvature  → curvature_to_radius
+    (เหตุผลเดียวกัน)
+  calculate_station_to_coord  → calculate_station_to_coordinate
+    ("coord" ไม่ในรายการอนุญาต ให้สะกดเต็ม)
+  calculate_coord_to_station  → calculate_coordinate_to_station
+    ("coord" ไม่ในรายการอนุญาต)
+  _theta_at  (private)  → _calculate_turning_angle_at
+    (ไม่มีกริยานำ; "theta" ใช้อักษรกรีกซึ่งควรแปลเป็น domain term)
+  chord_az  (local ใน calculate_point_on_element)  → chord_azimuth
+    ("az" ไม่ในรายการอนุญาต)
+  cn, ce  (local ใน calculate_projection_to_element)  → center_n, center_e
+    (ตัวอักษรคู่ย่อ "center N/E" ไม่สื่อความหมาย; ไม่ในรายการอนุญาต)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: vertical.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  คลาส    : VerticalSegment (PascalCase ✓)
+  field   : sta_start, sta_end, level, lvc, lvc2 (sta, LVC อนุญาต ✓)
+  ฟังก์ชัน: _has_second_arm (boolean has_ ✓)
+             calculate_elevation_at, calculate_grade_at, calculate_elevation
+             (calculate_ ✓)
+             parse_vertical_table (parse_ ✓)
+
+⚠️  ควรพิจารณา:
+  VerticalSegment.g1, .g2  → grade_in, grade_out
+    ("g" ไม่ในรายการอนุญาต; ควรใช้ domain term เต็ม)
+  Lx, L1, L2, Ltot, Lx2  (local ใน calculate_elevation_at, calculate_grade_at)
+    → lx, l1, l2, l_total, lx2  (หรือสะกดเต็ม: arc_distance, arm_1, arm_2 ฯลฯ)
+    (ตัวแปร local ใช้ PascalCase ผิดกฎ casing; ควรเป็น snake_case)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: crossfall.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  คลาส    : CrossfallSegment (PascalCase ✓)
+  field   : sta_start, sta_end, type ✓
+  ฟังก์ชัน: calculate_crossfall_at, calculate_crossfall_rate_at,
+             calculate_crossfall (calculate_ ✓)
+             parse_crossfall_table (parse_ ✓)
+
+⚠️  ควรพิจารณา:
+  CrossfallSegment.x_start, .x_end  → crossfall_start, crossfall_end
+    ("x" ย่อ crossfall ไม่ในรายการอนุญาต; ควรใช้ domain term เต็ม)
+  _norm_type  (private)  → _normalize_type
+    ("norm" ไม่ใช่กริยาจากคลัง; กริยาที่ approved คือ normalize_)
+  x1, x2  (local ใน calculate_crossfall_at)  → crossfall_start_value, crossfall_end_value
+    ("x" ย่อ crossfall ไม่ในรายการอนุญาต)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: surface.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  คลาส    : Point3D (PascalCase ✓)
+  field   : n, e (N, E อนุญาต ✓)
+             level, centerline_level, crossfall (สะกดเต็ม ✓)
+  ฟังก์ชัน: calculate_surface_level, calculate_point_3d (calculate_ ✓)
+
+⚠️  ควรพิจารณา:
+  off  (local ใน calculate_point_3d)  → offset
+    ("off" ย่อ offset ไม่ในรายการอนุญาต; ใช้ชื่อ parameter เดิมได้เลย)
+  ne  (local)  → plan_point หรือ horizontal_point
+    ("ne" ย่อ northing+easting ไม่ในรายการอนุญาต; ไม่สื่อว่าเป็น Point object)
+  cl  (local)  → centerline_elevation
+    ("cl" ย่อ centerline ไม่ในรายการอนุญาต)
+  xf  (local)  → crossfall_value
+    ("xf" ย่อ crossfall ไม่ในรายการอนุญาต)
+  lv  (local)  → surface_elevation
+    ("lv" ย่อ level ไม่ในรายการอนุญาต)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: check.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  คลาส    : HorizontalCheckResult, VerticalCheckResult (PascalCase ✓)
+  field   : HorizontalCheckResult.name, .sta (sta อนุญาต ✓)
+             VerticalCheckResult.name, .sta ✓
+  ฟังก์ชัน: check_horizontal, check_vertical (check_ ✓)
+
+⚠️  ควรพิจารณา:
+  HorizontalCheckResult.d_n  → delta_n
+    ("d" ย่อ delta ไม่ในรายการอนุญาต)
+  HorizontalCheckResult.d_e  → delta_e
+    ("d" ย่อ delta ไม่ในรายการอนุญาต)
+  HorizontalCheckResult.gap_m  → gap_metres
+    ("m" ย่อ metres ไม่ในรายการอนุญาต)
+  HorizontalCheckResult.ok  → is_ok หรือ is_within_tolerance
+    (boolean field ควรขึ้นต้น is_)
+  VerticalCheckResult.d_elev  → delta_elevation
+    ("d" + "elev" ทั้งคู่ไม่ในรายการอนุญาต)
+  VerticalCheckResult.ok  → is_ok หรือ is_within_tolerance
+    (boolean field ควรขึ้นต้น is_; เหตุผลเดียวกับ HorizontalCheckResult.ok)
+  _snap_to_alignment_ends  (private)  → _normalize_station_to_alignment_bounds
+    ("snap" ไม่ในคลังกริยา; normalize_ เป็น approved verb ที่ใกล้เคียงที่สุด)
+  _snap_to_profile_ends  (private)  → _normalize_station_to_profile_bounds
+    (เหตุผลเดียวกัน)
+  cp  (local ใน check_horizontal)  → control_point
+    ("cp" ย่อ control point ไม่ในรายการอนุญาต)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: cli.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  ฟังก์ชัน: _build_parser (build_ ✓)
+             main (standard Python entry point ✓)
+
+⚠️  ควรพิจารณา:
+  _read_alignment  → _parse_alignment_csv
+    ("read" ไม่ในคลังกริยา; ฟังก์ชันนี้อ่าน CSV แล้วแปลงเป็น struct ควรใช้ parse_)
+  _run_fwd  → _run_forward
+    ("fwd" ไม่ในรายการอนุญาต; ให้สะกดเต็ม)
+  _run_inv  → _run_inverse
+    ("inv" ไม่ในรายการอนุญาต; ให้สะกดเต็ม)
+  p_fwd  (local)  → parser_forward
+    ("fwd" ไม่ในรายการอนุญาต)
+  p_inv  (local)  → parser_inverse
+    ("inv" ไม่ในรายการอนุญาต)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: builders/alignment_builder.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  คลาส    : ControlPoint, BuildResult (PascalCase ✓)
+  field   : ControlPoint.name, .sta, .n, .e (sta, N, E อนุญาต ✓)
+             BuildResult.elements, .control, .issues ✓
+  ฟังก์ชัน: build_alignment_from_pi (build_ ✓)
+             check_against_drawing (check_ ✓)
+  local   : tan_len (domain term tangent ✓), sta_cs (sta, CS อนุญาต ✓)
+             delta, abs_delta ✓
+
+⚠️  ควรพิจารณา:
+  _curve_subs  (private)  → _build_curve_sub_elements
+    (ไม่มีกริยานำ; "subs" ย่อ sub-elements ไม่ในรายการอนุญาต)
+  _control_names  (private)  → _get_control_names หรือ _build_control_name_scheme
+    (ไม่มีกริยานำ)
+  _end_displacement  (private)  → _calculate_end_displacement
+    (ไม่มีกริยานำ; ค่าทางคณิตศาสตร์ควรขึ้นต้น calculate_)
+  az_in, az_out  (local ใน build_alignment_from_pi)  → azimuth_in, azimuth_out
+    ("az" ไม่ในรายการอนุญาต)
+  cur_az  (local ใน _end_displacement)  → current_azimuth
+    ("az" ไม่ในรายการอนุญาต)
+  sgn  (local)  → sign
+    ("sgn" ย่อ sign ไม่ในรายการอนุญาต)
+  vn, ve  (local)  → vertex_n, vertex_e
+    (ตัวอักษรคู่ย่อ vertex N/E ไม่สื่อความหมาย)
+  cs_n, cs_e  (local)  → curve_start_n, curve_start_e
+    ("cs" ย่อ curve start; แม้ CS อนุญาต (= CS control point) แต่บริบทนี้ไม่ใช่)
+  nm  (local)  → name_scheme
+    ("nm" ย่อ names dict ไม่ในรายการอนุญาต)
+  Rc  (local ใน _curve_subs)  → r_circular
+    (PascalCase ใน local var ผิด casing; สับสนกับคลาส)
+  LsIn, LsOut  (local ใน _curve_subs)  → ls_in, ls_out
+    (PascalCase ใน local var ผิด casing; Ls ไม่ในรายการอนุญาต)
+  th_in, th_out  (local)  → theta_in, theta_out หรือ spiral_angle_in, spiral_angle_out
+    ("th" ย่อ theta ไม่ในรายการอนุญาต)
+  dc  (local)  → delta_circular
+    ("dc" ย่อ 2 ตัวอักษร ไม่สื่อความหมาย)
+  dlt  (local)  → delta
+    ("dlt" ย่อ delta ไม่ในรายการอนุญาต; "delta" ก็สั้นและชัดกว่า)
+
+────────────────────────────────────────────────────────────────────────────────
+--- ไฟล์: builders/vertical_builder.py ---
+────────────────────────────────────────────────────────────────────────────────
+✅ ตรงมาตรฐาน:
+  คลาส    : VerticalRow, VerticalBuildResult (PascalCase ✓)
+  field   : VerticalRow.sta_start, .sta_end, .level, .lvc, .lvc2
+             (sta, LVC อนุญาต ✓)
+             VControlPoint.name, .sta (sta อนุญาต ✓)
+  ฟังก์ชัน: build_vertical_from_vpi (build_ ✓)
+             check_against_drawing (check_ ✓)
+  local   : end_sta, end_elev ✓
+             pvc_sta, pvt_sta, pvc_elev, pvt_elev (PVC/PVT อนุญาต ✓)
+
+⚠️  ควรพิจารณา:
+  VControlPoint  (คลาส)  → VerticalControlPoint
+    ("V" prefix เป็นตัวย่อ "Vertical" ไม่สื่อ; PascalCase ควรสะกดเต็ม)
+  VControlPoint.elev  → elevation
+    ("elev" ไม่ในรายการอนุญาต; ให้สะกดเต็ม)
+  VerticalRow.g1, .g2  → grade_in, grade_out
+    ("g" ไม่ในรายการอนุญาต; ควรใช้ domain term เต็ม)
+  to_table  → rows_to_table หรือ build_table
+    (idiom x_to_y ต้องระบุ source ชัดเจน; ปัจจุบัน "to" ขาด source)
+  g_in, g_out, g_end  (local)  → grade_in, grade_out, grade_end
+    ("g" ย่อ grade ไม่ในรายการอนุญาต)
+  sym  (local, boolean)  → is_symmetric
+    (boolean variable ควรขึ้นต้น is_ + "sym" ย่อ symmetric ไม่อนุญาต)
+  L1, L2  (local)  → arm_length_1, arm_length_2 หรือ lvc_arm_1, lvc_arm_2
+    (PascalCase ใน local var ผิด casing; ควรเป็น snake_case)
+
+────────────────────────────────────────────────────────────────────────────────
+--- SUMMARY ---
+────────────────────────────────────────────────────────────────────────────────
+
+ตรงมาตรฐาน : ประมาณ 87 รายการ
+ควรพิจารณา : 51 รายการ
+
+ตารางสรุปรายไฟล์:
+  fpmath.py               : ✅ ~15   ⚠️  3
+  wcb.py                  : ✅ ~10   ⚠️  2
+  alignment.py            : ✅ ~15   ⚠️ 10
+  vertical.py             : ✅  ~8   ⚠️  4
+  crossfall.py            : ✅  ~8   ⚠️  3
+  surface.py              : ✅  ~7   ⚠️  5
+  check.py                : ✅  ~6   ⚠️  9
+  cli.py                  : ✅  ~3   ⚠️  5
+  alignment_builder.py    : ✅  ~7   ⚠️ 14
+  vertical_builder.py     : ✅  ~8   ⚠️  7
+
+  (นับรวม local variables ที่ผิดทุกตัว ไม่นับซ้ำรายการเดียวกัน)
+
+หมวดปัญหาที่พบมากที่สุด (เรียงตามความถี่):
+
+  1. ตัวย่อ "az" ไม่อนุญาต (พบ 7 จุด)
+     Element.az, ElementState.az, chord_az, off_az, cur_az, az_in, az_out
+     → ควรใช้ "azimuth" ทุกกรณี
+
+  2. ตัวแปร local ใช้ PascalCase ผิด casing (พบ ~9 จุด)
+     Lx, L1, L2, Ltot, Lx2 (vertical.py)
+     Rc, LsIn, LsOut (alignment_builder.py)
+     → ควรเป็น snake_case เสมอ
+
+  3. Private functions ไม่มีกริยานำ (พบ 5 จุด)
+     _theta_at, _curve_subs, _control_names, _end_displacement, _norm_type
+     → เพิ่ม calculate_/_get_/_build_/_normalize_ ตามความหมาย
+
+  4. field ใน dataclass/NamedTuple ใช้ตัวย่อ (พบ ~10 จุด)
+     g1/g2, d_n/d_e, d_elev, elev, x_start/x_end, gap_m
+     → ใช้ domain term เต็ม (grade_in/grade_out, delta_n/delta_e เป็นต้น)
+
+  5. Boolean ไม่ขึ้นต้น is_ (พบ 3 จุด)
+     HorizontalCheckResult.ok, VerticalCheckResult.ok, sym (local)
+     → เปลี่ยนเป็น is_ok / is_within_tolerance / is_symmetric
+
+ไฟล์ที่สะอาดที่สุด    : wcb.py (2 รายการ ล้วนเป็น local var)
+ไฟล์ที่ต้องดูมากที่สุด: alignment_builder.py (14 รายการ) และ alignment.py (10 รายการ)
+
+หมายเหตุ: รายงานนี้ไม่แก้โค้ดใดๆ ทั้งสิ้น — สำรวจและรายงานเท่านั้น
