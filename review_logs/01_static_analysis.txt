@@ -1,0 +1,265 @@
+=== SMT Static Analysis Report ===
+Date: 2026-06-22
+
+--- RUFF (linting) ---
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\__init__.py:6:1
+   |
+ 4 |   (domain) -> builders -> check.  Pure, typed, tested.  See docs/blueprint.md.
+ 5 |   """
+ 6 | / from . import fpmath, wcb, alignment, vertical, crossfall, surface  # noqa: F401
+ 7 | | from . import builders  # noqa: F401
+ 8 | | from . import check  # noqa: F401
+   | |___________________^
+ 9 |
+10 |   __version__ = "0.1.0"
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\alignment.py:20:1
+   |
+18 |   Depends on: fpmath, wcb.
+19 |   """
+20 | / from __future__ import annotations
+21 | |
+22 | | import math
+23 | | from dataclasses import dataclass
+24 | | from typing import NamedTuple
+25 | |
+26 | | from . import fpmath
+27 | | from . import wcb
+   | |_________________^
+28 |
+29 |   SPIRAL_STEPS: int = 48   # Simpson intervals for spiral numerical integration (must be even)
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> src\smt\builders\__init__.py:2:1
+  |
+1 |   """SMT builders — high-level constructors that assemble domain objects from design data."""
+2 | / from . import alignment_builder  # noqa: F401
+3 | | from . import vertical_builder   # noqa: F401
+  | |______________________________^
+4 |
+5 |   __all__ = ['alignment_builder', 'vertical_builder']
+  |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\builders\alignment_builder.py:26:1
+   |
+24 |   Depends on: fpmath, wcb, alignment.
+25 |   """
+26 | / from __future__ import annotations
+27 | |
+28 | | import math
+29 | | from dataclasses import dataclass
+30 | | from typing import NamedTuple
+31 | |
+32 | | from .. import fpmath
+33 | | from .. import wcb
+34 | | from ..alignment import Element, make_element, calculate_exit_state
+   | |___________________________________________________________________^
+   |
+help: Organize imports
+
+E701 Multiple statements on one line (colon)
+   --> src\smt\builders\alignment_builder.py:120:39
+    |
+118 |     for i in range(len(subs) - 1):
+119 |         a, b = subs[i]['kind'], subs[i + 1]['kind']
+120 |         if   a == 'SPIN'  and b == 'C':     jct.append('SC')
+    |                                       ^
+121 |         elif a == 'C'     and b == 'SPOUT': jct.append('CS')
+122 |         elif a == 'C'     and b == 'C':     jct.append('PCC')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\smt\builders\alignment_builder.py:121:43
+    |
+119 |         a, b = subs[i]['kind'], subs[i + 1]['kind']
+120 |         if   a == 'SPIN'  and b == 'C':     jct.append('SC')
+121 |         elif a == 'C'     and b == 'SPOUT': jct.append('CS')
+    |                                           ^
+122 |         elif a == 'C'     and b == 'C':     jct.append('PCC')
+123 |         else:                                jct.append('JCT')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\smt\builders\alignment_builder.py:122:39
+    |
+120 |         if   a == 'SPIN'  and b == 'C':     jct.append('SC')
+121 |         elif a == 'C'     and b == 'SPOUT': jct.append('CS')
+122 |         elif a == 'C'     and b == 'C':     jct.append('PCC')
+    |                                       ^
+123 |         else:                                jct.append('JCT')
+124 |     return {'start': start, 'end': end, 'jct': jct}
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\smt\builders\alignment_builder.py:123:13
+    |
+121 |         elif a == 'C'     and b == 'SPOUT': jct.append('CS')
+122 |         elif a == 'C'     and b == 'C':     jct.append('PCC')
+123 |         else:                                jct.append('JCT')
+    |             ^
+124 |     return {'start': start, 'end': end, 'jct': jct}
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\builders\vertical_builder.py:19:1
+   |
+17 |     control = list of VControlPoint (BVP / PVC / PVI / PVT / EVP)
+18 |   """
+19 | / from __future__ import annotations
+20 | |
+21 | | from dataclasses import dataclass
+22 | | from typing import NamedTuple
+   | |_____________________________^
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\check.py:19:1
+   |
+17 |   Depends on: alignment, vertical.
+18 |   """
+19 | / from __future__ import annotations
+20 | |
+21 | | import math
+22 | | from typing import NamedTuple
+23 | |
+24 | | from . import alignment as al
+25 | | from . import vertical as vt
+   | |____________________________^
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\crossfall.py:19:1
+   |
+17 |   Standalone module (no dependency on fpmath, wcb, alignment, or vertical).
+18 |   """
+19 | / from __future__ import annotations
+20 | |
+21 | | import math
+22 | | from dataclasses import dataclass, field
+   | |________________________________________^
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\fpmath.py:16:1
+   |
+14 |   การตั้งชื่อ: ดู docs/naming_convention.md
+15 |   """
+16 | / from __future__ import annotations
+17 | |
+18 | | import math
+19 | | from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN
+   | |______________________________________________________^
+20 |
+21 |   EPS: float = 1e-9                 # tolerance เริ่มต้นสำหรับเทียบ float
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\surface.py:25:1
+   |
+23 |   Depends on: alignment, vertical, crossfall.
+24 |   """
+25 | / from __future__ import annotations
+26 | |
+27 | | from typing import NamedTuple
+28 | |
+29 | | from . import alignment
+30 | | from . import crossfall as cf
+31 | | from . import vertical
+   | |______________________^
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src\smt\vertical.py:18:1
+   |
+16 |   Standalone module (no dependency on fpmath, wcb, or alignment).
+17 |   """
+18 | / from __future__ import annotations
+19 | |
+20 | | import math
+21 | | from dataclasses import dataclass
+   | |_________________________________^
+   |
+help: Organize imports
+
+E501 Line too long (107 > 100)
+   --> src\smt\vertical.py:147:101
+    |
+145 |     for row in rows[1:]:                         # skip header
+146 |         sta_start_raw = row[1]
+147 |         if sta_start_raw in ('', None) or (isinstance(sta_start_raw, float) and math.isnan(sta_start_raw)):
+    |                                                                                                     ^^^^^^^
+148 |             continue
+149 |         try:
+    |
+
+Found 15 errors.
+[*] 10 fixable with the `--fix` option.
+
+--- MYPY (type checking) ---
+src\smt\vertical.py:84: error: Unsupported operand types for + ("float" and "None")  [operator]
+src\smt\vertical.py:84: note: Right operand is of type "float | None"
+src\smt\vertical.py:85: error: Unsupported operand types for * ("float" and "None")  [operator]
+src\smt\vertical.py:85: note: Right operand is of type "float | None"
+src\smt\vertical.py:88: error: Unsupported operand types for * ("float" and "None")  [operator]
+src\smt\vertical.py:88: note: Right operand is of type "float | None"
+src\smt\vertical.py:90: error: Unsupported operand types for / ("float" and "None")  [operator]
+src\smt\vertical.py:90: note: Right operand is of type "float | None"
+src\smt\vertical.py:107: error: Unsupported operand types for + ("float" and "None")  [operator]
+src\smt\vertical.py:107: note: Right operand is of type "float | None"
+src\smt\vertical.py:108: error: Unsupported operand types for * ("float" and "None")  [operator]
+src\smt\vertical.py:108: note: Right operand is of type "float | None"
+src\smt\vertical.py:112: error: Unsupported operand types for * ("float" and "None")  [operator]
+src\smt\vertical.py:112: error: Unsupported operand types for * ("None" and "float")  [operator]
+src\smt\vertical.py:112: error: Unsupported left operand type for * ("None")  [operator]
+src\smt\vertical.py:112: note: Both left and right operands are unions
+src\smt\vertical.py:137: error: Missing type arguments for generic type "list"  [type-arg]
+src\smt\vertical.py:156: error: Argument 1 to "float" has incompatible type "Any | None"; expected "str | Buffer | SupportsFloat | SupportsIndex"  [arg-type]
+src\smt\crossfall.py:111: error: Missing type arguments for generic type "list"  [type-arg]
+src\smt\builders\vertical_builder.py:67: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\vertical_builder.py:144: error: Missing type arguments for generic type "list"  [type-arg]
+src\smt\builders\vertical_builder.py:162: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\vertical_builder.py:165: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\vertical_builder.py:176: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\alignment.py:173: error: Missing type arguments for generic type "list"  [type-arg]
+src\smt\alignment.py:363: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\alignment.py:371: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\check.py:100: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\check.py:137: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\alignment_builder.py:61: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\alignment_builder.py:68: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\alignment_builder.py:110: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\alignment_builder.py:127: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\alignment_builder.py:140: error: Argument 9 to "make_element" has incompatible type "Any | None"; expected "str"  [arg-type]
+src\smt\builders\alignment_builder.py:152: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\alignment_builder.py:218: error: Argument 9 to "make_element" has incompatible type "Any | None"; expected "str"  [arg-type]
+src\smt\builders\alignment_builder.py:248: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\alignment_builder.py:250: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\builders\alignment_builder.py:261: error: Missing type arguments for generic type "dict"  [type-arg]
+src\smt\cli.py:37: error: Missing type arguments for generic type "list"  [type-arg]
+src\smt\cli.py:99: error: Returning Any from function declared to return "int"  [no-any-return]
+Found 34 errors in 7 files (checked 12 source files)
+
+--- SUMMARY ---
+ruff errors: 15
+ruff warnings: 0
+mypy errors: 34
+
+--- PYTEST ---
+........................................................................ [ 28%]
+........................................................................ [ 56%]
+........................................................................ [ 85%]
+......................................                                   [100%]
+254 passed in 1.34s
