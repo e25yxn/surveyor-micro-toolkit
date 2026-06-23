@@ -230,3 +230,54 @@ def test_exit_state_matches_next_entry(elements):
             f'Element {i}->{i+1} azimuth gap: '
             f'exit_az={math.degrees(ex.azimuth):.6f} next_az={math.degrees(nxt.azimuth):.6f}'
         )
+
+
+# ---------------------------------------------------------------------------
+# Test 6: check_chain detection (previously only "no issues" path was tested)
+# ---------------------------------------------------------------------------
+
+def test_check_chain_broken():
+    """check_chain must detect a position gap between non-connecting elements.
+
+    Two due-east tangents with el1 starting 1000 m east of where el0 exits:
+      el0 exits at (N=0, E=1000); el1 entry is at (N=0, E=2000) → gap = 1000 m.
+    """
+    el0 = al.make_element('T', 0,    1000, 0.0, 0.0,    90.0, 0)
+    el1 = al.make_element('T', 1000, 2000, 0.0, 2000.0, 90.0, 0)
+    issues = al.check_chain([el0, el1])
+    assert issues, 'check_chain should detect the 1000 m gap'
+    assert issues[0]['between'] == '1->2'
+    assert issues[0]['gap_mm'] > 900_000   # 1 000 000 mm expected
+
+
+# ---------------------------------------------------------------------------
+# Test 7: calculate_projection_to_element direct unit test (tangent case)
+# ---------------------------------------------------------------------------
+
+def test_projection_direct():
+    """calculate_projection_to_element on a tangent element: sta, offset, in_range.
+
+    Due-east tangent from (N=0, E=0), sta 0→1000.
+    Projection formulae (tangent):
+      d   = dN·cos(az) + dE·sin(az)   → arc distance from element start
+      off = −dN·sin(az) + dE·cos(az)  → signed perpendicular offset (+right/−left)
+    """
+    el = al.make_element('T', 0, 1000, 0.0, 0.0, 90.0, 0)
+
+    # Point north of the line (left of east-bound travel) at E=300
+    # d = 10*0 + 300*1 = 300;  off = −10*1 + 300*0 = −10 (left → negative)
+    pr = al.calculate_projection_to_element(el, 10.0, 300.0)
+    assert math.isclose(pr.sta,    300.0, abs_tol=1e-9), f'sta={pr.sta}'
+    assert math.isclose(pr.offset, -10.0, abs_tol=1e-9), f'offset={pr.offset}'
+    assert pr.in_range is True
+
+    # Point south of the line (right of east-bound travel) at E=700
+    # d = 700;  off = −(−5)*1 + 700*0 = +5 (right → positive)
+    pr2 = al.calculate_projection_to_element(el, -5.0, 700.0)
+    assert math.isclose(pr2.sta,    700.0, abs_tol=1e-9), f'sta={pr2.sta}'
+    assert math.isclose(pr2.offset,   5.0, abs_tol=1e-9), f'offset={pr2.offset}'
+    assert pr2.in_range is True
+
+    # Point beyond the far end (E=1500) → in_range must be False
+    pr3 = al.calculate_projection_to_element(el, 0.0, 1500.0)
+    assert pr3.in_range is False

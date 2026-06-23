@@ -20,6 +20,10 @@ StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition
 0,100,1000,2000,90,0,T,
 """
 
+_EMPTY_TABLE = """\
+StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition
+"""
+
 
 @pytest.fixture
 def table(tmp_path: Path) -> str:
@@ -61,3 +65,34 @@ def test_fwd_inv_roundtrip(table, capsys):
     sta_str, off_str = capsys.readouterr().out.strip().split(',')
     assert math.isclose(float(sta_str), 55.0, abs_tol=1e-3)
     assert math.isclose(float(off_str), -7.0, abs_tol=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# Error-path tests: exit code 1 (04_coverage_docstring.txt §high-risk)
+# ---------------------------------------------------------------------------
+
+def test_missing_file_returns_exit_code_1(capsys):
+    """Non-existent CSV file must produce exit code 1 and print to stderr."""
+    rc = cli.main(['fwd', 'nonexistent_file_xyz.csv', '40'])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'error' in err.lower()
+
+
+def test_fwd_station_outside_alignment_returns_exit_code_1(table, capsys):
+    """Station beyond the alignment end must produce exit code 1."""
+    # fixture table covers sta 0..100; sta=200 is outside
+    rc = cli.main(['fwd', table, '200'])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'error' in err.lower()
+
+
+def test_fwd_empty_csv_returns_exit_code_1(tmp_path, capsys):
+    """Header-only CSV (0 elements) must produce exit code 1."""
+    p = tmp_path / 'empty.csv'
+    p.write_text(_EMPTY_TABLE, encoding='utf-8')
+    rc = cli.main(['fwd', str(p), '0'])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'error' in err.lower()

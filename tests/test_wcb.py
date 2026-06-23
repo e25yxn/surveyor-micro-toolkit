@@ -35,3 +35,25 @@ def test_offset_point_right_is_south():
     p = wcb.calculate_offset_point(0, 0, fp.deg_to_rad(90), 100, 10)
     assert math.isclose(p.n, -10.0, abs_tol=1e-9)
     assert math.isclose(p.e, 100.0, abs_tol=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# calculate_distance_3d — previously untested (04_coverage_docstring.txt §high-risk)
+# ---------------------------------------------------------------------------
+
+def test_distance_3d_flat_equals_2d():
+    """z1 == z2: slope distance must equal the 2-D plan distance."""
+    d2d = wcb.calculate_distance_2d(0, 0, 3, 4)          # 5.0
+    d3d = wcb.calculate_distance_3d(0, 0, 10, 3, 4, 10)  # same z → same result
+    assert math.isclose(d3d, d2d, abs_tol=1e-12)
+
+
+def test_distance_3d_slope():
+    """Slope distance: sqrt(dN² + dE² + dZ²) = sqrt(3²+4²+5²) = sqrt(50)."""
+    d = wcb.calculate_distance_3d(0, 0, 0, 3, 4, 5)
+    assert math.isclose(d, math.sqrt(50), abs_tol=1e-12)
+
+
+def test_distance_3d_same_point():
+    """Identical 3-D points: slope distance must be exactly 0."""
+    assert wcb.calculate_distance_3d(100, 200, 300, 100, 200, 300) == 0.0
