@@ -114,11 +114,11 @@ def check_horizontal(
                the snap tolerance (0.01 m).
     """
     results: list[HorizontalCheckResult] = []
-    for cp in controls:
-        name = str(cp['name'])
-        sta_draw = float(cp['sta'])
-        n_draw = float(cp['n'])
-        e_draw = float(cp['e'])
+    for control_point in controls:
+        name = str(control_point['name'])
+        sta_draw = float(control_point['sta'])
+        n_draw = float(control_point['n'])
+        e_draw = float(control_point['e'])
         sta_eff = _snap_to_alignment_ends(sta_draw, elements)
         calc = al.calculate_station_to_coordinate(elements, sta_eff, 0.0)
         delta_n = calc.n - n_draw

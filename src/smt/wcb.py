@@ -77,8 +77,8 @@ def calculate_offset_point(n1: float, e1: float, azimuth: float,
 
     offset: + = ขวามือของทิศเดิน, - = ซ้ายมือ. ขวามือ = azimuth + 90 องศา.
     """
-    cl = calculate_forward(n1, e1, azimuth, along)
+    centerline_point = calculate_forward(n1, e1, azimuth, along)
     if not offset:
-        return cl
-    off_az = fpmath.normalize_angle(azimuth + math.pi / 2.0)
-    return calculate_forward(cl.n, cl.e, off_az, offset)
+        return centerline_point
+    offset_azimuth = fpmath.normalize_angle(azimuth + math.pi / 2.0)
+    return calculate_forward(centerline_point.n, centerline_point.e, offset_azimuth, offset)

@@ -226,7 +226,7 @@ def test_exit_state_matches_next_entry(elements):
             f'Element {i}->{i+1} position gap: '
             f'exit=({ex.n:.4f},{ex.e:.4f}) next=({nxt.n:.4f},{nxt.e:.4f})'
         )
-        assert abs(al.fpmath.angle_diff(ex.azimuth, nxt.azimuth)) < tol_az, (
+        assert abs(al.fpmath.calculate_angle_diff(ex.azimuth, nxt.azimuth)) < tol_az, (
             f'Element {i}->{i+1} azimuth gap: '
             f'exit_az={math.degrees(ex.azimuth):.6f} next_az={math.degrees(nxt.azimuth):.6f}'
         )

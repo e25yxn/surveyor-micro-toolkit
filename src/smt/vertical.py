@@ -60,34 +60,34 @@ def _has_second_arm(seg: VerticalSegment) -> bool:
 def calculate_elevation_at(seg: VerticalSegment, sta: float) -> float:
     """Elevation at station sta within one segment.
 
-    Lx = sta - seg.sta_start (arc distance from segment start).
+    lx = sta - seg.sta_start (arc distance from segment start).
     Returns the parabolic (or tangent) elevation at sta.
 
-    For symmetric VC: level = base + (grade_out-grade_in)/(200*L) * Lx²
-    For asymmetric VC (two arms L1, L2):
-      arm 1 (Lx ≤ L1): level = base + e*(Lx/L1)²
-      arm 2 (Lx > L1): level = levPVT - (grade_out/100)*Lx2 + e*(Lx2/L2)²
-      where e = L1*L2/(200*(L1+L2)) * (grade_out-grade_in)  [middle ordinate at VPI, signed]
+    For symmetric VC: level = base + (grade_out-grade_in)/(200*l1) * lx²
+    For asymmetric VC (two arms l1, l2):
+      arm 1 (lx ≤ l1): level = base + e*(lx/l1)²
+      arm 2 (lx > l1): level = levPVT - (grade_out/100)*lx2 + e*(lx2/l2)²
+      where e = l1*l2/(200*(l1+l2)) * (grade_out-grade_in)  [middle ordinate at VPI, signed]
     """
-    Lx = sta - seg.sta_start
-    base = seg.level + (seg.grade_in / 100.0) * Lx   # tangent grade from PVC
+    lx = sta - seg.sta_start
+    base = seg.level + (seg.grade_in / 100.0) * lx   # tangent grade from PVC
 
-    L1 = seg.lvc
-    if not L1:
+    l1 = seg.lvc
+    if not l1:
         return base                              # tangent grade segment
 
     if not _has_second_arm(seg):                # symmetric VC
-        return base + (seg.grade_out - seg.grade_in) / (200.0 * L1) * Lx * Lx
+        return base + (seg.grade_out - seg.grade_in) / (200.0 * l1) * lx * lx
 
     # Asymmetric (unequal-tangent) VC
-    L2 = seg.lvc2
-    Ltot = L1 + L2
-    e = (L1 * L2) / (200.0 * Ltot) * (seg.grade_out - seg.grade_in)   # VPI middle ordinate (signed)
-    if Lx <= L1:
-        return base + e * (Lx / L1) * (Lx / L1)           # arm 1: PVC → VPI
-    lev_pvt = seg.level + (seg.grade_in / 100.0) * L1 + (seg.grade_out / 100.0) * L2
-    Lx2 = seg.sta_end - sta
-    return lev_pvt - (seg.grade_out / 100.0) * Lx2 + e * (Lx2 / L2) * (Lx2 / L2)   # arm 2: VPI → PVT
+    l2 = seg.lvc2
+    l_total = l1 + l2
+    e = (l1 * l2) / (200.0 * l_total) * (seg.grade_out - seg.grade_in)   # VPI middle ordinate (signed)
+    if lx <= l1:
+        return base + e * (lx / l1) * (lx / l1)           # arm 1: PVC → VPI
+    lev_pvt = seg.level + (seg.grade_in / 100.0) * l1 + (seg.grade_out / 100.0) * l2
+    lx2 = seg.sta_end - sta
+    return lev_pvt - (seg.grade_out / 100.0) * lx2 + e * (lx2 / l2) * (lx2 / l2)   # arm 2: VPI → PVT
 
 
 def calculate_grade_at(seg: VerticalSegment, sta: float) -> float:
@@ -95,21 +95,21 @@ def calculate_grade_at(seg: VerticalSegment, sta: float) -> float:
 
     Derivative of calculate_elevation_at with respect to sta.
     """
-    L1 = seg.lvc
-    if not L1:
+    l1 = seg.lvc
+    if not l1:
         return seg.grade_in
 
-    Lx = sta - seg.sta_start
+    lx = sta - seg.sta_start
     if not _has_second_arm(seg):                # symmetric VC
-        return seg.grade_in + (seg.grade_out - seg.grade_in) * (Lx / L1)
+        return seg.grade_in + (seg.grade_out - seg.grade_in) * (lx / l1)
 
-    L2 = seg.lvc2
-    Ltot = L1 + L2
-    e = (L1 * L2) / (200.0 * Ltot) * (seg.grade_out - seg.grade_in)
-    if Lx <= L1:
-        return seg.grade_in + 200.0 * e * Lx / (L1 * L1)        # arm 1
-    Lx2 = seg.sta_end - sta
-    return seg.grade_out - 200.0 * e * Lx2 / (L2 * L2)           # arm 2
+    l2 = seg.lvc2
+    l_total = l1 + l2
+    e = (l1 * l2) / (200.0 * l_total) * (seg.grade_out - seg.grade_in)
+    if lx <= l1:
+        return seg.grade_in + 200.0 * e * lx / (l1 * l1)        # arm 1
+    lx2 = seg.sta_end - sta
+    return seg.grade_out - 200.0 * e * lx2 / (l2 * l2)           # arm 2
 
 
 # ---------------------------------------------------------------------------

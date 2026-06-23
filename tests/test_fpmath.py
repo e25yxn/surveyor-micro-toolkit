@@ -15,7 +15,7 @@ def test_normalize_angle():
 
 def test_angle_diff_wrap():
     # 10 deg - 350 deg ควรได้ +20 deg (ทางสั้น) ไม่ใช่ -340
-    got = fp.angle_diff(fp.deg_to_rad(10), fp.deg_to_rad(350))
+    got = fp.calculate_angle_diff(fp.deg_to_rad(10), fp.deg_to_rad(350))
     assert math.isclose(got, fp.deg_to_rad(20), abs_tol=1e-12)
 
 

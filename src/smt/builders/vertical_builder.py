@@ -14,7 +14,7 @@ Grades are computed from consecutive VPI elevations; they do not need to be supp
 
 Returns VerticalBuildResult(rows, control, issues).
   rows    = list of VerticalRow ready for use with VLEVEL
-  control = list of VControlPoint (BVP / PVC / PVI / PVT / EVP)
+  control = list of VerticalControlPoint (BVP / PVC / PVI / PVT / EVP)
 """
 from __future__ import annotations
 
@@ -46,17 +46,17 @@ class VerticalRow:
 
 
 @dataclass
-class VControlPoint:
+class VerticalControlPoint:
     """Named station-elevation control point produced by the builder."""
     name: str
     sta: float
-    elev: float
+    elevation: float
 
 
 class VerticalBuildResult(NamedTuple):
     """Output of build_vertical_from_vpi."""
     rows: list[VerticalRow]
-    control: list[VControlPoint]
+    control: list[VerticalControlPoint]
     issues: list[str]
 
 
@@ -75,50 +75,50 @@ def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
     curves) are appended to issues rather than raised.
     """
     rows: list[VerticalRow] = []
-    control: list[VControlPoint] = []
+    control: list[VerticalControlPoint] = []
     issues: list[str] = []
     N = len(vpis)
 
     end_sta = float(vpis[0]['sta'])
     end_elev = float(vpis[0]['elev'])
-    control.append(VControlPoint(name='BVP', sta=end_sta, elev=end_elev))
+    control.append(VerticalControlPoint(name='BVP', sta=end_sta, elevation=end_elev))
 
     for i in range(1, N - 1):
         v = vpis[i]
         v_sta = float(v['sta'])
         v_elev = float(v['elev'])
 
-        g_in = (v_elev - float(vpis[i - 1]['elev'])) / (v_sta - float(vpis[i - 1]['sta'])) * 100
-        g_out = (float(vpis[i + 1]['elev']) - v_elev) / (float(vpis[i + 1]['sta']) - v_sta) * 100
+        grade_in = (v_elev - float(vpis[i - 1]['elev'])) / (v_sta - float(vpis[i - 1]['sta'])) * 100
+        grade_out = (float(vpis[i + 1]['elev']) - v_elev) / (float(vpis[i + 1]['sta']) - v_sta) * 100
 
-        sym = v.get('L1') is None and v.get('L2') is None
-        L1 = float(v.get('L') or 0) / 2 if sym else float(v.get('L1') or 0)
-        L2 = float(v.get('L') or 0) / 2 if sym else float(v.get('L2') or 0)
+        is_symmetric = v.get('L1') is None and v.get('L2') is None
+        l1 = float(v.get('L') or 0) / 2 if is_symmetric else float(v.get('L1') or 0)
+        l2 = float(v.get('L') or 0) / 2 if is_symmetric else float(v.get('L2') or 0)
 
-        pvc_sta = v_sta - L1
-        pvt_sta = v_sta + L2
-        pvc_elev = v_elev - g_in * L1 / 100
-        pvt_elev = v_elev + g_out * L2 / 100
+        pvc_sta = v_sta - l1
+        pvt_sta = v_sta + l2
+        pvc_elev = v_elev - grade_in * l1 / 100
+        pvt_elev = v_elev + grade_out * l2 / 100
 
         if pvc_sta > end_sta + 1e-9:
             rows.append(VerticalRow(
                 sta_start=end_sta, sta_end=pvc_sta, level=end_elev,
-                grade_in=g_in, grade_out=g_in, lvc=0, lvc2=None,
+                grade_in=grade_in, grade_out=grade_in, lvc=0, lvc2=None,
             ))
         elif pvc_sta < end_sta - 1e-6:
             issues.append(
                 f'VPI#{i} (STA {v_sta}): vertical curve overlaps previous segment (LVC too long)'
             )
 
-        control.append(VControlPoint(name='PVC', sta=pvc_sta, elev=pvc_elev))
+        control.append(VerticalControlPoint(name='PVC', sta=pvc_sta, elevation=pvc_elev))
         rows.append(VerticalRow(
             sta_start=pvc_sta, sta_end=pvt_sta, level=pvc_elev,
-            grade_in=g_in, grade_out=g_out,
-            lvc=float(v.get('L') or 0) if sym else L1,
-            lvc2=None if sym else L2,
+            grade_in=grade_in, grade_out=grade_out,
+            lvc=float(v.get('L') or 0) if is_symmetric else l1,
+            lvc2=None if is_symmetric else l2,
         ))
-        control.append(VControlPoint(name='PVI', sta=v_sta, elev=v_elev))
-        control.append(VControlPoint(name='PVT', sta=pvt_sta, elev=pvt_elev))
+        control.append(VerticalControlPoint(name='PVI', sta=v_sta, elevation=v_elev))
+        control.append(VerticalControlPoint(name='PVT', sta=pvt_sta, elevation=pvt_elev))
 
         end_sta = pvt_sta
         end_elev = pvt_elev
@@ -127,12 +127,12 @@ def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
     ep_sta = float(ep['sta'])
     ep_elev = float(ep['elev'])
     if ep_sta > end_sta + 1e-9:
-        g_end = (ep_elev - end_elev) / (ep_sta - end_sta) * 100
+        grade_end = (ep_elev - end_elev) / (ep_sta - end_sta) * 100
         rows.append(VerticalRow(
             sta_start=end_sta, sta_end=ep_sta, level=end_elev,
-            grade_in=g_end, grade_out=g_end, lvc=0, lvc2=None,
+            grade_in=grade_end, grade_out=grade_end, lvc=0, lvc2=None,
         ))
-    control.append(VControlPoint(name='EVP', sta=ep_sta, elev=ep_elev))
+    control.append(VerticalControlPoint(name='EVP', sta=ep_sta, elevation=ep_elev))
 
     return VerticalBuildResult(rows=rows, control=control, issues=issues)
 
@@ -141,7 +141,7 @@ def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
 # Public: table conversion
 # ---------------------------------------------------------------------------
 
-def to_table(rows: list[VerticalRow]) -> list[list]:
+def build_table(rows: list[VerticalRow]) -> list[list]:
     """Convert VerticalRow list to a 2-D table (columns: sta_start..lvc2).
 
     lvc2 is '' when None, matching the spreadsheet column convention.
@@ -158,7 +158,7 @@ def to_table(rows: list[VerticalRow]) -> list[list]:
 # ---------------------------------------------------------------------------
 
 def check_against_drawing(
-    control: list[VControlPoint],
+    control: list[VerticalControlPoint],
     drawing: list[dict],
     tolerance_sta: float = 0.01,
     tolerance_elev: float = 0.005,
@@ -177,7 +177,7 @@ def check_against_drawing(
     for d in drawing:
         d_name = str(d.get('name') or '').strip()
         d_sta = float(d['sta'])
-        best: VControlPoint | None = None
+        best: VerticalControlPoint | None = None
         best_dist = float('inf')
         for c in control:
             if d_name and c.name != d_name:
@@ -189,7 +189,7 @@ def check_against_drawing(
         if best is None:
             continue
         d_sta_diff = abs(best.sta - d_sta)
-        d_elev_diff = abs(best.elev - float(d['elev']))
+        d_elev_diff = abs(best.elevation - float(d['elev']))
         report.append({
             'name': d_name or best.name,
             'sta': best.sta,

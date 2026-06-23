@@ -82,22 +82,22 @@ def calculate_point_3d(
     level is None when the vertical profile or crossfall table has no data for sta.
     Raises ValueError when sta lies outside the alignment (propagated from alignment).
     """
-    off = float(offset)
-    ne = alignment.calculate_station_to_coordinate(elements, sta, off)
-    cl = vertical.calculate_elevation(v_segs, sta)
+    offset = float(offset)
+    plan_point = alignment.calculate_station_to_coordinate(elements, sta, offset)
+    centerline_elevation = vertical.calculate_elevation(v_segs, sta)
 
-    xf: float | None = None
-    lv: float | None
+    crossfall_value: float | None = None
+    surface_elevation: float | None
 
-    if cl is None:
-        lv = None
-    elif off == 0.0:
-        lv = cl
+    if centerline_elevation is None:
+        surface_elevation = None
+    elif offset == 0.0:
+        surface_elevation = centerline_elevation
     else:
-        primary = xlt_segs if off < 0 else xrt_segs
-        fallback = xrt_segs if off < 0 else xlt_segs
+        primary = xlt_segs if offset < 0 else xrt_segs
+        fallback = xrt_segs if offset < 0 else xlt_segs
         x_segs = primary if primary else (fallback if fallback else None)
-        xf = cf.calculate_crossfall(x_segs, sta) if x_segs is not None else None
-        lv = calculate_surface_level(cl, xf, off) if xf is not None else None
+        crossfall_value = cf.calculate_crossfall(x_segs, sta) if x_segs is not None else None
+        surface_elevation = calculate_surface_level(centerline_elevation, crossfall_value, offset) if crossfall_value is not None else None
 
-    return Point3D(n=ne.n, e=ne.e, level=lv, centerline_level=cl, crossfall=xf)
+    return Point3D(n=plan_point.n, e=plan_point.e, level=surface_elevation, centerline_level=centerline_elevation, crossfall=crossfall_value)

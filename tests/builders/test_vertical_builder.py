@@ -115,19 +115,19 @@ def test_cross_check_against_vchecks(result: vb.VerticalBuildResult, golden: dic
 # ---------------------------------------------------------------------------
 
 def test_to_table_shape(result: vb.VerticalBuildResult) -> None:
-    table = vb.to_table(result.rows)
+    table = vb.build_table(result.rows)
     assert len(table) == 7
     assert all(len(row) == 7 for row in table)
 
 
 def test_to_table_lvc2_sentinel(result: vb.VerticalBuildResult) -> None:
-    table = vb.to_table(result.rows)
+    table = vb.build_table(result.rows)
     assert table[0][6] == ''                       # tangent row → ''
     assert isinstance(table[3][6], (int, float))   # asymmetric VC row 3 → numeric
 
 
 def test_to_table_values_match_rows(result: vb.VerticalBuildResult) -> None:
-    table = vb.to_table(result.rows)
+    table = vb.build_table(result.rows)
     for i, row in enumerate(result.rows):
         assert table[i][0] == row.sta_start
         assert table[i][2] == row.level

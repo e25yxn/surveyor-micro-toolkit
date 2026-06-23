@@ -95,7 +95,7 @@ def _shape_integral(transition: str, tau: float) -> float:
     return tau ** 2 / 2
 
 
-def _theta_at(el: Element, s: float) -> float:
+def _calculate_turning_angle_at(el: Element, s: float) -> float:
     """Accumulated turning angle at arc distance s from element start (radians).
 
     θ(s) = k_in · s + (k_out − k_in) · L · F(s/L)
@@ -205,8 +205,8 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
         k = el.k_in
         theta = k * d                                         # signed arc angle
         chord = 2.0 / abs(k) * abs(math.sin(theta / 2))     # chord length
-        chord_az = el.azimuth + theta / 2                    # chord bisects arc angle
-        pt = wcb.calculate_forward(el.n, el.e, chord_az, chord)
+        chord_azimuth = el.azimuth + theta / 2               # chord bisects arc angle
+        pt = wcb.calculate_forward(el.n, el.e, chord_azimuth, chord)
         return ElementState(n=pt.n, e=pt.e, azimuth=fpmath.normalize_angle(el.azimuth + theta))
 
     # Spiral: variable curvature → Simpson integration of (cos θ, sin θ)
@@ -217,7 +217,7 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
     sum_x = sum_y = 0.0
     for i in range(n_seg + 1):
         s = i * h
-        th = _theta_at(el, s)
+        th = _calculate_turning_angle_at(el, s)
         w = 1 if (i == 0 or i == n_seg) else (4 if i % 2 == 1 else 2)
         sum_x += w * math.cos(th)
         sum_y += w * math.sin(th)
@@ -227,7 +227,7 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
     return ElementState(
         n=el.n + x * ca - y * sa,
         e=el.e + x * sa + y * ca,
-        azimuth=fpmath.normalize_angle(el.azimuth + _theta_at(el, d)),
+        azimuth=fpmath.normalize_angle(el.azimuth + _calculate_turning_angle_at(el, d)),
     )
 
 
@@ -295,12 +295,12 @@ def calculate_projection_to_element(el: Element, pn: float, pe: float) -> Projec
     if el.k_in == el.k_out:
         k = el.k_in
         R = 1.0 / k
-        cn = el.n - R * math.sin(el.azimuth)
-        ce = el.e + R * math.cos(el.azimuth)
-        rho = math.hypot(pn - cn, pe - ce)
-        phi0 = math.atan2(el.e - ce, el.n - cn)
-        phi_p = math.atan2(pe - ce, pn - cn)
-        d_arc = fpmath.angle_diff(phi_p, phi0) / k
+        center_n = el.n - R * math.sin(el.azimuth)
+        center_e = el.e + R * math.cos(el.azimuth)
+        rho = math.hypot(pn - center_n, pe - center_e)
+        phi0 = math.atan2(el.e - center_e, el.n - center_n)
+        phi_p = math.atan2(pe - center_e, pn - center_n)
+        d_arc = fpmath.calculate_angle_diff(phi_p, phi0) / k
         off = (1 if k > 0 else -1) * (abs(R) - rho)
         return Projection(
             sta=el.sta_start + d_arc,
@@ -373,7 +373,7 @@ def check_chain(
         a, b = elements[i], elements[i + 1]
         ex = calculate_exit_state(a)
         gap = math.hypot(ex.n - b.n, ex.e - b.e)
-        d_az = abs(fpmath.rad_to_deg(fpmath.angle_diff(ex.azimuth, b.azimuth)) * 3600)
+        d_az = abs(fpmath.rad_to_deg(fpmath.calculate_angle_diff(ex.azimuth, b.azimuth)) * 3600)
         if gap > tolerance or d_az > 5:
             issues.append({
                 'between': f'{i + 1}->{i + 2}',

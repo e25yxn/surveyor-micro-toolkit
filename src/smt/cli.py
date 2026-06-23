@@ -75,18 +75,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest='command', required=True)
 
-    p_fwd = sub.add_parser('fwd', help='station (+offset) -> N,E')
-    p_fwd.add_argument('table', help='path to CSV element table')
-    p_fwd.add_argument('sta', type=float, help='station (chainage)')
-    p_fwd.add_argument('--offset', type=float, default=0.0,
-                       help='perpendicular offset (+ right, - left); default 0')
-    p_fwd.set_defaults(func=_run_fwd)
+    parser_forward = sub.add_parser('fwd', help='station (+offset) -> N,E')
+    parser_forward.add_argument('table', help='path to CSV element table')
+    parser_forward.add_argument('sta', type=float, help='station (chainage)')
+    parser_forward.add_argument('--offset', type=float, default=0.0,
+                                help='perpendicular offset (+ right, - left); default 0')
+    parser_forward.set_defaults(func=_run_fwd)
 
-    p_inv = sub.add_parser('inv', help='N,E -> station,offset')
-    p_inv.add_argument('table', help='path to CSV element table')
-    p_inv.add_argument('n', type=float, help='northing')
-    p_inv.add_argument('e', type=float, help='easting')
-    p_inv.set_defaults(func=_run_inv)
+    parser_inverse = sub.add_parser('inv', help='N,E -> station,offset')
+    parser_inverse.add_argument('table', help='path to CSV element table')
+    parser_inverse.add_argument('n', type=float, help='northing')
+    parser_inverse.add_argument('e', type=float, help='easting')
+    parser_inverse.set_defaults(func=_run_inv)
 
     return parser
 

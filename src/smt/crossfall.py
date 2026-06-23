@@ -44,7 +44,7 @@ class CrossfallSegment:
 # Private helper: normalise type string (mirrors JS `String(seg.type||'V').trim().toUpperCase()`)
 # ---------------------------------------------------------------------------
 
-def _norm_type(raw: str | None) -> str:
+def _normalize_type(raw: str | None) -> str:
     return str(raw or 'V').strip().upper()
 
 
@@ -58,16 +58,16 @@ def calculate_crossfall_at(seg: CrossfallSegment, sta: float) -> float:
     Uses the segment's transition type to interpolate between crossfall_start and crossfall_end.
     Returns crossfall_start immediately when type is 'N' or crossfall_start == crossfall_end.
     """
-    x1, x2 = seg.crossfall_start, seg.crossfall_end
-    t_type = _norm_type(seg.type)
-    if t_type == 'N' or x1 == x2:
-        return x1
+    crossfall_start_value, crossfall_end_value = seg.crossfall_start, seg.crossfall_end
+    t_type = _normalize_type(seg.type)
+    if t_type == 'N' or crossfall_start_value == crossfall_end_value:
+        return crossfall_start_value
     L = seg.sta_end - seg.sta_start
     if L == 0:
-        return x1
+        return crossfall_start_value
     t = (sta - seg.sta_start) / L
     f = t * t * (3.0 - 2.0 * t) if t_type == 'S' else t   # S-curve or linear (V)
-    return x1 + (x2 - x1) * f
+    return crossfall_start_value + (crossfall_end_value - crossfall_start_value) * f
 
 
 def calculate_crossfall_rate_at(seg: CrossfallSegment, sta: float) -> float:
@@ -76,7 +76,7 @@ def calculate_crossfall_rate_at(seg: CrossfallSegment, sta: float) -> float:
     Derivative of calculate_crossfall_at with respect to sta.
     Returns 0 for constant segments (type N, or crossfall_start == crossfall_end, or L == 0).
     """
-    t_type = _norm_type(seg.type)
+    t_type = _normalize_type(seg.type)
     L = seg.sta_end - seg.sta_start
     if t_type == 'N' or seg.crossfall_start == seg.crossfall_end or L == 0:
         return 0.0
@@ -132,6 +132,6 @@ def parse_crossfall_table(rows: list) -> list[CrossfallSegment]:
             sta_end=float(row[2]),
             crossfall_start=float(row[3]),
             crossfall_end=float(row[4]),
-            type=_norm_type(type_raw),
+            type=_normalize_type(type_raw),
         ))
     return segs

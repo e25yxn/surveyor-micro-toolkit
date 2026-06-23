@@ -19,7 +19,7 @@ Supported curve types at each PI vertex
   (CLOTHOID / BLOSS / COSINE / SINE, default CLOTHOID).
 
 R is always positive in the vertex dict.  Turn direction (left/right) is inferred from
-the deflection angle δ = angle_diff(az_out, az_in).
+the deflection angle δ = calculate_angle_diff(az_out, az_in).
 
 Depends on: fpmath, wcb, alignment.
 """
@@ -58,7 +58,7 @@ class BuildResult(NamedTuple):
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _curve_subs(vert: dict, abs_delta: float) -> tuple[list[dict], str | None]:
+def _build_curve_sub_elements(vert: dict, abs_delta: float) -> tuple[list[dict], str | None]:
     """Decompose a PI vertex into ordered sub-element specifications.
 
     abs_delta : absolute deflection angle (radians, always ≥ 0).
@@ -72,42 +72,42 @@ def _curve_subs(vert: dict, abs_delta: float) -> tuple[list[dict], str | None]:
     if compound:
         used = 0.0
         for i, arc in enumerate(compound):
-            Rc = abs(float(arc['R']))
+            r_circular = abs(float(arc['R']))
             if i < len(compound) - 1:
-                dlt = fpmath.deg_to_rad(float(arc['delta']))
-                used += dlt
+                delta = fpmath.deg_to_rad(float(arc['delta']))
+                used += delta
             else:
-                dlt = abs_delta - used
-            if dlt < 0:
+                delta = abs_delta - used
+            if delta < 0:
                 issue = 'compound: ผลรวม delta เกินมุมเลี้ยว'
-            subs.append({'kind': 'C', 'R': Rc, 'len': Rc * dlt})
+            subs.append({'kind': 'C', 'R': r_circular, 'len': r_circular * delta})
         return subs, issue
 
     R = abs(float(vert['R']))
-    LsIn  = float(vert['LsIn']  if vert.get('LsIn')  is not None else (vert.get('Ls') or 0.0))
-    LsOut = float(vert['LsOut'] if vert.get('LsOut') is not None else (vert.get('Ls') or 0.0))
+    ls_in  = float(vert['LsIn']  if vert.get('LsIn')  is not None else (vert.get('Ls') or 0.0))
+    ls_out = float(vert['LsOut'] if vert.get('LsOut') is not None else (vert.get('Ls') or 0.0))
 
-    if LsIn > 0 or LsOut > 0:
-        th_in  = LsIn  / (2.0 * R) if LsIn  > 0 else 0.0
-        th_out = LsOut / (2.0 * R) if LsOut > 0 else 0.0
-        dc = abs_delta - th_in - th_out
-        if dc < 0:
+    if ls_in > 0 or ls_out > 0:
+        theta_in  = ls_in  / (2.0 * R) if ls_in  > 0 else 0.0
+        theta_out = ls_out / (2.0 * R) if ls_out > 0 else 0.0
+        delta_circular = abs_delta - theta_in - theta_out
+        if delta_circular < 0:
             issue = 'spiral ยาวเกินมุมเลี้ยว (Δ < θsIn+θsOut)'
         trans     = vert.get('trans')
         trans_in  = vert.get('transIn') or trans
         trans_out = vert.get('transOut') or trans
-        if LsIn > 0:
-            subs.append({'kind': 'SPIN',  'R': R, 'len': LsIn,  'trans': trans_in})
-        subs.append({'kind': 'C', 'R': R, 'len': R * dc})
-        if LsOut > 0:
-            subs.append({'kind': 'SPOUT', 'R': R, 'len': LsOut, 'trans': trans_out})
+        if ls_in > 0:
+            subs.append({'kind': 'SPIN',  'R': R, 'len': ls_in,  'trans': trans_in})
+        subs.append({'kind': 'C', 'R': R, 'len': R * delta_circular})
+        if ls_out > 0:
+            subs.append({'kind': 'SPOUT', 'R': R, 'len': ls_out, 'trans': trans_out})
         return subs, issue
 
     subs.append({'kind': 'C', 'R': R, 'len': R * abs_delta})
     return subs, issue
 
 
-def _control_names(subs: list[dict]) -> dict:
+def _get_control_names(subs: list[dict]) -> dict:
     """Return control-point name scheme for a curve group.
 
     Returns dict with keys 'start', 'end', 'jct' (list of junction names).
@@ -124,23 +124,23 @@ def _control_names(subs: list[dict]) -> dict:
     return {'start': start, 'end': end, 'jct': jct}
 
 
-def _end_displacement(subs: list[dict], az_in: float, sgn: float) -> tuple[float, float]:
+def _calculate_end_displacement(subs: list[dict], azimuth_in: float, sign: float) -> tuple[float, float]:
     """End-displacement (ΔN, ΔE) of the curve group starting at the global origin.
 
-    Builds each sub as an Element starting at (0, 0) with entry azimuth az_in, then
+    Builds each sub as an Element starting at (0, 0) with entry azimuth azimuth_in, then
     propagates forward.  The returned value equals (ST.N − TS.N, ST.E − TS.E) when the
     group is placed at any origin in a global frame without rotation.
     """
-    cur_n, cur_e, cur_az = 0.0, 0.0, az_in
+    cur_n, cur_e, current_azimuth = 0.0, 0.0, azimuth_in
     sta = 0.0
     for s in subs:
         el = make_element(
             s['kind'], sta, sta + s['len'],
-            cur_n, cur_e, fpmath.rad_to_deg(cur_az),
-            sgn * s['R'], None, s.get('trans'),
+            cur_n, cur_e, fpmath.rad_to_deg(current_azimuth),
+            sign * s['R'], None, s.get('trans'),
         )
         state = calculate_exit_state(el)
-        cur_n, cur_e, cur_az = state.n, state.e, state.azimuth
+        cur_n, cur_e, current_azimuth = state.n, state.e, state.azimuth
         sta += s['len']
     return cur_n, cur_e
 
@@ -170,58 +170,58 @@ def build_alignment_from_pi(vertices: list[dict]) -> BuildResult:
     control.append(ControlPoint(name='BP', sta=prev_sta, n=prev_n, e=prev_e))
 
     for v in range(1, N - 1):
-        vn = float(vertices[v]['n'])
-        ve = float(vertices[v]['e'])
+        vertex_n = float(vertices[v]['n'])
+        vertex_e = float(vertices[v]['e'])
 
-        az_in  = wcb.calculate_azimuth(
-            float(vertices[v - 1]['n']), float(vertices[v - 1]['e']), vn, ve
+        azimuth_in  = wcb.calculate_azimuth(
+            float(vertices[v - 1]['n']), float(vertices[v - 1]['e']), vertex_n, vertex_e
         )
-        az_out = wcb.calculate_azimuth(
-            vn, ve, float(vertices[v + 1]['n']), float(vertices[v + 1]['e'])
+        azimuth_out = wcb.calculate_azimuth(
+            vertex_n, vertex_e, float(vertices[v + 1]['n']), float(vertices[v + 1]['e'])
         )
 
-        delta     = fpmath.angle_diff(az_out, az_in)
-        sgn       = 1.0 if delta >= 0 else -1.0
+        delta     = fpmath.calculate_angle_diff(azimuth_out, azimuth_in)
+        sign      = 1.0 if delta >= 0 else -1.0
         abs_delta = abs(delta)
 
-        subs, issue = _curve_subs(vertices[v], abs_delta)
+        subs, issue = _build_curve_sub_elements(vertices[v], abs_delta)
         if issue:
             issues.append(f'PI#{v}: {issue}')
 
         # Solve 2×2 system: d1·uIn + d2·uOut = V
         # where V = end displacement of curve group placed at origin.
         # Solution: d1 = (V.n·sin(az_out) − V.e·cos(az_out)) / sin(δ)
-        v_n, v_e = _end_displacement(subs, az_in, sgn)
+        v_n, v_e = _calculate_end_displacement(subs, azimuth_in, sign)
         det = math.sin(delta)                              # = sin(az_out − az_in)
-        d1  = (v_n * math.sin(az_out) - v_e * math.cos(az_out)) / det
+        d1  = (v_n * math.sin(azimuth_out) - v_e * math.cos(azimuth_out)) / det
 
-        cs_n = vn - d1 * math.cos(az_in)                  # curve start (TS / PC)
-        cs_e = ve - d1 * math.sin(az_in)
+        curve_start_n = vertex_n - d1 * math.cos(azimuth_in)   # curve start (TS / PC)
+        curve_start_e = vertex_e - d1 * math.sin(azimuth_in)
 
-        nm = _control_names(subs)
+        name_scheme = _get_control_names(subs)
 
         # Tangent element: previous exit → curve start
-        tan_len = wcb.calculate_distance_2d(prev_n, prev_e, cs_n, cs_e)
+        tan_len = wcb.calculate_distance_2d(prev_n, prev_e, curve_start_n, curve_start_e)
         sta_cs  = prev_sta + tan_len
         elements.append(make_element(
-            'T', prev_sta, sta_cs, prev_n, prev_e, fpmath.rad_to_deg(az_in), 0,
+            'T', prev_sta, sta_cs, prev_n, prev_e, fpmath.rad_to_deg(azimuth_in), 0,
         ))
-        control.append(ControlPoint(name=nm['start'], sta=sta_cs, n=cs_n, e=cs_e))
+        control.append(ControlPoint(name=name_scheme['start'], sta=sta_cs, n=curve_start_n, e=curve_start_e))
 
         # Sub-elements: propagate forward from curve start
-        cur_n, cur_e, cur_az = cs_n, cs_e, az_in
+        cur_n, cur_e, cur_az = curve_start_n, curve_start_e, azimuth_in
         sta = sta_cs
         for i, s in enumerate(subs):
             el = make_element(
                 s['kind'], sta, sta + s['len'],
                 cur_n, cur_e, fpmath.rad_to_deg(cur_az),
-                sgn * s['R'], None, s.get('trans'),
+                sign * s['R'], None, s.get('trans'),
             )
             elements.append(el)
             state = calculate_exit_state(el)
             cur_n, cur_e, cur_az = state.n, state.e, state.azimuth
             sta += s['len']
-            pt_name = nm['jct'][i] if i < len(subs) - 1 else nm['end']
+            pt_name = name_scheme['jct'][i] if i < len(subs) - 1 else name_scheme['end']
             control.append(ControlPoint(name=pt_name, sta=sta, n=cur_n, e=cur_e))
 
         prev_n, prev_e, prev_sta = cur_n, cur_e, sta

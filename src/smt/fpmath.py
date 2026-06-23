@@ -20,8 +20,8 @@ from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN
 
 EPS: float = 1e-9                 # tolerance เริ่มต้นสำหรับเทียบ float
 TWO_PI: float = 2.0 * math.pi
-DEG2RAD: float = math.pi / 180.0
-RAD2DEG: float = 180.0 / math.pi
+DEG_TO_RAD: float = math.pi / 180.0
+RAD_TO_DEG: float = 180.0 / math.pi
 
 
 # --------------------------------------------------------------------------
@@ -76,7 +76,7 @@ def normalize_angle(rad: float) -> float:
     return floor_mod(rad, TWO_PI)
 
 
-def angle_diff(a: float, b: float) -> float:
+def calculate_angle_diff(a: float, b: float) -> float:
     """ผลต่างมุมที่สั้นที่สุด (a - b) ในช่วง (-pi, pi]."""
     return floor_mod(a - b + math.pi, TWO_PI) - math.pi
 
@@ -100,11 +100,11 @@ def kahan_sum(values: list[float]) -> float:
 # CONVERSION -- แปลงหน่วยมุม (idiom <source>_to_<target>)
 # --------------------------------------------------------------------------
 def deg_to_rad(deg: float) -> float:
-    return deg * DEG2RAD
+    return deg * DEG_TO_RAD
 
 
 def rad_to_deg(rad: float) -> float:
-    return rad * RAD2DEG
+    return rad * RAD_TO_DEG
 
 
 def packed_dms_to_rad(packed: float, sec_decimals: int = 4) -> float:
@@ -112,16 +112,16 @@ def packed_dms_to_rad(packed: float, sec_decimals: int = 4) -> float:
     sign = -1.0 if packed < 0 else 1.0
     a = abs(packed)
     d = math.trunc(a)
-    r1 = round_to((a - d) * 100.0, sec_decimals + 2)   # .MMSSsss -> MM.SSsss
-    m = math.trunc(r1)
-    s = round_to((r1 - m) * 100.0, sec_decimals)        # .SSsss -> SS.sss
+    minutes_with_seconds = round_to((a - d) * 100.0, sec_decimals + 2)   # .MMSSsss -> MM.SSsss
+    m = math.trunc(minutes_with_seconds)
+    s = round_to((minutes_with_seconds - m) * 100.0, sec_decimals)        # .SSsss -> SS.sss
     decimal_deg = d + m / 60.0 + s / 3600.0
-    return sign * decimal_deg * DEG2RAD
+    return sign * decimal_deg * DEG_TO_RAD
 
 
 def rad_to_packed_dms(rad: float, sec_decimals: int = 2) -> float:
     """radian -> packed DMS (D.MMSSsss). ปัดวินาทีแล้วทดเมื่อถึง 60."""
-    deg = rad * RAD2DEG
+    deg = rad * RAD_TO_DEG
     sign = -1.0 if deg < 0 else 1.0
     deg = abs(deg)
     d = math.trunc(deg)
@@ -140,7 +140,7 @@ def rad_to_packed_dms(rad: float, sec_decimals: int = 2) -> float:
 
 def rad_to_dms_string(rad: float, sec_decimals: int = 2) -> str:
     """radian -> ข้อความ DMS เช่น \"120\u00b001\u203222.56\u2033\"."""
-    deg = rad * RAD2DEG
+    deg = rad * RAD_TO_DEG
     sign = "-" if deg < 0 else ""
     deg = abs(deg)
     d = math.trunc(deg)
@@ -164,4 +164,4 @@ def dms_to_rad(d: float, m: float = 0.0, s: float = 0.0) -> float:
     """องค์ประกอบ D, M, S -> radian."""
     sign = -1.0 if d < 0 else 1.0
     decimal_deg = abs(d) + m / 60.0 + s / 3600.0
-    return sign * decimal_deg * DEG2RAD
+    return sign * decimal_deg * DEG_TO_RAD
