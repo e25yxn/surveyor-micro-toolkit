@@ -1,0 +1,427 @@
+=== SMT Docstring & Test-Coverage Audit ===
+Date    : 2026-06-23
+Scope   : สำรวจทุก public function ใน src/smt/ (10 ไฟล์) ใน 2 มิติ
+          มิติ 1 — Docstring quality : ครบ (1)สิ่งที่ทำ (2)หน่วย (3)เครื่องหมาย/convention หรือไม่
+          มิติ 2 — Test coverage     : มี happy path + boundary + None/0/ลบ + error case หรือไม่
+
+สัญลักษณ์:
+  ✅  ครบแล้ว / ผ่าน
+  ⚠️  ควรเพิ่ม / ขาด
+
+หมายเหตุสำคัญ: รายงานนี้ "สำรวจเท่านั้น" — ไม่แก้โค้ดหรือเพิ่มเทสต์ใดๆ ทั้งสิ้น
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: fpmath.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: round_to
+  Docstring ✅  อธิบายพฤติกรรม round-half-away-from-zero พร้อมตัวอย่าง (-2.5→-3)
+  Docstring ⚠️  ไม่ระบุหน่วยของ value (ไม่จำเป็นสำหรับ pure numeric แต่ควรระบุว่า
+                decimals = จำนวนตำแหน่งหลังจุดทศนิยม)
+  Coverage  ✅  test_round_half_away ครอบ positive / negative / classic 1.005 bug
+  Coverage  ⚠️  ไม่มี test สำหรับ math.inf และ math.nan (code มี isfinite guard แต่ไม่มี test)
+
+ฟังก์ชัน: trunc_to
+  Docstring ✅  อธิบายจุดประสงค์ (STATION display) สั้นแต่เพียงพอ
+  Docstring ⚠️  ไม่ระบุพฤติกรรมเมื่อ value < 0 (เช่น trunc_to(-1.999,2) = -1.99 หรือ -2.00?)
+  Coverage  ✅  test_trunc ครอบ positive และ negative
+  Coverage  ⚠️  ขาด: decimals=0, math.inf, math.nan
+
+ฟังก์ชัน: is_almost_equal
+  Docstring ✅  ระบุ "absolute + relative tolerance" ผสม
+  Docstring ⚠️  ไม่ระบุว่า eps ใช้ absolute เมื่อไหร่ vs relative เมื่อไหร่
+                (เงื่อนไข: diff<=eps → absolute; ไม่งั้น → relative × max(|a|,|b|))
+  Coverage  ✅  test_compare ครอบ floating-point ที่รู้จัก (0.1+0.2≈0.3)
+  Coverage  ⚠️  ขาด: large numbers ที่เข้า relative branch, a==b (exact zero diff),
+                a=0 and b=1e-10 (eps boundary), a or b == 0 (หาร |0| ต้องตรวจ)
+
+ฟังก์ชัน: is_in_range
+  Docstring ✅  ระบุ [lo, hi] + tolerance ชัดเจน
+  Coverage  ✅  test_compare ครอบกรณีอยู่นอกช่วง และ just-inside ด้วย eps
+  Coverage  ⚠️  ขาด: lo > hi (invalid range), lo == hi (ช่วงจุดเดียว)
+
+ฟังก์ชัน: floor_mod
+  Docstring ✅  ให้ตัวอย่าง floor_mod(-1,4)=3 ชัดเจน
+  Docstring ⚠️  ไม่ระบุว่าเกิดอะไรเมื่อ n ≤ 0 (n=0 → ZeroDivisionError)
+  Coverage  ✅  test_floor_mod_positive ครอบกรณี negative a
+  Coverage  ⚠️  ขาด: n=0 (expect error?), n<0, fractional n
+
+ฟังก์ชัน: normalize_angle
+  Docstring ✅  ระบุหน่วย (radian) และช่วงผลลัพธ์ [0, 2π)
+  Coverage  ✅  test_normalize_angle ครอบ negative input และ >2π
+  Coverage  ⚠️  ขาด: rad=0 (should return 0), rad=2π exactly (should return 0)
+
+ฟังก์ชัน: calculate_angle_diff
+  Docstring ✅  ระบุช่วงผล (-π, π] และความหมาย "ทางสั้นที่สุด"
+  Docstring ⚠️  ไม่ระบุหน่วย (radian) อย่างชัดเจนในพารามิเตอร์ a, b
+  Coverage  ✅  test_angle_diff_wrap ครอบ wrap-around case (10°-350°=+20°)
+  Coverage  ⚠️  ขาด: a==b (ควรได้ 0), |a-b|=π exactly, a-b=2π (ควรได้ 0)
+
+ฟังก์ชัน: kahan_sum
+  Docstring ✅  อธิบายอัลกอริทึม Kahan และวัตถุประสงค์
+  Coverage  ✅  test_kahan_sum ครอบ [0.1]*10 == 1.0
+  Coverage  ⚠️  ขาด: empty list (return 0.0?), single element, negative values,
+                mixed sign list
+
+ฟังก์ชัน: deg_to_rad
+  Docstring ⚠️  ไม่มี docstring เลย — อย่างน้อยควรระบุ: degrees → radians
+  Coverage  ✅  test_conversions ครอบ 180°→π
+  Coverage  ⚠️  ขาด: 0°, negative degrees, >360°
+
+ฟังก์ชัน: rad_to_deg
+  Docstring ⚠️  ไม่มี docstring เลย — อย่างน้อยควรระบุ: radians → degrees
+  Coverage  ✅  test_conversions ครอบ π→180
+  Coverage  ⚠️  ขาด: 0, negative rad, >2π
+
+ฟังก์ชัน: packed_dms_to_rad
+  Docstring ✅  อธิบาย format "D.MMSSsss" พร้อมตัวอย่าง 120.012256
+  Docstring ⚠️  ไม่ระบุ sign convention สำหรับค่าลบ (code จัดการอยู่แต่ docstring เงียบ)
+  Coverage  ✅  test_dms_roundtrip ครอบ roundtrip ไป-กลับ
+  Coverage  ⚠️  ขาด: negative packed (เช่น -120.012256), packed=0, sec_decimals ≠ 4
+
+ฟังก์ชัน: rad_to_packed_dms
+  Docstring ✅  ระบุ "ปัดวินาทีแล้วทดเมื่อถึง 60" (carry behavior) ✅
+  Docstring ⚠️  ไม่ระบุ sign convention สำหรับ negative rad
+  Coverage  ✅  test_dms_roundtrip ครอบ roundtrip
+  Coverage  ⚠️  ขาด: negative rad, rad=0, วินาทีที่ปัดแล้วทดถึง 60 (carry edge case)
+
+ฟังก์ชัน: rad_to_dms_string
+  Docstring ✅  แสดงตัวอย่าง output format พร้อม Unicode symbols
+  Docstring ⚠️  ไม่ระบุว่า negative rad จะขึ้นต้น "-" (code ทำได้แต่ไม่ document)
+  Coverage  ✅  test_dms_roundtrip ครอบ positive case
+  Coverage  ⚠️  ขาด: negative rad (sign prefix "-"), sec_decimals ≠ 2, rad=0
+
+ฟังก์ชัน: dms_to_rad
+  Docstring ✅  ระบุ "D, M, S → radian" สั้นแต่ชัด
+  Docstring ⚠️  ไม่ระบุ sign convention: d<0 → negative result? m/s ลบได้ไหม?
+  Coverage  ✅  test_dms_roundtrip ครอบ 120°01'22.56" roundtrip
+  Coverage  ⚠️  ขาด: negative d (เช่น dms_to_rad(-90,0,0)), m/s only (d=0), d=0 m=0 s=0
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: wcb.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: calculate_azimuth
+  Docstring ✅  ระบุหน่วย (radian), convention (วัดจากเหนือวนขวา), ช่วง [0,2π)
+                และอธิบาย atan2(dE,dN) vs atan2(dN,dE)
+  Coverage  ✅  test_azimuth_ne (45° NE), test_forward_inverse_roundtrip
+  Coverage  ⚠️  ขาด: จุดเดียวกัน (n1=n2, e1=e2 → atan2(0,0) พฤติกรรม undefined),
+                ทิศหลัก due-West (270°), due-South (180°)
+
+ฟังก์ชัน: calculate_distance_2d
+  Docstring ✅  อธิบาย math.hypot ป้องกัน overflow/underflow
+  Docstring ⚠️  ไม่ระบุหน่วยของ return (metres — implied จาก n/e convention แต่ไม่ระบุ)
+  Coverage  ⚠️  ไม่มี direct test — ทดสอบแค่ผ่าน calculate_inverse/roundtrip
+  Coverage  ⚠️  ขาด: same-point (distance=0), จุดที่มีพิกัดขนาดใหญ่ (overflow check)
+
+ฟังก์ชัน: calculate_distance_3d
+  Docstring ✅  อธิบาย "slope distance รวมความต่างระดับ"
+  Docstring ⚠️  ไม่ระบุหน่วยของ z1, z2, หรือ return
+  Coverage  ⚠️  ไม่มี test เลย — calculate_distance_3d ไม่ปรากฏในไฟล์ test_wcb.py เลย
+  Coverage  ⚠️  ขาด: happy path (z1=z2 → ผลลัพธ์ = distance_2d), slope case,
+                same point in 3D
+
+ฟังก์ชัน: calculate_forward
+  Docstring ✅  แสดงสูตร dN=d*cos(az), dE=d*sin(az), อ้างอิง Casio Rec()
+  Docstring ⚠️  ไม่ระบุหน่วยของ azimuth (radian) และ distance (metres) ใน Args
+  Coverage  ✅  test_forward_due_east ครอบ due-east case, test_forward_inverse_roundtrip
+  Coverage  ⚠️  ขาด: distance=0 (should return start point), negative distance,
+                azimuth=0 (due-north)
+
+ฟังก์ชัน: calculate_inverse
+  Docstring ✅  อ้างอิง Casio Pol(), บอกว่า returns azimuth+distance
+  Docstring ⚠️  ไม่ระบุหน่วยของ return fields (azimuth=radian, distance=metres)
+  Coverage  ✅  test_inverse_due_east, test_forward_inverse_roundtrip
+  Coverage  ⚠️  ขาด: identical points (distance=0, azimuth undefined)
+
+ฟังก์ชัน: calculate_offset_point
+  Docstring ✅  ระบุ sign convention อย่างชัดเจน: +right/-left, azimuth+90°
+  Docstring ⚠️  ไม่ระบุหน่วยของ along และ offset (metres implied)
+  Coverage  ✅  test_offset_point_right_is_south ครอบ positive offset
+  Coverage  ⚠️  ขาด: offset=0 (ผ่าน if not offset → return centerline_point),
+                negative offset (left), along=0
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: alignment.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: curvature_from_radius
+  Docstring ✅  "Signed curvature k = 1/R. Tangent (R=0/None/±inf) → k=0" — ครบทุก edge case
+  Coverage  ✅  test_curvature_from_radius_tangent (0, None, inf), positive, negative
+
+ฟังก์ชัน: radius_from_curvature
+  Docstring ✅  "Signed radius R = 1/k. Tangent (k=0) → ±inf"
+  Coverage  ✅  test_radius_from_curvature_zero
+  Coverage  ⚠️  ขาด: negative k → negative inf?, k=1 (R=1), k close to 0 (very large R)
+
+ฟังก์ชัน: make_element
+  Docstring ✅  อธิบาย az_deg (WCB degrees), r_in (signed, 0/None=tangent),
+                r_out=None logic per type (SPIN/SPOUT/T/C), trans options
+  Coverage  ✅  test_make_element_tangent, _spin, _spout, _circular_negative_radius
+  Coverage  ⚠️  ขาด: r_out ระบุทั้งคู่ (k_in/k_out อิสระ), trans = BLOSS/COSINE/SINE,
+                trans = None (should default to CLOTHOID), type case-insensitive
+
+ฟังก์ชัน: parse_alignment_table
+  Docstring ✅  ระบุ column order ครบ (8 columns), อ้างอิง tables.json
+  Coverage  ✅  ใช้งานผ่าน golden tests ทั้ง 30 elements
+  Coverage  ⚠️  ขาด: header-only (rows=[header]), empty Radius cell, malformed row (ValueError)
+
+ฟังก์ชัน: calculate_point_on_element
+  Docstring ✅  อธิบาย 3 กรณี (tangent/circular/spiral) พร้อมสูตรและหน่วย
+  Docstring ⚠️  ไม่ระบุหน่วยของ d (arc distance ใน metres — implied)
+  Coverage  ✅  tangent case (test_point_on_tangent_due_east), circular/spiral ผ่าน golden
+  Coverage  ⚠️  ขาด: d=0 (จุดเริ่มต้น), d=L (จุดปลาย exact), d<0 (outside), d>L (outside)
+
+ฟังก์ชัน: calculate_exit_state
+  Docstring ✅  "Tangent state at the far end of this element" ชัดเจน
+  Coverage  ✅  test_exit_state_matches_next_entry ครอบทุก junction ใน 30-element chain
+  Coverage  ⚠️  ขาด: zero-length element (sta_start==sta_end)
+
+ฟังก์ชัน: get_element_index
+  Docstring ✅  ระบุ return -1 เมื่อ sta ไม่อยู่ใน element ใดๆ
+  Coverage  ⚠️  ไม่มี direct test — ทดสอบผ่าน calculate_station_to_coordinate เท่านั้น
+  Coverage  ⚠️  ขาด: sta ที่อยู่บนขอบ (boundary overlap), sta=-1 (before start),
+                empty elements list, sta at junction ระหว่าง 2 elements
+
+ฟังก์ชัน: calculate_station_to_coordinate
+  Docstring ✅  sign convention ของ offset (+right/-left) ✅, ValueError ✅
+  Coverage  ✅  test_control_points_parametrized (31 points), roundtrip, offset test
+  Coverage  ⚠️  ขาด: sta outside → ValueError actually raised (negative test missing),
+                sta ที่ขอบสุด (sta_start ของ element แรก)
+
+ฟังก์ชัน: calculate_projection_to_element
+  Docstring ✅  อธิบาย 3 กรณี (tangent/circular/spiral bisection), offset sign convention
+  Coverage  ⚠️  ไม่มี direct unit test — ทดสอบผ่าน calculate_coordinate_to_station roundtrip เท่านั้น
+  Coverage  ⚠️  ขาด: point on tangent exact (d exactly at start/end), point off circular end,
+                spiral projection at element boundary
+
+ฟังก์ชัน: calculate_coordinate_to_station
+  Docstring ✅  อธิบาย algorithm, ValueError เมื่อ project นอก element ทั้งหมด
+  Coverage  ✅  test_roundtrip_parametrized ครอบทุก element type
+  Coverage  ⚠️  ขาด: ValueError case (จุดไกลออกนอก alignment), จุดที่อยู่ระหว่าง 2 elements
+                เท่ากัน (tie-breaking)
+
+ฟังก์ชัน: check_chain
+  Docstring ✅  ระบุ tolerance (metres), azimuth threshold (5 arc-sec), return dict keys
+  Coverage  ✅  test_chain_has_no_gaps ครอบกรณีที่ chain ต่อเนื่อง (issues=[])
+  Coverage  ⚠️  ขาด: กรณี chain มี gap จริง (ควรตรวจว่า issue ถูก detect และรายงานถูก),
+                สองจุดที่ azimuth ต่างเกิน 5 arc-sec
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: vertical.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: calculate_elevation_at
+  Docstring ✅  ครบมากที่สุดในโปรเจกต์ — สูตรทั้ง 3 กรณี (tangent/sym/asym VC),
+                นิยาม lx, e (middle ordinate) พร้อมหน่วย
+  Docstring ⚠️  ไม่ระบุหน่วยของ sta (metres implied)
+  Coverage  ✅  test_tangent_grade_is_linear, symmetric_vc_pvc/pvt/midpoint,
+                asymmetric_vc_pvc/pvt/at_pvi_station, เทียบ golden vchecks
+
+ฟังก์ชัน: calculate_grade_at
+  Docstring ✅  ระบุ "derivative of calculate_elevation_at", หน่วย % ✅
+  Coverage  ✅  test_grade_at_pvc_equals_g1/pvt_equals_g2 (sym VC), grade_continuity
+  Coverage  ⚠️  ขาด: asymmetric VC — grade at arm boundary (lx=l1, arm-1→arm-2 transition)
+
+ฟังก์ชัน: calculate_elevation
+  Docstring ✅  อธิบาย interior vs last segment rule (inclusive at end), None for outside
+  Coverage  ✅  test_elevation_outside_returns_none (before start and after end),
+                test_elevation_continuity_at_junctions
+  Coverage  ⚠️  ขาด: empty segs list → return None immediately?
+
+ฟังก์ชัน: parse_vertical_table
+  Docstring ✅  column order ครบ (index|sta_start|sta_end|level|g1|g2|lvc|lvc2),
+                skipping rule (empty/NaN sta_start)
+  Coverage  ✅  test_parse_produces_seven_segments, test_parse_first_segment,
+                test_parse_asymmetric_segment
+  Coverage  ⚠️  ขาด: header-only input (rows=[header]), NaN sta_start (skip rule),
+                empty lvc column (default=0.0), row ที่ lvc2 column หายไป (len<8)
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: crossfall.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: calculate_crossfall_at
+  Docstring ✅  อธิบาย type handling, constant return conditions (N, equal endpoints, L=0)
+  Docstring ⚠️  ไม่ระบุหน่วยของ return value (%) อย่างชัดเจน
+  Coverage  ✅  ครอบครบ: N constant, S start/end/midpoint/shape function parametrized,
+                V linear, unknown type default V, equal endpoints, zero-length segment
+
+ฟังก์ชัน: calculate_crossfall_rate_at
+  Docstring ✅  ระบุหน่วย %/m ✅, zero conditions (N, equal, L=0) ✅,
+                "derivative of calculate_crossfall_at" ✅
+  Coverage  ✅  ครอบครบ: N=0, S at endpoints=0, S midpoint max, V constant, equal=0, zero-length=0
+
+ฟังก์ชัน: calculate_crossfall
+  Docstring ✅  interior vs last rule (inclusive end), None for outside
+  Coverage  ✅  constant zone, transition zones, last-segment end (inclusive), outside → None,
+                interior boundary (sta at seg_end goes to NEXT seg)
+
+ฟังก์ชัน: parse_crossfall_table
+  Docstring ✅  column order (index|sta_start|sta_end|xf_start|xf_end|type),
+                skipping rules, reference format (xLT/xRT)
+  Coverage  ✅  3-segment and 1-segment parse, field values checked
+  Coverage  ⚠️  ขาด: NaN sta_start explicit test (code จัดการ math.isnan แต่ไม่ test),
+                len(row)<6 (type_raw = None → default V)
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: surface.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: calculate_surface_level
+  Docstring ✅  แสดงสูตร surface_level = cl + |offset|*crossfall/100 ✅
+                อธิบาย sign convention ของ crossfall_pct (−=lower, +=higher) ✅
+  Docstring ⚠️  ไม่ระบุหน่วยของ offset (metres) และ return (metres) ชัดๆ
+  Coverage  ✅  test_surface_level_negative_crossfall, positive, zero, zero_offset,
+                uses_abs_offset, large_offset — ครอบทุก case
+
+ฟังก์ชัน: calculate_point_3d
+  Docstring ✅  พารามิเตอร์ทุกตัวมีคำอธิบาย, หน่วย offset (+right/-left) ✅,
+                None condition, ValueError propagation ✅
+  Coverage  ✅  ครอบครบ: all components consistent (13 parametrized), crossfall values,
+                fallback logic (empty lt/rt), None when outside crossfall, None when both empty,
+                centre-line behavior, NamedTuple fields, unpack
+  Coverage  ⚠️  ขาด: sta outside alignment → ValueError propagated จาก alignment
+                (ควรมี negative test ยืนยัน exception นี้)
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: check.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: check_horizontal
+  Docstring ✅  controls dict keys (name/sta/n/e) ✅, snap tolerance (0.01 m) ✅,
+                tol units (metres) ✅, ValueError condition ✅, return type ✅
+  Coverage  ✅  result count, result type, gap=hypot(dN,dE), all 31 pass, names preserved
+  Coverage  ⚠️  ขาด: empty controls list → return []; station far outside snap range →
+                ValueError actually raised (negative test); tol=0 edge case
+
+ฟังก์ชัน: check_vertical
+  Docstring ✅  vchecks keys (name/sta/elev) ✅, PVI special note ✅,
+                tol units (metres) ✅, ValueError ✅
+  Coverage  ✅  result count, result type, curve points pass, PVI count, PVI nonzero delta_elevation,
+                names preserved
+  Coverage  ⚠️  ขาด: empty vchecks → return []; station outside profile → ValueError raised;
+                vc entry that matches snap tolerance boundary
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: cli.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: main  [public entry point]
+  Docstring ✅  "Entry point. Returns a process exit code." ✅
+  Docstring ⚠️  สั้นมาก — ไม่ระบุ: subcommands ที่รองรับ (fwd/inv), exit code 1 เมื่อไหร่
+                (ValueError + FileNotFoundError → print error → return 1)
+  Coverage  ✅  test_fwd_centerline, test_fwd_with_offset, test_inv_recovers_station,
+                test_fwd_inv_roundtrip
+  Coverage  ⚠️  ขาด: file not found → exit code 1 (FileNotFoundError path),
+                station outside alignment → exit code 1 (ValueError path),
+                empty CSV → exit code 1, no subcommand given → argparse error
+
+หมายเหตุ functions private ที่สำคัญ:
+  _read_alignment: docstring ✅ อธิบาย CSV format ละเอียด แต่ขาด test สำหรับ empty file
+  _run_fwd/_run_inv: docstring ✅ one-liner เพียงพอ
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: builders/alignment_builder.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: build_alignment_from_pi
+  Docstring ✅  อธิบาย vertices[0]=BP, vertices[1:-1]=PI, vertices[-1]=EP,
+                return type, geometry errors → issues (not raised) ✅
+  Docstring ⚠️  ไม่ระบุหน่วยของ n/e (metres) และ sta (metres); ไม่ระบุว่า
+                vertices[0].get('sta', 0.0) default คือ 0 เมื่อ 'sta' ไม่มี
+  Coverage  ✅  TestSimpleAlignments: tangent-only (2 verts), simple circle (types/names/PC/PT/arc),
+                left turn (negative k), spiral (SPIN/C/SPOUT), compound (PCC), starting sta
+  Coverage  ✅  TestGoldenStructure/Geometry/ControlPoints: 30 elements / 31 controls vs JS oracle
+  Coverage  ⚠️  ขาด: issues case — spiral longer than deflection angle (delta_circular < 0),
+                compound sum exceeds turn angle, single PI with Ls=0 (simple circle edge)
+
+ฟังก์ชัน: check_against_drawing
+  Docstring ✅  drawing entry keys documented, return keys documented,
+                ok definition (gap_m ≤ tolerance) ✅
+  Coverage  ✅  all controls pass, report length, keys present, ok flag, name filter,
+                unnamed entry (station match), empty drawing → []
+  Coverage  ⚠️  ขาด: empty control list; drawing entry name ที่หาใน control ไม่เจอ
+                (best=None → skipped) — ควร test ว่า report สั้นลง
+
+════════════════════════════════════════════════════════════════════════════════
+--- ไฟล์: builders/vertical_builder.py ---
+════════════════════════════════════════════════════════════════════════════════
+
+ฟังก์ชัน: build_vertical_from_vpi
+  Docstring ✅  vpis[0]=BVP, interior VPI keys (sta/elev/L/L1/L2), vpis[-1]=EVP,
+                errors → issues ✅
+  Docstring ⚠️  ไม่ระบุหน่วยของ sta (metres) และ elev (metres); ไม่บอกว่า
+                grade คำนวณจาก VPI โดยอัตโนมัติ (ไม่ต้องให้ไว้) — สำคัญสำหรับผู้ใช้
+  Coverage  ✅  row count, no issues, rows match vtable (tolerance-aware), control count/names,
+                cross-check vs vchecks, symmetric/asymmetric lvc fields
+  Coverage  ✅  test_pure_tangent_no_vpi, test_overlap_reported_as_issue
+  Coverage  ⚠️  ขาด: VPI with L=0 (ไม่มี VC แต่มี interior VPI), consecutive VPI
+                ที่ overlap ทั้งคู่ (multiple issues), evp_sta < pvt_sta (degenerate)
+
+ฟังก์ชัน: build_table
+  Docstring ✅  column order ครบ, lvc2='' convention ✅
+  Coverage  ✅  shape (7×7), lvc2 sentinel (''/ numeric), values match rows
+  Coverage  ⚠️  ขาด: empty input list → return []
+
+ฟังก์ชัน: check_against_drawing
+  Docstring ✅  drawing keys, return keys, ok definition ✅
+  Docstring ⚠️  return dict key 'd_sta' และ 'd_elev' เป็น absolute value (|diff|) แต่ไม่ระบุ;
+                เทียบกับ check.py HorizontalCheckResult ที่ระบุ + = engine > drawing
+  Coverage  ✅  all ok, fail on large error, report fields
+  Coverage  ⚠️  ขาด: empty drawing → return []; name ไม่ตรงใน control (best=None → skip)
+
+════════════════════════════════════════════════════════════════════════════════
+--- SUMMARY ---
+════════════════════════════════════════════════════════════════════════════════
+
+สรุปตารางรายไฟล์ (D = Docstring gaps, T = Test coverage gaps):
+
+  ไฟล์                    D ⚠️   T ⚠️   ปัญหาเด่น
+  ──────────────────────────────────────────────────────────────────────────
+  fpmath.py                 7      9    deg_to_rad/rad_to_deg ไม่มี docstring;
+                                        ไม่ test inf/nan, empty kahan_sum,
+                                        negative DMS, floor_mod edge cases
+  wcb.py                    4      5    calculate_distance_3d ไม่มี test เลย (critical);
+                                        identical-point edge case ขาดทุกฟังก์ชัน
+  alignment.py              4      6    calculate_projection_to_element ไม่มี unit test;
+                                        get_element_index ไม่มี direct test;
+                                        check_chain ไม่มี "broken chain" test
+  vertical.py               2      3    calculate_grade_at asymmetric arm-boundary ขาด;
+                                        empty segs list ขาด
+  crossfall.py              1      2    หน่วย % ไม่ระบุใน docstring;
+                                        NaN sta_start parse test ขาด
+  surface.py                1      1    หน่วย metres ใน return ไม่ระบุ;
+                                        ValueError propagation test ขาด
+  check.py                  1      2    main() docstring สั้น; ValueError path ขาด test
+  cli.py                    1      3    main() docstring สั้น; error exit path ขาดทั้งหมด
+  alignment_builder.py      2      2    issues case (spiral overflow) ขาด test;
+                                        units ใน docstring ขาด
+  vertical_builder.py       3      3    grade auto-compute ไม่ document;
+                                        d_sta/d_elev เป็น abs ไม่ระบุ; edge cases ขาด
+
+ปัญหาที่ควรแก้ก่อน (เรียงตามความเสี่ยง):
+
+  1. ⚠️ calculate_distance_3d — ไม่มีแม้แต่ test เดียว (wcb.py)
+     ฟังก์ชันนี้จะถูกใช้เมื่อ 3D feature ต้องการ — ถ้าผิดจะไม่รู้จนสายเกินไป
+
+  2. ⚠️ deg_to_rad / rad_to_deg — ไม่มี docstring (fpmath.py)
+     เป็น 2 ฟังก์ชันที่ใช้บ่อยที่สุดในโปรเจกต์ ควรมีอย่างน้อย 1 บรรทัด
+
+  3. ⚠️ calculate_projection_to_element — ไม่มี direct unit test (alignment.py)
+     ทดสอบแค่ผ่าน roundtrip ทำให้ถ้า bug เฉพาะกรณี tangent หรือ circular
+     โดยไม่กระทบ roundtrip จะไม่จับได้
+
+  4. ⚠️ check_chain "broken chain" test — มีแค่ "ไม่มีปัญหา" ไม่มี "พบปัญหา" (alignment.py)
+     ฟังก์ชัน detection ที่ไม่มี test กรณีที่ detect ได้ เสี่ยงต่อ regression
+
+  5. ⚠️ CLI error paths — ไม่มี test exit code 1 (cli.py)
+     user-facing errors (file not found, bad station) ควรมี test
+
+  6. ⚠️ docstring missing sign convention สำหรับ DMS negative (fpmath.py)
+     วิศวกรเขตใต้ศูนย์สูตรหรือทิศตะวันตกต้องใช้มุมลบ
+
+ไฟล์ที่ coverage ดีที่สุด: crossfall.py และ surface.py
+ไฟล์ที่ต้องการความสนใจมากที่สุด: wcb.py (distance_3d ขาด) และ fpmath.py (docstring + edge cases)
+
+หมายเหตุ: รายงานนี้ไม่แก้โค้ดหรือเพิ่มเทสต์ใดๆ — สำรวจและรายงานเท่านั้น
