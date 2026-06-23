@@ -26,9 +26,8 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from . import alignment
+from . import alignment, vertical
 from . import crossfall as cf
-from . import vertical
 
 
 class Point3D(NamedTuple):
@@ -98,6 +97,14 @@ def calculate_point_3d(
         fallback = xrt_segs if offset < 0 else xlt_segs
         x_segs = primary if primary else (fallback if fallback else None)
         crossfall_value = cf.calculate_crossfall(x_segs, sta) if x_segs is not None else None
-        surface_elevation = calculate_surface_level(centerline_elevation, crossfall_value, offset) if crossfall_value is not None else None
+        surface_elevation = (
+            calculate_surface_level(centerline_elevation, crossfall_value, offset)
+            if crossfall_value is not None else None
+        )
 
-    return Point3D(n=plan_point.n, e=plan_point.e, level=surface_elevation, centerline_level=centerline_elevation, crossfall=crossfall_value)
+    return Point3D(
+        n=plan_point.n, e=plan_point.e,
+        level=surface_elevation,
+        centerline_level=centerline_elevation,
+        crossfall=crossfall_value,
+    )

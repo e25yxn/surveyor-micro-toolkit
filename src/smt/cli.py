@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+from typing import Any
 
 from . import alignment
 
@@ -34,7 +35,7 @@ def _read_alignment(path: str) -> list[alignment.Element]:
     if not raw:
         raise ValueError(f'{path} is empty')
 
-    rows: list = [raw[0]]   # keep header row as-is; parse_alignment_table skips it
+    rows: list[Any] = [raw[0]]   # keep header row as-is; parse_alignment_table skips it
     for line in raw[1:]:
         if not line or all(cell.strip() == '' for cell in line):
             continue   # tolerate blank lines
@@ -96,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:
-        return args.func(args)
+        return int(args.func(args))
     except (ValueError, FileNotFoundError) as exc:
         print(f'error: {exc}', file=sys.stderr)
         return 1

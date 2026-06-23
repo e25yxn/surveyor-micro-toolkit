@@ -19,8 +19,7 @@ Returns VerticalBuildResult(rows, control, issues).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import NamedTuple
-
+from typing import Any, NamedTuple
 
 # ---------------------------------------------------------------------------
 # Return types
@@ -64,7 +63,7 @@ class VerticalBuildResult(NamedTuple):
 # Public: builder
 # ---------------------------------------------------------------------------
 
-def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
+def build_vertical_from_vpi(vpis: list[dict[str, Any]]) -> VerticalBuildResult:
     """Build vertical alignment segment list from a VPI list.
 
     vpis[0]    = BVP — {'sta', 'elev'}.  Sets the starting chainage and elevation.
@@ -89,7 +88,9 @@ def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
         v_elev = float(v['elev'])
 
         grade_in = (v_elev - float(vpis[i - 1]['elev'])) / (v_sta - float(vpis[i - 1]['sta'])) * 100
-        grade_out = (float(vpis[i + 1]['elev']) - v_elev) / (float(vpis[i + 1]['sta']) - v_sta) * 100
+        next_elev = float(vpis[i + 1]['elev'])
+        next_sta  = float(vpis[i + 1]['sta'])
+        grade_out = (next_elev - v_elev) / (next_sta - v_sta) * 100
 
         is_symmetric = v.get('L1') is None and v.get('L2') is None
         l1 = float(v.get('L') or 0) / 2 if is_symmetric else float(v.get('L1') or 0)
@@ -141,7 +142,7 @@ def build_vertical_from_vpi(vpis: list[dict]) -> VerticalBuildResult:
 # Public: table conversion
 # ---------------------------------------------------------------------------
 
-def build_table(rows: list[VerticalRow]) -> list[list]:
+def build_table(rows: list[VerticalRow]) -> list[list[Any]]:
     """Convert VerticalRow list to a 2-D table (columns: sta_start..lvc2).
 
     lvc2 is '' when None, matching the spreadsheet column convention.
@@ -159,10 +160,10 @@ def build_table(rows: list[VerticalRow]) -> list[list]:
 
 def check_against_drawing(
     control: list[VerticalControlPoint],
-    drawing: list[dict],
+    drawing: list[dict[str, Any]],
     tolerance_sta: float = 0.01,
     tolerance_elev: float = 0.005,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Cross-check computed control points against drawing / survey values.
 
     For each entry in drawing, finds the closest-by-station control point
@@ -173,7 +174,7 @@ def check_against_drawing(
     Returns list of dicts: {name, sta, d_sta, d_elev, ok}.
     ok is True when d_sta ≤ tolerance_sta and d_elev ≤ tolerance_elev.
     """
-    report: list[dict] = []
+    report: list[dict[str, Any]] = []
     for d in drawing:
         d_name = str(d.get('name') or '').strip()
         d_sta = float(d['sta'])

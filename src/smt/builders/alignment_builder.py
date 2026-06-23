@@ -27,12 +27,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
-from .. import fpmath
-from .. import wcb
-from ..alignment import Element, make_element, calculate_exit_state
-
+from .. import fpmath, wcb
+from ..alignment import Element, calculate_exit_state, make_element
 
 # ---------------------------------------------------------------------------
 # Return types
@@ -58,14 +56,16 @@ class BuildResult(NamedTuple):
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _build_curve_sub_elements(vert: dict, abs_delta: float) -> tuple[list[dict], str | None]:
+def _build_curve_sub_elements(
+    vert: dict[str, Any], abs_delta: float,
+) -> tuple[list[dict[str, Any]], str | None]:
     """Decompose a PI vertex into ordered sub-element specifications.
 
     abs_delta : absolute deflection angle (radians, always ≥ 0).
     Returns (subs, issue) where each sub is a dict with keys
     'kind', 'R', 'len', and optionally 'trans'.
     """
-    subs: list[dict] = []
+    subs: list[dict[str, Any]] = []
     issue: str | None = None
 
     compound = vert.get('compound')
@@ -107,7 +107,7 @@ def _build_curve_sub_elements(vert: dict, abs_delta: float) -> tuple[list[dict],
     return subs, issue
 
 
-def _get_control_names(subs: list[dict]) -> dict:
+def _get_control_names(subs: list[dict[str, Any]]) -> dict[str, Any]:
     """Return control-point name scheme for a curve group.
 
     Returns dict with keys 'start', 'end', 'jct' (list of junction names).
@@ -124,7 +124,9 @@ def _get_control_names(subs: list[dict]) -> dict:
     return {'start': start, 'end': end, 'jct': jct}
 
 
-def _calculate_end_displacement(subs: list[dict], azimuth_in: float, sign: float) -> tuple[float, float]:
+def _calculate_end_displacement(
+    subs: list[dict[str, Any]], azimuth_in: float, sign: float,
+) -> tuple[float, float]:
     """End-displacement (ΔN, ΔE) of the curve group starting at the global origin.
 
     Builds each sub as an Element starting at (0, 0) with entry azimuth azimuth_in, then
@@ -149,7 +151,7 @@ def _calculate_end_displacement(subs: list[dict], azimuth_in: float, sign: float
 # Public: builder
 # ---------------------------------------------------------------------------
 
-def build_alignment_from_pi(vertices: list[dict]) -> BuildResult:
+def build_alignment_from_pi(vertices: list[dict[str, Any]]) -> BuildResult:
     """Build a horizontal alignment element list from a PI vertex polyline.
 
     vertices[0]  = BP  — {'n', 'e', 'sta'}.  sta sets the starting chainage.
@@ -206,7 +208,9 @@ def build_alignment_from_pi(vertices: list[dict]) -> BuildResult:
         elements.append(make_element(
             'T', prev_sta, sta_cs, prev_n, prev_e, fpmath.rad_to_deg(azimuth_in), 0,
         ))
-        control.append(ControlPoint(name=name_scheme['start'], sta=sta_cs, n=curve_start_n, e=curve_start_e))
+        control.append(ControlPoint(
+            name=name_scheme['start'], sta=sta_cs, n=curve_start_n, e=curve_start_e,
+        ))
 
         # Sub-elements: propagate forward from curve start
         cur_n, cur_e, cur_az = curve_start_n, curve_start_e, azimuth_in
@@ -245,9 +249,9 @@ def build_alignment_from_pi(vertices: list[dict]) -> BuildResult:
 
 def check_against_drawing(
     control: list[ControlPoint],
-    drawing: list[dict],
+    drawing: list[dict[str, Any]],
     tolerance: float = 0.05,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Cross-check computed control points against drawn / surveyed coordinates.
 
     For each entry in drawing, finds the closest-by-station control point
@@ -258,7 +262,7 @@ def check_against_drawing(
     Returns list of dicts: {name, sta_calc, sta_draw, gap_m, ok}.
     ok is True when gap_m ≤ tolerance.
     """
-    report: list[dict] = []
+    report: list[dict[str, Any]] = []
     for d in drawing:
         d_name = str(d.get('name') or '').strip()
         d_sta  = float(d['sta'])

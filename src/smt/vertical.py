@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data type
@@ -80,14 +80,15 @@ def calculate_elevation_at(seg: VerticalSegment, sta: float) -> float:
         return base + (seg.grade_out - seg.grade_in) / (200.0 * l1) * lx * lx
 
     # Asymmetric (unequal-tangent) VC
+    assert seg.lvc2 is not None
     l2 = seg.lvc2
     l_total = l1 + l2
-    e = (l1 * l2) / (200.0 * l_total) * (seg.grade_out - seg.grade_in)   # VPI middle ordinate (signed)
+    e = (l1 * l2) / (200.0 * l_total) * (seg.grade_out - seg.grade_in)
     if lx <= l1:
         return base + e * (lx / l1) * (lx / l1)           # arm 1: PVC → VPI
     lev_pvt = seg.level + (seg.grade_in / 100.0) * l1 + (seg.grade_out / 100.0) * l2
     lx2 = seg.sta_end - sta
-    return lev_pvt - (seg.grade_out / 100.0) * lx2 + e * (lx2 / l2) * (lx2 / l2)   # arm 2: VPI → PVT
+    return lev_pvt - (seg.grade_out / 100.0) * lx2 + e * (lx2 / l2) * (lx2 / l2)
 
 
 def calculate_grade_at(seg: VerticalSegment, sta: float) -> float:
@@ -103,6 +104,7 @@ def calculate_grade_at(seg: VerticalSegment, sta: float) -> float:
     if not _has_second_arm(seg):                # symmetric VC
         return seg.grade_in + (seg.grade_out - seg.grade_in) * (lx / l1)
 
+    assert seg.lvc2 is not None
     l2 = seg.lvc2
     l_total = l1 + l2
     e = (l1 * l2) / (200.0 * l_total) * (seg.grade_out - seg.grade_in)
@@ -134,7 +136,7 @@ def calculate_elevation(segs: list[VerticalSegment], sta: float) -> float | None
 # Public: parse
 # ---------------------------------------------------------------------------
 
-def parse_vertical_table(rows: list) -> list[VerticalSegment]:
+def parse_vertical_table(rows: list[Any]) -> list[VerticalSegment]:
     """Parse a row-table (first row = headers) into a list of VerticalSegment.
 
     Expected columns: index, sta_start, sta_end, level, grade_in(%), grade_out(%), lvc, (lvc2).
@@ -144,7 +146,8 @@ def parse_vertical_table(rows: list) -> list[VerticalSegment]:
     segs: list[VerticalSegment] = []
     for row in rows[1:]:                         # skip header
         sta_start_raw = row[1]
-        if sta_start_raw in ('', None) or (isinstance(sta_start_raw, float) and math.isnan(sta_start_raw)):
+        is_nan = isinstance(sta_start_raw, float) and math.isnan(sta_start_raw)
+        if sta_start_raw in ('', None) or is_nan:
             continue
         try:
             sta_start = float(sta_start_raw)
@@ -153,7 +156,7 @@ def parse_vertical_table(rows: list) -> list[VerticalSegment]:
         lvc_raw = row[6]
         lvc = float(lvc_raw) if lvc_raw not in ('', None) else 0.0
         lvc2_raw = row[7] if len(row) > 7 else None
-        lvc2 = float(lvc2_raw) if lvc2_raw not in ('', None) else None
+        lvc2 = float(lvc2_raw) if lvc2_raw is not None and lvc2_raw != '' else None
         segs.append(VerticalSegment(
             sta_start=sta_start,
             sta_end=float(row[2]),

@@ -19,11 +19,10 @@ Depends on: alignment, vertical.
 from __future__ import annotations
 
 import math
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from . import alignment as al
 from . import vertical as vt
-
 
 # ---------------------------------------------------------------------------
 # Result types
@@ -97,7 +96,7 @@ def _snap_to_profile_ends(
 
 def check_horizontal(
     elements: list[al.Element],
-    controls: list[dict],
+    controls: list[dict[str, Any]],
     tol: float = 0.05,
 ) -> list[HorizontalCheckResult]:
     """Cross-check drawing control points against the horizontal alignment engine.
@@ -134,7 +133,7 @@ def check_horizontal(
 
 def check_vertical(
     segs: list[vt.VerticalSegment],
-    vchecks: list[dict],
+    vchecks: list[dict[str, Any]],
     tol: float = 0.005,
 ) -> list[VerticalCheckResult]:
     """Cross-check drawing elevation points against the vertical profile engine.

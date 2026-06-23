@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import math
-from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
 EPS: float = 1e-9                 # tolerance เริ่มต้นสำหรับเทียบ float
 TWO_PI: float = 2.0 * math.pi

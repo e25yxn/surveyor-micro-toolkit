@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data type
@@ -108,7 +108,7 @@ def calculate_crossfall(segs: list[CrossfallSegment], sta: float) -> float | Non
 # Public: parse
 # ---------------------------------------------------------------------------
 
-def parse_crossfall_table(rows: list) -> list[CrossfallSegment]:
+def parse_crossfall_table(rows: list[Any]) -> list[CrossfallSegment]:
     """Parse a row-table (first row = headers) into a list of CrossfallSegment.
 
     Expected columns: index, sta_start, sta_end, crossfall_start(%), crossfall_end(%), type.

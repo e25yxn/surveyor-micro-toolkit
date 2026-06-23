@@ -21,10 +21,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
-from . import fpmath
-from . import wcb
+from . import fpmath, wcb
 
 SPIRAL_STEPS: int = 48   # Simpson intervals for spiral numerical integration (must be even)
 
@@ -134,7 +133,7 @@ def make_element(
     az_deg: float,
     r_in: float | None = None,
     r_out: float | None = None,
-    trans: str = 'CLOTHOID',
+    trans: str | None = 'CLOTHOID',
 ) -> Element:
     """Create one Element from boundary parameters.
 
@@ -170,7 +169,7 @@ def make_element(
     )
 
 
-def parse_alignment_table(rows: list) -> list[Element]:
+def parse_alignment_table(rows: list[Any]) -> list[Element]:
     """Parse a row-table (first row = headers) into a list of Elements.
 
     Expected columns: StaStart, StaEnd, N, E, Azimuth_deg, Radius, Type, Transition.
@@ -360,7 +359,7 @@ def calculate_coordinate_to_station(
 def check_chain(
     elements: list[Element],
     tolerance: float = 0.005,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Check tangency continuity at every element junction.
 
     Returns a list of dicts for junctions where position gap > tolerance (metres)
@@ -368,7 +367,7 @@ def check_chain(
 
     Dict keys: 'between' (e.g. '1->2'), 'gap_mm', 'az_arcsec'.
     """
-    issues: list[dict] = []
+    issues: list[dict[str, Any]] = []
     for i in range(len(elements) - 1):
         a, b = elements[i], elements[i + 1]
         ex = calculate_exit_state(a)
