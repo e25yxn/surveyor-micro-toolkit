@@ -70,6 +70,9 @@ def build_vertical_from_vpi(vpis: list[dict[str, Any]]) -> VerticalBuildResult:
     vpis[1:-1] = interior VPI — curve parameters as described in the module docstring.
     vpis[-1]   = EVP — {'sta', 'elev'}.
 
+    Grade between VPIs is computed automatically from the station and elevation
+    differences; callers do not supply grade values.
+
     Returns VerticalBuildResult(rows, control, issues).  Geometry errors (e.g. overlapping
     curves) are appended to issues rather than raised.
     """
@@ -172,6 +175,7 @@ def check_against_drawing(
 
     drawing entries: {'name' (optional), 'sta', 'elev'}.
     Returns list of dicts: {name, sta, d_sta, d_elev, ok}.
+    d_sta and d_elev are absolute differences (always ≥ 0).
     ok is True when d_sta ≤ tolerance_sta and d_elev ≤ tolerance_elev.
     """
     report: list[dict[str, Any]] = []

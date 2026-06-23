@@ -100,15 +100,20 @@ def kahan_sum(values: list[float]) -> float:
 # CONVERSION -- แปลงหน่วยมุม (idiom <source>_to_<target>)
 # --------------------------------------------------------------------------
 def deg_to_rad(deg: float) -> float:
+    """degrees -> radians. Unit: deg in, rad out."""
     return deg * DEG_TO_RAD
 
 
 def rad_to_deg(rad: float) -> float:
+    """radians -> degrees. Unit: rad in, deg out."""
     return rad * RAD_TO_DEG
 
 
 def packed_dms_to_rad(packed: float, sec_decimals: int = 4) -> float:
-    """packed DMS (D.MMSSsss) -> radian. เช่น 120.012256 -> rad ของ 120 01' 22.56"."""
+    """packed DMS (D.MMSSsss) -> radian. เช่น 120.012256 -> rad ของ 120 01' 22.56".
+
+    Sign: negative input -> negative output (handles bearings south of equator or west longitudes).
+    """
     sign = -1.0 if packed < 0 else 1.0
     a = abs(packed)
     d = math.trunc(a)
@@ -120,7 +125,10 @@ def packed_dms_to_rad(packed: float, sec_decimals: int = 4) -> float:
 
 
 def rad_to_packed_dms(rad: float, sec_decimals: int = 2) -> float:
-    """radian -> packed DMS (D.MMSSsss). ปัดวินาทีแล้วทดเมื่อถึง 60."""
+    """radian -> packed DMS (D.MMSSsss). ปัดวินาทีแล้วทดเมื่อถึง 60.
+
+    Sign: negative input -> negative output (handles bearings south of equator or west longitudes).
+    """
     deg = rad * RAD_TO_DEG
     sign = -1.0 if deg < 0 else 1.0
     deg = abs(deg)
@@ -139,7 +147,10 @@ def rad_to_packed_dms(rad: float, sec_decimals: int = 2) -> float:
 
 
 def rad_to_dms_string(rad: float, sec_decimals: int = 2) -> str:
-    """radian -> ข้อความ DMS เช่น \"120\u00b001\u203222.56\u2033\"."""
+    """radian -> ข้อความ DMS เช่น \"120\u00b001\u203222.56\u2033\".
+
+    Sign: negative input -> string prefixed with '-' (e.g. \"-45°00′00.00″\").
+    """
     deg = rad * RAD_TO_DEG
     sign = "-" if deg < 0 else ""
     deg = abs(deg)
@@ -161,7 +172,10 @@ def rad_to_dms_string(rad: float, sec_decimals: int = 2) -> str:
 
 
 def dms_to_rad(d: float, m: float = 0.0, s: float = 0.0) -> float:
-    """องค์ประกอบ D, M, S -> radian."""
+    """องค์ประกอบ D, M, S -> radian.
+
+    Sign: negative d -> negative output (handles bearings south of equator or west longitudes).
+    """
     sign = -1.0 if d < 0 else 1.0
     decimal_deg = abs(d) + m / 60.0 + s / 3600.0
     return sign * decimal_deg * DEG_TO_RAD

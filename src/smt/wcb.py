@@ -42,19 +42,27 @@ def calculate_azimuth(n1: float, e1: float, n2: float, e2: float) -> float:
 
 
 def calculate_distance_2d(n1: float, e1: float, n2: float, e2: float) -> float:
-    """ระยะราบระหว่างสองจุด (ใช้ math.hypot กัน overflow/underflow)."""
+    """ระยะราบระหว่างสองจุด (ใช้ math.hypot กัน overflow/underflow).
+
+    Args: n, e in metres.  Returns: plan distance in metres.
+    """
     return math.hypot(n2 - n1, e2 - e1)
 
 
 def calculate_distance_3d(n1: float, e1: float, z1: float,
                           n2: float, e2: float, z2: float) -> float:
-    """ระยะตรง (slope distance) รวมความต่างระดับ."""
+    """ระยะตรง (slope distance) รวมความต่างระดับ.
+
+    Args: n, e, z in metres.  Returns: slope distance in metres.
+    """
     return math.hypot(n2 - n1, e2 - e1, z2 - z1)
 
 
 def calculate_forward(n1: float, e1: float, azimuth: float, distance: float) -> Point:
     """จุดตั้ง + azimuth(radian) + ระยะ -> จุดใหม่.
 
+    Args: n1, e1 in metres; azimuth in radians (WCB); distance in metres.
+    Returns: Point(n, e) in metres.
     dN = d*cos(az), dE = d*sin(az)  (เทียบ Casio: Rec(distance, azimuth)).
     """
     return Point(
@@ -64,7 +72,10 @@ def calculate_forward(n1: float, e1: float, azimuth: float, distance: float) -> 
 
 
 def calculate_inverse(n1: float, e1: float, n2: float, e2: float) -> Inverse:
-    """สองจุด -> azimuth(radian) + ระยะ (เทียบ Casio: Pol)."""
+    """สองจุด -> azimuth(radian) + ระยะ (เทียบ Casio: Pol).
+
+    Args: n, e in metres.  Returns: Inverse(azimuth in radians, distance in metres).
+    """
     return Inverse(
         azimuth=calculate_azimuth(n1, e1, n2, e2),
         distance=calculate_distance_2d(n1, e1, n2, e2),
@@ -75,6 +86,8 @@ def calculate_offset_point(n1: float, e1: float, azimuth: float,
                            along: float, offset: float = 0.0) -> Point:
     """เดินตาม azimuth เป็นระยะ along แล้วเยื้องตั้งฉาก offset.
 
+    Args: n1, e1 in metres; azimuth in radians (WCB); along in metres; offset in metres.
+    Returns: Point(n, e) in metres.
     offset: + = ขวามือของทิศเดิน, - = ซ้ายมือ. ขวามือ = azimuth + 90 องศา.
     """
     centerline_point = calculate_forward(n1, e1, azimuth, along)
