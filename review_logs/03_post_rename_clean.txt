@@ -1,0 +1,102 @@
+=== SMT Static Analysis Report — Post-Rename Clean ===
+Date: 2026-06-23
+Baseline: commit 9502ac3 (Fix all static analysis issues)
+Covers: naming audit (02_naming_audit.txt) + static analysis fixes (01_static_analysis.txt)
+
+--- RUFF (linting) ---
+E701 Multiple statements on one line (colon)
+   --> src\smt\builders\alignment_builder.py:120:39
+    |
+118 |     for i in range(len(subs) - 1):
+119 |         a, b = subs[i]['kind'], subs[i + 1]['kind']
+120 |         if   a == 'SPIN'  and b == 'C':     jct.append('SC')
+    |                                       ^
+121 |         elif a == 'C'     and b == 'SPOUT': jct.append('CS')
+122 |         elif a == 'C'     and b == 'C':     jct.append('PCC')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\smt\builders\alignment_builder.py:121:43
+    |
+119 |         a, b = subs[i]['kind'], subs[i + 1]['kind']
+120 |         if   a == 'SPIN'  and b == 'C':     jct.append('SC')
+121 |         elif a == 'C'     and b == 'SPOUT': jct.append('CS')
+    |                                           ^
+122 |         elif a == 'C'     and b == 'C':     jct.append('PCC')
+123 |         else:                                jct.append('JCT')
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\smt\builders\alignment_builder.py:122:39
+    |
+120 |         if   a == 'SPIN'  and b == 'C':     jct.append('SC')
+121 |         elif a == 'C'     and b == 'SPOUT': jct.append('CS')
+122 |         elif a == 'C'     and b == 'C':     jct.append('PCC')
+    |                                       ^
+123 |         else:                                jct.append('JCT')
+124 |     return {'start': start, 'end': end, 'jct': jct}
+    |
+
+E701 Multiple statements on one line (colon)
+   --> src\smt\builders\alignment_builder.py:123:13
+    |
+121 |         elif a == 'C'     and b == 'SPOUT': jct.append('CS')
+122 |         elif a == 'C'     and b == 'C':     jct.append('PCC')
+123 |         else:                                jct.append('JCT')
+    |             ^
+124 |     return {'start': start, 'end': end, 'jct': jct}
+    |
+
+Found 4 errors.
+[NOTE] All 4 E701 are intentional: alignment-table lookups written as single-line
+if/elif/else for visual alignment with the string-pair pattern they match.
+No auto-fixable errors remain.
+
+--- MYPY (type checking) ---
+Success: no issues found in 12 source files
+
+--- SUMMARY ---
+ruff errors: 4
+ruff warnings: 0
+mypy errors: 0
+
+--- PYTEST ---
+........................................................................  [ 28%]
+........................................................................  [ 56%]
+........................................................................  [ 85%]
+......................................                                    [100%]
+254 passed in 1.04s
+
+--- COMPARISON ---
+Baseline: 01_static_analysis.txt (2026-06-22, before naming audit + static fixes)
+This file: 03_post_rename_clean.txt (2026-06-23, after both fix rounds)
+
+  Metric          Before   After   Delta   Notes
+  --------------- -------- ------- ------- ----------------------------------------
+  ruff errors       15       4     -11     11 I001 fixed by ruff --fix; 1 E501 fixed
+                                            manually; 4 E701 intentional (unchanged)
+  ruff warnings      0       0       0
+  mypy errors       34       0     -34     All operator, type-arg, arg-type, and
+                                            no-any-return errors resolved
+  pytest passed    254     254       0     All golden tests still green
+  pytest failed      0       0       0
+
+Changes that drove the mypy reduction:
+  - vertical.py     : assert lvc2 is not None type guards (9 operator errors)
+  - vertical.py     : parse_vertical_table rows: list[Any] + lvc2_raw None check
+  - crossfall.py    : parse_crossfall_table rows: list[Any]
+  - alignment.py    : parse_alignment_table rows: list[Any]; check_chain
+                      list[dict[str, Any]]; make_element trans: str | None
+  - check.py        : controls/vchecks list[dict[str, Any]]
+  - alignment_builder.py : all dict -> dict[str, Any], list[dict[str, Any]];
+                           trans arg-type resolved via make_element signature fix
+  - vertical_builder.py  : dict[str, Any], list[list[Any]]
+  - cli.py          : rows: list[Any]; return int(args.func(args))
+
+Changes that drove the ruff E501 reduction (new lines from naming audit):
+  - alignment_builder._build_curve_sub_elements : signature wrapped
+  - alignment_builder._calculate_end_displacement : signature wrapped
+  - alignment_builder.build_alignment_from_pi   : control.append wrapped
+  - vertical_builder.build_vertical_from_vpi    : grade_out split into temps
+  - surface.calculate_point_3d                  : Point3D return + ternary wrapped
+  - vertical.parse_vertical_table               : isnan condition split; comments trimmed
