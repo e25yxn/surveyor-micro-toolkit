@@ -1,5 +1,6 @@
 """Golden tests for smt.wcb."""
 import math
+
 from smt import fpmath as fp
 from smt import wcb
 
@@ -57,3 +58,97 @@ def test_distance_3d_slope():
 def test_distance_3d_same_point():
     """Identical 3-D points: slope distance must be exactly 0."""
     assert wcb.calculate_distance_3d(100, 200, 300, 100, 200, 300) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# calculate_azimuth — cardinal directions + same point
+# ---------------------------------------------------------------------------
+
+def test_azimuth_due_south():
+    az = wcb.calculate_azimuth(100, 0, 0, 0)
+    assert math.isclose(az, math.pi, abs_tol=1e-12)
+
+
+def test_azimuth_due_west():
+    az = wcb.calculate_azimuth(0, 100, 0, 0)
+    assert math.isclose(az, 3 * math.pi / 2, abs_tol=1e-12)
+
+
+def test_azimuth_same_point():
+    # atan2(0, 0) = 0 in Python; normalized → 0.0.  Document, don't crash.
+    az = wcb.calculate_azimuth(100, 200, 100, 200)
+    assert az == 0.0
+
+
+# ---------------------------------------------------------------------------
+# calculate_distance_2d — same point, large coordinates
+# ---------------------------------------------------------------------------
+
+def test_distance_2d_same_point():
+    assert wcb.calculate_distance_2d(100, 200, 100, 200) == 0.0
+
+
+def test_distance_2d_large_coords():
+    # math.hypot handles large values without overflow
+    d = wcb.calculate_distance_2d(0, 0, 1e200, 1e200)
+    assert math.isclose(d, math.sqrt(2) * 1e200, rel_tol=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# calculate_forward — zero distance, due-north, negative distance
+# ---------------------------------------------------------------------------
+
+def test_forward_zero_distance():
+    p = wcb.calculate_forward(1000, 2000, fp.deg_to_rad(45), 0.0)
+    assert math.isclose(p.n, 1000.0, abs_tol=1e-12)
+    assert math.isclose(p.e, 2000.0, abs_tol=1e-12)
+
+
+def test_forward_due_north():
+    p = wcb.calculate_forward(0, 0, 0.0, 500.0)
+    assert math.isclose(p.n, 500.0, abs_tol=1e-9)
+    assert math.isclose(p.e, 0.0, abs_tol=1e-9)
+
+
+def test_forward_negative_distance():
+    # heading east with negative distance goes west
+    p = wcb.calculate_forward(0, 0, fp.deg_to_rad(90), -100.0)
+    assert math.isclose(p.n, 0.0, abs_tol=1e-9)
+    assert math.isclose(p.e, -100.0, abs_tol=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# calculate_inverse — identical points
+# ---------------------------------------------------------------------------
+
+def test_inverse_identical_points():
+    # distance must be 0; azimuth is atan2(0,0)=0, normalized to 0.0 — no exception
+    inv = wcb.calculate_inverse(300, 400, 300, 400)
+    assert inv.distance == 0.0
+    assert inv.azimuth == 0.0
+
+
+# ---------------------------------------------------------------------------
+# calculate_offset_point — offset=0, negative offset, along=0
+# ---------------------------------------------------------------------------
+
+def test_offset_zero():
+    # offset=0 → short-circuit returns centerline point
+    p = wcb.calculate_offset_point(0, 0, fp.deg_to_rad(90), 100, 0.0)
+    assert math.isclose(p.n, 0.0, abs_tol=1e-9)
+    assert math.isclose(p.e, 100.0, abs_tol=1e-9)
+
+
+def test_offset_negative():
+    # heading east, negative offset (-) = left = north
+    p = wcb.calculate_offset_point(0, 0, fp.deg_to_rad(90), 100, -10)
+    assert math.isclose(p.n, 10.0, abs_tol=1e-9)
+    assert math.isclose(p.e, 100.0, abs_tol=1e-9)
+
+
+def test_offset_along_zero():
+    # along=0 → offset from the start point
+    p = wcb.calculate_offset_point(0, 0, fp.deg_to_rad(90), 0, 10)
+    # right of east = south (n decreases)
+    assert math.isclose(p.n, -10.0, abs_tol=1e-9)
+    assert math.isclose(p.e, 0.0, abs_tol=1e-9)

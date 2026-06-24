@@ -281,3 +281,122 @@ def test_projection_direct():
     # Point beyond the far end (E=1500) → in_range must be False
     pr3 = al.calculate_projection_to_element(el, 0.0, 1500.0)
     assert pr3.in_range is False
+
+
+# ---------------------------------------------------------------------------
+# Test 8: radius_from_curvature — negative k, unit, near-zero k
+# ---------------------------------------------------------------------------
+
+def test_radius_from_curvature_negative_k():
+    assert math.isclose(al.radius_from_curvature(-2.0), -0.5, abs_tol=1e-12)
+
+
+def test_radius_from_curvature_unit():
+    assert al.radius_from_curvature(1.0) == 1.0
+
+
+def test_radius_from_curvature_near_zero():
+    R = al.radius_from_curvature(1e-9)
+    assert math.isclose(R, 1e9, rel_tol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Test 9: make_element — trans variants, trans=None default
+# ---------------------------------------------------------------------------
+
+def test_make_element_trans_bloss():
+    el = al.make_element('SPIN', 0, 100, 0, 0, 90, 400, None, 'BLOSS')
+    assert el.transition == 'BLOSS'
+
+
+def test_make_element_trans_none_defaults_clothoid():
+    el = al.make_element('T', 0, 100, 0, 0, 90, 0, None, None)
+    assert el.transition == 'CLOTHOID'
+
+
+# ---------------------------------------------------------------------------
+# Test 10: parse_alignment_table — header-only, empty radius field
+# ---------------------------------------------------------------------------
+
+def test_parse_alignment_header_only():
+    rows = [['StaStart', 'StaEnd', 'N', 'E', 'Azimuth_deg', 'Radius', 'Type', 'Transition']]
+    assert al.parse_alignment_table(rows) == []
+
+
+def test_parse_alignment_empty_radius():
+    rows = [
+        ['StaStart', 'StaEnd', 'N', 'E', 'Azimuth_deg', 'Radius', 'Type', 'Transition'],
+        [0, 1000, 20000, 10000, 90.0, None, 'T', 'CLOTHOID'],
+    ]
+    els = al.parse_alignment_table(rows)
+    assert len(els) == 1
+    assert els[0].k_in == 0.0
+    assert els[0].k_out == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Test 11: calculate_point_on_element — d=0 (entry) and d=L (exit)
+# ---------------------------------------------------------------------------
+
+def test_point_on_element_d_zero():
+    el = al.make_element('T', 0, 1000, 20000, 10000, 90.0, 0)
+    st = al.calculate_point_on_element(el, 0.0)
+    assert math.isclose(st.n, 20000.0, abs_tol=1e-9)
+    assert math.isclose(st.e, 10000.0, abs_tol=1e-9)
+
+
+def test_point_on_element_d_equals_L():
+    el = al.make_element('T', 0, 1000, 20000, 10000, 90.0, 0)
+    L = el.sta_end - el.sta_start
+    st = al.calculate_point_on_element(el, L)
+    ex = al.calculate_exit_state(el)
+    assert math.isclose(st.n, ex.n, abs_tol=1e-9)
+    assert math.isclose(st.e, ex.e, abs_tol=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# Test 12: get_element_index — empty list, before start, junction boundary
+# ---------------------------------------------------------------------------
+
+def test_get_element_index_empty_list():
+    assert al.get_element_index([], 100.0) == -1
+
+
+def test_get_element_index_before_start(elements):
+    sta_before = elements[0].sta_start - 1.0
+    assert al.get_element_index(elements, sta_before) == -1
+
+
+def test_get_element_index_at_junction(elements):
+    # station exactly at el[0].sta_end: first element wins (loop returns first match)
+    sta_j = elements[0].sta_end
+    idx = al.get_element_index(elements, sta_j)
+    assert idx == 0
+
+
+# ---------------------------------------------------------------------------
+# Test 13: calculate_station_to_coordinate — outside raises, first station ok
+# ---------------------------------------------------------------------------
+
+def test_s2c_outside_raises(elements):
+    sta_out = elements[-1].sta_end + 100.0
+    with pytest.raises(ValueError):
+        al.calculate_station_to_coordinate(elements, sta_out, 0.0)
+
+
+def test_s2c_at_very_first_station(elements):
+    sta_first = elements[0].sta_start
+    pt = al.calculate_station_to_coordinate(elements, sta_first, 0.0)
+    assert math.isclose(pt.n, elements[0].n, abs_tol=1e-6)
+    assert math.isclose(pt.e, elements[0].e, abs_tol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Test 14: calculate_coordinate_to_station — far point raises ValueError
+# ---------------------------------------------------------------------------
+
+def test_c2s_far_point_raises():
+    # Single due-east tangent sta 0→100; point behind it (E=-500) cannot project in-range
+    el = al.make_element('T', 0, 100, 0.0, 0.0, 90.0, 0)
+    with pytest.raises(ValueError):
+        al.calculate_coordinate_to_station([el], 0.0, -500.0)
