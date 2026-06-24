@@ -66,3 +66,144 @@ extension work (CLI, notebooks, LandXML I/O) — see docs/blueprint.md.
 ## Known limits (carry over + document)
 - spiral + compound combination unsupported.
 - inverse exactly at a spiral-start node is a benign edge case (matches the JS oracle).
+
+## Session logging
+หลังทำงานเสร็จแต่ละหน่วย (แก้ไฟล์ / รัน test / commit) ให้ append ลงไฟล์
+session_logs/latest.md ทันทีด้วย Write tool โดยไม่ต้องรอให้ผู้ใช้ขอ
+แต่ละบรรทัดบันทึก: เวลา / สิ่งที่ทำ / คำสั่งที่รัน / ผล (ผ่านหรือไม่ผ่าน) / commit hash
+
+# มาตรฐานการทำงานร่วมกัน (Collaboration Standard)
+### สำหรับวาง/ผนวกเข้าใน CLAUDE.md ของทุกโปรเจกต์
+
+> เอกสารนี้คือ "ข้อตกลงการทำงาน" ระหว่าง 3 ฝ่าย: ผู้ใช้ (อาจารย์) · Claude (แชทที่ปรึกษา) ·
+> Claude Code (CLI ในเครื่อง) เพื่อให้สื่อสารกันตรงประเด็น ไม่สับสน ไม่เสียโควต้าโดยใช่เหตุ
+
+---
+
+## ส่วนที่ 1 — การบันทึก Log อัตโนมัติ (แก้ปัญหา copy จากจอ)
+
+Claude Code ต้องทำสิ่งต่อไปนี้โดยอัตโนมัติ ไม่ต้องรอให้ผู้ใช้ขอ:
+
+1. หลังทำงานเสร็จแต่ละหน่วย (แก้ไฟล์ / รัน test / commit) ให้ append ลงไฟล์
+   `session_logs/latest.md` ด้วย Write tool
+2. แต่ละรายการบันทึก: เวลา / สิ่งที่ทำ / คำสั่งที่รัน / ผล (ผ่าน-ไม่ผ่าน) / commit hash (ถ้ามี)
+3. เขียนให้ผู้ใช้อ่านเข้าใจง่าย ภาษากระชับ ไม่ต้องมีศัพท์เทคนิคเกินจำเป็น
+
+รูปแบบแต่ละรายการใน latest.md:
+```
+## [เวลา] หัวข้องาน
+- ทำ: <อธิบายสั้นๆ>
+- คำสั่ง: <command ที่รัน>
+- ผล: PASS / FAIL (<จำนวน test ที่ผ่าน>)
+- commit: <hash> (ถ้ามี)
+- หมายเหตุ: <ถ้ามีอะไรผิดปกติ>
+```
+
+> ผู้ใช้แค่ upload `session_logs/latest.md` ให้ Claude (แชท) — ไม่ต้อง copy จาก terminal อีก
+
+---
+
+## ส่วนที่ 2 — รายงานตรวจสอบสถานะ (Health Check Report)
+
+เมื่อผู้ใช้ขอ "ตรวจสถานะโปรเจกต์" หรือ "เช็คว่าเป็นเวอร์ชันล่าสุดหรือยัง" ให้ Claude Code
+สร้างไฟล์ `session_logs/health_check.md` โดยรันและบันทึกผลทั้งหมดนี้:
+
+1. `git status`                → มีไฟล์ค้าง uncommit ไหม
+2. `git log --oneline -10`     → 10 commit ล่าสุด
+3. `git log origin/main..HEAD --oneline`  → commit ที่ยังไม่ push (ถ้าว่าง = push ครบแล้ว)
+4. `git status -sb` บรรทัดแรก  → local vs remote ตรงกันไหม (ahead/behind)
+5. `pytest -q` บรรทัดสุดท้าย   → จำนวน test ที่ผ่าน
+6. `ruff check src/` บรรทัดสรุป → จำนวน lint error
+7. `mypy` บรรทัดสรุป           → จำนวน type error
+
+แล้วสรุปท้ายไฟล์เป็น 1 บรรทัด: "สถานะ: สะอาด/มีงานค้าง — <รายละเอียดสั้นๆ>"
+
+> ผู้ใช้ upload `session_logs/health_check.md` ให้ Claude (แชท) เพื่อวิเคราะห์
+
+---
+
+## ส่วนที่ 3 — กฎ "วางแผนก่อนทำ" (Plan-Review-Approve)
+
+สำหรับงานที่ "แก้โค้ด" (ไม่ใช่แค่อ่าน/รายงาน) ให้ทำตามวงจรนี้เสมอ:
+
+1. **Claude Code วางแผนก่อน** — เขียนแผนเป็นไฟล์ `session_logs/plan.md`
+   ระบุ: จะแก้ไฟล์ไหนบ้าง / แก้อะไร / มีความเสี่ยงอะไร / test ที่ใช้ยืนยัน
+2. **ผู้ใช้ upload plan.md ให้ Claude (แชท) รีวิว** — Claude ตรวจแผนแล้วบอกว่า
+   อนุมัติได้ หรือต้องปรับอะไร
+3. **เมื่อ Claude อนุมัติ ผู้ใช้จึงสั่ง Claude Code ลงมือ**
+4. **ห้าม Claude Code แก้โค้ดนอกเหนือจากแผนที่อนุมัติ** ถ้าเจอเรื่องใหม่ระหว่างทาง
+   ให้หยุดและรายงานก่อน
+
+> งานประเภท "อ่าน/รายงาน" (audit, health check) ไม่ต้องผ่านวงจรนี้ ทำได้เลย
+
+---
+
+## ส่วนที่ 4 — กฎเหล็กด้านคุณภาพโค้ด (ใช้ทุกโปรเจกต์)
+
+### 4.1 ความถูกต้องเชิงตัวเลข (กันค่าคลาดเคลื่อนสะสม)
+- คำนวณด้วย full precision (float64) เสมอ — **ห้ามปัดเศษกลางทาง** ปัดเฉพาะตอนแสดงผล
+- เทียบ float ด้วย tolerance เสมอ ห้ามใช้ `==` ตรงๆ กับทศนิยม
+- มุมเก็บเป็น radian ภายใน, แปลงเป็นองศา/DMS เฉพาะตอน input/output
+- กำหนด sign convention ให้ชัดและเขียนใน docstring (เช่น offset +ขวา/-ซ้าย)
+- **ถ้า test ไม่ผ่านเพราะ fixture ปัดเศษ ให้แก้ที่ test ห้ามลด tolerance ของ engine**
+- ใช้ oracle (เวอร์ชันที่ผ่านการพิสูจน์แล้ว) + golden test เป็นตาข่ายนิรภัย
+
+### 4.2 การตั้งชื่อ (สรุปจาก naming_convention.md)
+- ความหมาย: [กริยา Action] + [เป้าหมาย Target] + [บริบท Context]
+  เช่น `calculate_northing_from_azimuth`
+- การสะกด (Python): ฟังก์ชัน/ตัวแปร = snake_case, คลาส = PascalCase, ค่าคงที่ = UPPER_SNAKE_CASE
+- คลังคำกริยา (เลือกคำเดียวต่อความหมาย): calculate_ (คำนวณ), get_ (ดึงค่า),
+  make_ (สร้างชิ้นเดียว), build_ (ประกอบหลายชิ้น), parse_ (อ่านตาราง), check_ (ตรวจสอบ),
+  is_/has_/in_ (boolean) — การแปลงหน่วยใช้ idiom `<src>_to_<dst>` เช่น deg_to_rad
+- ตัวย่อที่อนุญาตเท่านั้น: N, E, sta, R, k, PI, VPI, PC, PT, SC, CS, TS, ST, WCB, LVC, dms
+  นอกนั้นสะกดเต็ม (azimuth ไม่ใช่ az, distance ไม่ใช่ dist)
+
+### 4.3 โครงสร้างโค้ด
+- ฟังก์ชันในแกนเป็น pure function (ไม่มี I/O, ไม่มี side effect)
+- type hints ครบทุกฟังก์ชัน, docstring บอก: ทำอะไร + หน่วย + เครื่องหมาย
+- หลัก SAFE · SMALL · STABLE · MODULAR
+
+---
+
+## ส่วนที่ 5 — มาตรฐานการ commit (กัน PowerShell heredoc พัง)
+
+1. เขียนข้อความ commit ลงไฟล์ `.git\smt_commit_msg.txt` ด้วย Write tool ก่อนเสมอ
+2. รัน `git add <files>` แยกเป็นคำสั่งเดียว
+3. รัน `git commit -F .git\smt_commit_msg.txt` แยกอีกคำสั่ง
+4. **ห้ามใช้ heredoc** (`<<'EOF'` หรือ `@'...'@`) กับ git commit บน PowerShell
+
+---
+
+## ส่วนที่ 6 — รูปแบบการตอบของ Claude (แชท) ต่อผู้ใช้
+
+เมื่อผู้ใช้ส่งเมนูปุ่ม (1/2/3/4) ของ Claude Code มา ให้ Claude ตอบรูปแบบนี้เท่านั้น:
+
+```
+กดเลข: X
+
+เพราะ: <เหตุผลสั้น 1 บรรทัด>
+
+ปุ่มอื่น:
+1 = <ทำอะไร>
+2 = <ทำอะไร>
+3 = <ทำอะไร>
+```
+
+หลักการตอบ:
+- ตอบเป็นขั้นตอน 1-2-3 ทีละขั้น **ห้ามใช้ตารางซับซ้อน**
+- ภาษ ากระชับ ตรงประเด็น ไม่ต้องยาว
+- ศัพท์เทคนิคอังกฤษให้มีคำไทยกำกับเมื่อจำเป็น
+- ถ้าเป็นคำสั่งเสี่ยง (แก้ engine, ลด tolerance, คำสั่งยาวผิดปกติ) เตือนชัดเจน
+```
+
+---
+
+## ส่วนที่ 7 — เมนูปุ่มที่เจอบ่อย (ผู้ใช้ตอบเองได้ ไม่ต้องถาม Claude)
+
+1. "Do you want to proceed?" (รัน test / อ่านไฟล์ / git) → กด **1** (ปลอดภัย)
+2. "Do you want to create/overwrite?" (ไฟล์ในโปรเจกต์) → กด **2** (allow all this session)
+3. "Compound command contains cd..." → กด **1** (แค่เข้าโฟลเดอร์ตัวเอง)
+4. เมนูมีคำว่า "don't ask again" แบบกว้าง → **เลี่ยง** กด 1 ธรรมดาแทน
+5. commit ที่ใช้ heredoc / คำสั่งยาวเกิน → กด **No** แล้วสั่งใช้ Write + commit -F
+
+> ถ้าไม่ใช่ 5 กรณีนี้ หรือไม่แน่ใจ → ค่อยถาม Claude (แชท)
