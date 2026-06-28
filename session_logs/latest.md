@@ -1,5 +1,20 @@
 # Session Log
 
+## [2026-06-28] Refactor parse_pi_table — header-name lookup
+
+- ทำ: แก้ `parse_pi_table` ใน `builders/alignment_builder.py` จาก position-based (r[0]..r[9]) → header-name lookup (case-insensitive)
+  - เพิ่ม `_COL_ALIASES` dict: map header cell text → canonical key (รองรับ N/NORTHING, R/RADIUS, STA/CHAINAGE, TRANS/TRANSITION, LS/SPIRAL)
+  - เพิ่ม `_parse_header(header_row)` → สร้าง `{key: col_index}` จาก header row
+  - เพิ่ม `_get_cell(row, col_map, key)` → ดึงค่า safe, คืน '' ถ้า column ไม่มีหรือ row สั้นเกิน
+  - `parse_pi_table` อ่าน `col_map` จาก rows[0] แล้วใช้ `_g(row, key)` แทน `r[index]` ตลอด
+  - Columns ที่ไม่มีใน header → default (STA = 0.0; อื่นๆ = blank)
+- ไม่แก้ test (existing `_HDR` headers ทุกตัว match alias แบบ case-insensitive อยู่แล้ว)
+- คำสั่ง: `pytest -q`
+- ผล: PASS (387/387)
+- commit: fcd840c
+
+---
+
 ## [2026-06-28] Bulk Field Cross-Check Feature
 
 - ทำ: วางแผน (plan_bulk_crosscheck.md) + implement 3 ส่วนหลัก + 46 tests ใหม่
