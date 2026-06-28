@@ -100,6 +100,8 @@ def _run_build(args: argparse.Namespace) -> int:
     """build: PI table CSV -> elements_output.csv + controls_so_output.csv."""
     import os
     vertices = _read_pi_table(args.alignment)
+    if not vertices:
+        raise ValueError('ไม่พบข้อมูล PI ในไฟล์ หรือไฟล์ไม่ใช่ PI table format')
     build_result = build_alignment_from_pi(vertices)
     for issue in build_result.issues:
         print(f'warning: {issue}', file=sys.stderr)
@@ -111,22 +113,23 @@ def _run_build(args: argparse.Namespace) -> int:
     el_header = ['StaStart', 'StaEnd', 'N', 'E', 'Azimuth', 'Radius', 'Type', 'Transition']
     el_rows = []
     for el in build_result.elements:
+        transition_val = '' if el.type in ('T', 'C') else el.transition
         el_rows.append([
-            f'{el.sta_start:.3f}',
-            f'{el.sta_end:.3f}',
-            f'{el.n:.3f}',
-            f'{el.e:.3f}',
+            f'{el.sta_start:.6f}',
+            f'{el.sta_end:.6f}',
+            f'{el.n:.6f}',
+            f'{el.e:.6f}',
             f'{fpmath.rad_to_deg(el.azimuth):.6f}',
-            f'{_radius_from_element(el):.3f}',
+            f'{_radius_from_element(el):.6f}',
             el.type,
-            el.transition,
+            transition_val,
         ])
     with open(el_path, 'w', newline='', encoding='utf-8') as f:
         csv.writer(f).writerows([el_header] + el_rows)
 
     cp_path = os.path.join(out_dir, 'controls_so_output.csv')
     cp_header = ['Name', 'STA', 'N', 'E']
-    cp_rows = [[cp.name, f'{cp.sta:.3f}', f'{cp.n:.3f}', f'{cp.e:.3f}']
+    cp_rows = [[cp.name, f'{cp.sta:.6f}', f'{cp.n:.6f}', f'{cp.e:.6f}']
                for cp in build_result.control]
     with open(cp_path, 'w', newline='', encoding='utf-8') as f:
         csv.writer(f).writerows([cp_header] + cp_rows)
