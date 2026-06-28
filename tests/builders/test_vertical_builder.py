@@ -198,3 +198,55 @@ def test_overlap_reported_as_issue() -> None:
     res = vb.build_vertical_from_vpi(vpis)
     assert len(res.issues) == 1
     assert 'VPI#1' in res.issues[0]
+
+
+# ---------------------------------------------------------------------------
+# Part 2 defensive edge-case tests
+# ---------------------------------------------------------------------------
+
+class TestDefensiveVerticalBuilder:
+    """Error-path and edge-case coverage for vertical_builder (Part 2)."""
+
+    def test_vpi_with_l_zero_produces_zero_lvc_row(self) -> None:
+        # L=0: l1=l2=0, pvc_sta=pvt_sta=v_sta → zero-length VC row with lvc=0
+        vpis = [
+            {'sta': 0,    'elev': 100},
+            {'sta': 500,  'elev': 110, 'L': 0},
+            {'sta': 1000, 'elev': 120},
+        ]
+        res = vb.build_vertical_from_vpi(vpis)
+        assert res.issues == []
+        # Expected rows: tangent (0→500), degenerate VC (500→500), tangent (500→1000)
+        assert len(res.rows) == 3
+        vc_row = res.rows[1]
+        assert vc_row.lvc == 0.0
+        assert vc_row.lvc2 is None
+        assert vc_row.sta_start == vc_row.sta_end   # zero-length
+
+    def test_multiple_overlapping_vpis_produce_multiple_issues(self) -> None:
+        # Two interior VPIs both with LVC long enough to overlap previous end
+        vpis = [
+            {'sta': 0,    'elev': 100},
+            {'sta': 300,  'elev': 110, 'L': 1200},  # PVC at -300 < end_sta=0  → issue #1
+            {'sta': 600,  'elev': 110, 'L': 1200},  # PVC at  0  < end_sta=900 → issue #2
+            {'sta': 1500, 'elev': 120},
+        ]
+        res = vb.build_vertical_from_vpi(vpis)
+        assert len(res.issues) >= 2
+
+    def test_build_table_empty_input_returns_empty(self) -> None:
+        assert vb.build_table([]) == []
+
+    def test_check_against_drawing_empty_drawing_gives_empty(self, result) -> None:
+        report = vb.check_against_drawing(result.control, [])
+        assert report == []
+
+    def test_check_against_drawing_unknown_name_is_skipped(self, result) -> None:
+        # 'XYZ' matches no control name → entry skipped, only 'BVP' reported
+        drawing = [
+            {'name': 'BVP', 'sta': 0,    'elev': 100},
+            {'name': 'XYZ', 'sta': 0,    'elev': 100},
+        ]
+        report = vb.check_against_drawing(result.control, drawing)
+        assert len(report) == 1
+        assert report[0]['name'] == 'BVP'

@@ -139,3 +139,29 @@ def test_check_vertical_names_preserved(golden: dict, segs: list) -> None:
     for r, vc in zip(results, golden['vchecks']):
         assert r.name == vc['name']
         assert r.sta == vc['sta']
+
+
+# ---------------------------------------------------------------------------
+# Part 2 defensive edge-case tests
+# ---------------------------------------------------------------------------
+
+def test_check_horizontal_empty_controls_returns_empty(elements: list) -> None:
+    assert ck.check_horizontal(elements, []) == []
+
+
+def test_check_horizontal_far_outside_raises(elements: list) -> None:
+    """Station far outside snap tolerance (0.01 m) propagates ValueError from alignment."""
+    far_outside = [{'name': 'X', 'sta': -1000.0, 'n': 0.0, 'e': 0.0}]
+    with pytest.raises(ValueError):
+        ck.check_horizontal(elements, far_outside)
+
+
+def test_check_vertical_empty_vchecks_returns_empty(segs: list) -> None:
+    assert ck.check_vertical(segs, []) == []
+
+
+def test_check_vertical_far_outside_raises(segs: list) -> None:
+    """Station far outside profile raises ValueError (calculate_elevation returns None)."""
+    far_outside = [{'name': 'X', 'sta': -1000.0, 'elev': 100.0}]
+    with pytest.raises(ValueError):
+        ck.check_vertical(segs, far_outside)

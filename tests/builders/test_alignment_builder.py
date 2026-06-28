@@ -649,3 +649,72 @@ class TestNoCurvePI:
             assert math.isclose(ex.e, nxt.e, abs_tol=1e-9), (
                 f'Chain break E at boundary {i}→{i+1}'
             )
+
+
+# ---------------------------------------------------------------------------
+# Part 2 defensive edge-case tests
+# ---------------------------------------------------------------------------
+
+class TestDefensiveBuilder:
+    """Error-path and edge-case coverage for alignment_builder (Part 2)."""
+
+    def test_spiral_overflow_reported_as_issue(self):
+        # R=100, Ls=1000 on a 90° right turn: θs = 1000/200 = 5 rad >> π/2
+        # delta_circular = π/2 - 5 - 5 = -8.43 < 0 → issue logged
+        verts = [
+            {'n': 0.0,    'e': 0.0,   'sta': 0.0},
+            {'n': 1000.0, 'e': 0.0,   'R': 100, 'Ls': 1000},
+            {'n': 1000.0, 'e': 1000.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert len(r.issues) == 1
+        assert 'PI#1' in r.issues[0]
+
+    def test_compound_overflow_reported_as_issue(self):
+        # 90° left turn (east→north), compound[0].delta=100° > 90° total
+        # last arc delta = π/2 - deg_to_rad(100) < 0 → issue logged
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 0.0,   'e': 500.0, 'compound': [
+                {'R': 300, 'delta': 100},
+                {'R': 150},
+            ]},
+            {'n': 500.0, 'e': 500.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert len(r.issues) >= 1
+        assert 'compound' in r.issues[0]
+
+    def test_ls_zero_treated_as_simple_circle(self):
+        # Ls=0 must fall through to simple circle path (not spiral branch)
+        verts_no_ls = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 500.0, 'e': 0.0,   'R': 300},
+            {'n': 500.0, 'e': 500.0},
+        ]
+        verts_ls0 = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 500.0, 'e': 0.0,   'R': 300, 'Ls': 0},
+            {'n': 500.0, 'e': 500.0},
+        ]
+        r1 = ab.build_alignment_from_pi(verts_no_ls)
+        r2 = ab.build_alignment_from_pi(verts_ls0)
+        assert [el.type for el in r1.elements] == [el.type for el in r2.elements]
+        assert r1.issues == r2.issues == []
+
+    def test_check_against_drawing_empty_control_gives_empty_report(self):
+        # No control points → every drawing entry has best=None → skipped → []
+        drawing = [{'name': 'PC', 'sta': 100.0, 'n': 0.0, 'e': 0.0}]
+        report = ab.check_against_drawing([], drawing)
+        assert report == []
+
+    def test_check_against_drawing_unknown_name_is_skipped(self):
+        # 'XYZ' does not match any control name → entry skipped, only 'PC' reported
+        ctrl = [ab.ControlPoint(name='PC', sta=100.0, n=10.0, e=0.0)]
+        drawing = [
+            {'name': 'PC',  'sta': 100.0, 'n': 10.0, 'e': 0.0},
+            {'name': 'XYZ', 'sta': 100.0, 'n': 10.0, 'e': 0.0},
+        ]
+        report = ab.check_against_drawing(ctrl, drawing)
+        assert len(report) == 1
+        assert report[0]['name'] == 'PC'

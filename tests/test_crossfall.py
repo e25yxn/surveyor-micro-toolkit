@@ -244,3 +244,31 @@ def test_zero_length_segment_returns_x_start():
     seg = cf.CrossfallSegment(sta_start=100, sta_end=100, crossfall_start=-2.5, crossfall_end=4.0, type='S')
     assert cf.calculate_crossfall_at(seg, 100) == -2.5
     assert cf.calculate_crossfall_rate_at(seg, 100) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Part 2 defensive edge-case tests
+# ---------------------------------------------------------------------------
+
+class TestDefensiveCrossfall:
+    """Edge-case coverage for parse_crossfall_table (Part 2)."""
+
+    def test_parse_nan_sta_start_is_skipped(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'xf_start', 'xf_end', 'type'],
+            [1, math.nan, 1000.0, -2.5, -2.5, 'N'],   # skipped (NaN sta_start)
+            [2, 0.0,       500.0, -2.5, -2.5, 'N'],   # kept
+        ]
+        segs = cf.parse_crossfall_table(rows)
+        assert len(segs) == 1
+        assert segs[0].sta_start == 0.0
+
+    def test_parse_short_row_defaults_to_type_v(self):
+        # 5-element row (no type column): len=5, NOT > 5 → type_raw=None → 'V'
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'xf_start', 'xf_end'],
+            [1, 0.0, 100.0, -2.5, 4.0],
+        ]
+        segs = cf.parse_crossfall_table(rows)
+        assert len(segs) == 1
+        assert segs[0].type == 'V'

@@ -287,3 +287,13 @@ def test_point3d_unpack(elements, v_segs, xlt_segs, xrt_segs):
     assert isinstance(level, float)
     assert isinstance(cl_level, float)
     assert isinstance(xfall, float)
+
+
+# ---------------------------------------------------------------------------
+# Part 2 defensive edge-case tests
+# ---------------------------------------------------------------------------
+
+def test_point3d_outside_alignment_raises_value_error(elements, v_segs, xlt_segs, xrt_segs):
+    """Raises ValueError when sta lies outside the alignment (propagated from alignment)."""
+    with pytest.raises(ValueError):
+        sf.calculate_point_3d(elements, v_segs, xlt_segs, xrt_segs, sta=-1000.0, offset=0.0)

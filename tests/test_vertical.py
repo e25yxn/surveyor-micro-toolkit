@@ -264,3 +264,66 @@ def test_elevation_continuity_at_junctions(segs):
             f'Elevation gap between seg {i} and {i+1}: '
             f'exit={elev_exit:.6f} entry_level={elev_entry:.6f}'
         )
+
+
+# ---------------------------------------------------------------------------
+# Part 2 defensive edge-case tests
+# ---------------------------------------------------------------------------
+
+class TestDefensiveVertical:
+    """Edge-case and error-path coverage for smt.vertical (Part 2)."""
+
+    def test_grade_continuity_at_asymmetric_arm_boundary(self):
+        """At the VPI station (lx=L1) both arm formulas must give the same grade."""
+        # segs[3]: asymmetric VC [2700,3000], g1=-1.125%, g2≈0.706%, L1=100, L2=200
+        seg = vt.VerticalSegment(
+            sta_start=2700, sta_end=3000,
+            level=101.125, grade_in=-1.125, grade_out=0.706,
+            lvc=100, lvc2=200,
+        )
+        vpi_sta = 2800  # sta_start + L1
+        g_before = vt.calculate_grade_at(seg, vpi_sta - 1e-6)   # arm-1
+        g_after  = vt.calculate_grade_at(seg, vpi_sta + 1e-6)   # arm-2
+        assert abs(g_before - g_after) < 1e-4, (
+            f'Grade discontinuity at asymmetric arm boundary: '
+            f'{g_before:.9f} vs {g_after:.9f}'
+        )
+
+    def test_elevation_empty_segs_returns_none(self):
+        assert vt.calculate_elevation([], 0.0) is None
+        assert vt.calculate_elevation([], 500.0) is None
+
+    def test_parse_header_only_returns_empty(self):
+        rows = [['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2']]
+        assert vt.parse_vertical_table(rows) == []
+
+    def test_parse_nan_sta_start_is_skipped(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2'],
+            [1, math.nan, 1000, 100.0, 1.5, 1.5, 0, None],    # skipped
+            [2, 0.0,       500, 100.0, 1.5, 1.5, 0, None],    # kept
+        ]
+        segs = vt.parse_vertical_table(rows)
+        assert len(segs) == 1
+        assert segs[0].sta_start == 0.0
+
+    def test_parse_empty_lvc_cell_defaults_to_zero(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2'],
+            [1, 0.0, 500.0, 100.0, 1.5, 1.5, '', None],
+        ]
+        segs = vt.parse_vertical_table(rows)
+        assert len(segs) == 1
+        assert segs[0].lvc == 0.0
+        assert segs[0].lvc2 is None
+
+    def test_parse_short_row_without_lvc2_column(self):
+        # 7-element row (indices 0–6): len=7, NOT > 7 → lvc2_raw=None → lvc2=None
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc'],
+            [1, 0.0, 500.0, 100.0, 1.5, 1.5, 200.0],
+        ]
+        segs = vt.parse_vertical_table(rows)
+        assert len(segs) == 1
+        assert segs[0].lvc == 200.0
+        assert segs[0].lvc2 is None
