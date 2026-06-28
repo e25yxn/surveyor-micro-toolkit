@@ -1,5 +1,18 @@
 # Session Log
 
+## [2026-06-28 19:02] Add smt build subcommand
+
+- ทำ: เพิ่ม CLI subcommand `smt build` ใน `cli.py` + 6 tests ใน `test_cli.py`
+  - `_radius_from_element(el)`: helper แปลง k_in/k_out → signed design radius (0=tangent)
+  - `_run_build(args)`: อ่าน PI CSV → `build_alignment_from_pi` → เขียน `elements_output.csv` + `controls_so_output.csv` + แสดงทั้งสองตารางใน terminal
+  - parser registration: `smt build <alignment> [--out-dir DIR]`
+  - import เพิ่ม `fpmath` สำหรับแปลง azimuth radian → degree
+- คำสั่ง: `pytest -q`, `smt build test_data/SettingOutTest.csv --out-dir test_data/build_out/`
+- ผล: PASS (393/393) — smoke test ผ่าน: elements_output.csv 32 rows, controls_so_output.csv 33 rows
+- commit: 1a1efd1
+
+---
+
 ## [2026-06-28] Refactor parse_pi_table — header-name lookup
 
 - ทำ: แก้ `parse_pi_table` ใน `builders/alignment_builder.py` จาก position-based (r[0]..r[9]) → header-name lookup (case-insensitive)
