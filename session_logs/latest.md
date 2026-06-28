@@ -1,5 +1,31 @@
 # Session Log
 
+## [2026-06-28] Implement: No-Curve PI (Angle Point) support
+
+- ทำ: เพิ่ม extension รองรับ PI ที่ไม่มีรัศมีโค้ง (angle point) ใน alignment_builder.py และ test ใหม่ 12 cases
+- ไฟล์ที่แก้:
+  - `src/smt/builders/alignment_builder.py`: แก้ 3 ฟังก์ชัน
+    - `_build_curve_sub_elements`: เพิ่ม early return `([], None)` เมื่อ `not vert.get('R')` (ครอบคลุม missing R, R=0, R=None)
+    - `_get_control_names`: เพิ่ม guard `if not subs: return {'start':'IP',...}`
+    - `build_alignment_from_pi`: เพิ่ม branch `if not subs:` → emit tangent + ControlPoint('IP') + continue
+  - `tests/builders/test_alignment_builder.py`: เพิ่ม class `TestNoCurvePI` (12 tests)
+  - `session_logs/investigate_nocurve_pi.md`: รายงานสืบสวนก่อนลงมือ (อ่านอย่างเดียว)
+- คำสั่ง: `pytest tests/builders/test_alignment_builder.py -v`, `pytest -q`
+- ผล: PASS — 341/341 (เดิม 329 + 12 ใหม่), ไม่มี regression
+- commit: cdf896d
+
+---
+
+## [2026-06-28] สร้าง docs/extensions.md (EXT-001)
+
+- ทำ: สร้างไฟล์ `docs/extensions.md` — บันทึก extension แรกของโปรเจกต์ (no-curve PI / angle point)
+- เนื้อหา: oracle limitation, สิ่งที่เพิ่ม, ที่มาคณิตศาสตร์ (AASHTO), commit ref, ตาราง 12 test cases
+- คำสั่ง: `git add docs/extensions.md`, `git commit`, `git commit --amend` (ผู้ใช้แก้ message), `git push`
+- ผล: PASS — commit 673da5d pushed to GitHub
+- commit: 673da5d
+
+---
+
 ## [2026-06-28] สืบสวน: No-Curve PI / Angle Point
 
 - ทำ: อ่านและวิเคราะห์ว่าโปรเจกต์จัดการ PI ที่ไม่มีรัศมีโค้งอย่างไร (อ่านอย่างเดียว ไม่แก้โค้ด)
