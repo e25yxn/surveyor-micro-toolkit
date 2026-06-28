@@ -161,27 +161,72 @@ def _calculate_end_displacement(
 # Public: parser
 # ---------------------------------------------------------------------------
 
+# Maps lowercased header cell text → canonical column key.
+_COL_ALIASES: dict[str, str] = {
+    'point':      'point',
+    'n':          'northing',
+    'northing':   'northing',
+    'e':          'easting',
+    'easting':    'easting',
+    'sta':        'sta',
+    'chainage':   'sta',
+    'r':          'radius',
+    'radius':     'radius',
+    'ls':         'ls',
+    'spiral':     'ls',
+    'lsin':       'lsin',
+    'lsout':      'lsout',
+    'trans':      'trans',
+    'transition': 'trans',
+    'delta':      'delta',
+}
+
+
+def _parse_header(header_row: list[Any]) -> dict[str, int]:
+    """Return canonical-key → column-index mapping from the header row."""
+    col_map: dict[str, int] = {}
+    for i, cell in enumerate(header_row):
+        key = _COL_ALIASES.get(str(cell).strip().lower())
+        if key is not None and key not in col_map:
+            col_map[key] = i
+    return col_map
+
+
+def _get_cell(row: list[Any], col_map: dict[str, int], key: str) -> str:
+    """Return stripped cell string; '' when column is absent or row is too short."""
+    idx = col_map.get(key)
+    if idx is None or idx >= len(row):
+        return ''
+    return str(row[idx]).strip()
+
+
 def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
     """Parse a PI-table (first row = headers) into a vertex list for
     build_alignment_from_pi.
 
-    Column order (position-based; names ignored):
-      0 POINT   — 'BP' | 'EP' | non-blank = PI vertex | blank = compound sub-row
-      1 N       — northing  (blank for compound sub-rows)
-      2 E       — easting   (blank for compound sub-rows)
-      3 Sta     — starting chainage (BP only)
-      4 R       — radius metres; blank or '0' = angle point (EXT-001)
-      5 Ls      — symmetric spiral length
-      6 LsIn    — entry spiral length (overrides Ls when non-blank)
-      7 LsOut   — exit spiral length (overrides Ls when non-blank)
-      8 Trans   — CLOTHOID (default) | BLOSS | COSINE | SINE
-      9 Delta   — arc deflection degrees (compound sub-rows; blank on last arc)
+    Column names are matched case-insensitively from the header row:
+      POINT / (same)         — 'BP' | 'EP' | PI label | blank = compound sub-row
+      N / NORTHING           — northing
+      E / EASTING            — easting
+      STA / CHAINAGE         — starting chainage (BP only; default 0.0)
+      R / RADIUS             — radius metres; blank or '0' = angle point (EXT-001)
+      LS / SPIRAL            — symmetric spiral length
+      LSIN                   — entry spiral length (overrides LS when non-blank)
+      LSOUT                  — exit spiral length (overrides LS when non-blank)
+      TRANS / TRANSITION     — CLOTHOID (default) | BLOSS | COSINE | SINE
+      DELTA                  — arc deflection degrees (compound sub-rows; blank on last arc)
 
+    Columns not present in the header use defaults (STA → 0.0; others → blank).
     Blank-POINT rows with a non-blank R are compound sub-arcs attached to the
     preceding PI vertex.  Blank-POINT rows with blank R are ignored (blank lines).
 
     Raises ValueError for malformed numeric cells (propagated from float()).
     """
+    col_map = _parse_header(rows[0])
+
+    def _g(row: list[Any], key: str) -> str:
+        return _get_cell(row, col_map, key)
+
     vertices: list[dict[str, Any]] = []
     pending_pi: dict[str, Any] | None = None
     compound_arcs: list[dict[str, Any]] = []
@@ -200,16 +245,15 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
         pending_pi = None
 
     for row in rows[1:]:            # skip header row
-        r = list(row) + [''] * 10  # pad to avoid IndexError
-        point = str(r[0]).strip()
+        point = _g(row, 'point')
 
         if not point:
             # compound sub-row — only meaningful when R is non-blank
-            r_raw = str(r[4]).strip()
+            r_raw = _g(row, 'radius')
             if not r_raw:
                 continue
             arc: dict[str, Any] = {'R': float(r_raw)}
-            delta_raw = str(r[9]).strip()
+            delta_raw = _g(row, 'delta')
             if delta_raw:
                 arc['delta'] = float(delta_raw)
             compound_arcs.append(arc)
@@ -217,11 +261,11 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
 
         _flush_pending()
 
-        n = float(r[1])
-        e = float(r[2])
+        n = float(_g(row, 'northing'))
+        e = float(_g(row, 'easting'))
 
         if point == 'BP':
-            sta_raw = str(r[3]).strip()
+            sta_raw = _g(row, 'sta')
             vertices.append({'n': n, 'e': e, 'sta': float(sta_raw) if sta_raw else 0.0})
             continue
 
@@ -231,12 +275,12 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
 
         # PI vertex
         pi_dict: dict[str, Any] = {'n': n, 'e': e}
-        r_raw = str(r[4]).strip()
+        r_raw = _g(row, 'radius')
         if r_raw and float(r_raw) != 0.0:
             pi_dict['R'] = float(r_raw)
-            ls_raw    = str(r[5]).strip()
-            lsin_raw  = str(r[6]).strip()
-            lsout_raw = str(r[7]).strip()
+            ls_raw    = _g(row, 'ls')
+            lsin_raw  = _g(row, 'lsin')
+            lsout_raw = _g(row, 'lsout')
             if lsin_raw or lsout_raw:
                 if lsin_raw:
                     pi_dict['LsIn'] = float(lsin_raw)
@@ -244,7 +288,7 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
                     pi_dict['LsOut'] = float(lsout_raw)
             elif ls_raw:
                 pi_dict['Ls'] = float(ls_raw)
-            trans = str(r[8]).strip()
+            trans = _g(row, 'trans')
             if trans:
                 pi_dict['trans'] = trans
         # else: R absent or 0 → angle point (no 'R' key); may gain 'compound' later
