@@ -1,5 +1,21 @@
 # Session Log
 
+## [2026-06-28] Part 2 — Defensive edge-case tests (vertical, crossfall, surface, check, builders)
+
+- ทำ: เพิ่ม 23 tests ครอบ coverage gaps ที่ audit ระบุใน 6 ไฟล์ test
+- ไฟล์ที่แก้:
+  - `tests/test_vertical.py` (+6): grade continuity ที่ asymmetric arm boundary, empty segs→None, parse header-only/NaN/empty-lvc/short-row
+  - `tests/test_crossfall.py` (+2): parse NaN sta_start ถูก skip, short row→default type V
+  - `tests/test_surface.py` (+1): sta นอก alignment → ValueError propagated
+  - `tests/test_check.py` (+4): empty controls→[], empty vchecks→[], far-outside sta→ValueError (horizontal + vertical)
+  - `tests/builders/test_alignment_builder.py` (+5): spiral overflow/compound overflow→issues, Ls=0=simple circle, check_against_drawing empty control/unknown name skipped
+  - `tests/builders/test_vertical_builder.py` (+5): L=0 VPI zero-lvc row, multiple overlaps→multiple issues, build_table([]), check_against_drawing empty drawing/unknown name skipped
+- คำสั่ง: `pytest tests/ -q`
+- ผล: PASS — 364/364 (เดิม 341 + 23 ใหม่), ไม่มี regression, ไม่แก้ engine
+- commit: 0b75c5d
+
+---
+
 ## [2026-06-28] Implement: No-Curve PI (Angle Point) support
 
 - ทำ: เพิ่ม extension รองรับ PI ที่ไม่มีรัศมีโค้ง (angle point) ใน alignment_builder.py และ test ใหม่ 12 cases
