@@ -468,3 +468,184 @@ class TestChainContinuity:
             assert math.isclose(ex.e, nxt.e, abs_tol=1e-9), (
                 f'Chain break E at boundary {i}→{i+1}: {ex.e:.9f} vs {nxt.e:.9f}'
             )
+
+
+# ---------------------------------------------------------------------------
+# Test 7: no-curve PI / angle point  (EXTENSION: beyond oracle)
+# ---------------------------------------------------------------------------
+
+class TestNoCurvePI:
+    """Verify angle-point and collinear-PI handling added beyond the GS oracle.
+
+    Geometry note — coordinate axes used throughout:
+      N-axis = northing (increases upward in plan), E-axis = easting (increases right).
+      Azimuth 0 = north, π/2 = east (clockwise from north).
+    """
+
+    # ---- T-A: no-R vertex produces two tangents and 'IP' control ----
+
+    def test_angle_point_element_types(self):
+        # BP(0,0) heading north, IP(200,0) right-turn 90°, EP(200,500) heading east
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0},               # no 'R' → angle point
+            {'n': 200.0, 'e': 500.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'T']
+
+    def test_angle_point_control_names(self):
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0},
+            {'n': 200.0, 'e': 500.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [c.name for c in r.control] == ['BP', 'IP', 'EP']
+
+    # ---- T-B: IP coordinates and station are exact ----
+
+    def test_angle_point_ip_station_and_coords(self):
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0},
+            {'n': 200.0, 'e': 500.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        ip = r.control[1]
+        assert math.isclose(ip.sta, 200.0,   abs_tol=1e-9)
+        assert math.isclose(ip.n,   200.0,   abs_tol=1e-9)
+        assert math.isclose(ip.e,   0.0,     abs_tol=1e-9)
+        ep = r.control[2]
+        assert math.isclose(ep.sta, 700.0,   abs_tol=1e-9)
+
+    # ---- T-C: R=0 is treated the same as no-R ----
+
+    def test_r_zero_is_angle_point(self):
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0,   'R': 0},     # R=0 → angle point
+            {'n': 200.0, 'e': 500.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'T']
+        assert [c.name for c in r.control] == ['BP', 'IP', 'EP']
+
+    # ---- T-D: collinear PI (delta=0) does not raise and advances station ----
+
+    def test_collinear_pi_no_error(self):
+        # All three points on the same northward line → delta=0, sin(delta)=0
+        verts = [
+            {'n': 0.0,    'e': 0.0, 'sta': 0.0},
+            {'n': 500.0,  'e': 0.0},              # collinear, no R
+            {'n': 1000.0, 'e': 0.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'T']
+        assert math.isclose(r.control[1].sta, 500.0,  abs_tol=1e-9)
+        assert math.isclose(r.control[2].sta, 1000.0, abs_tol=1e-9)
+
+    # ---- T-E: no issues emitted for a clean angle-point alignment ----
+
+    def test_angle_point_no_issues(self):
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0},
+            {'n': 200.0, 'e': 500.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert r.issues == []
+
+    # ---- T-F: circle followed by angle point ----
+
+    def test_curve_then_angle_point_types(self):
+        # BP(0,0) → PI₁(200,0) R=50 (right 90°) → IP₂(200,300) no-R → EP(700,300)
+        # T = 50·tan(45°) = 50 → PC=(150,0), PT=(200,50)
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0,   'R': 50},
+            {'n': 200.0, 'e': 300.0},              # no R → IP
+            {'n': 700.0, 'e': 300.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'C', 'T', 'T']
+        assert [c.name for c in r.control] == ['BP', 'PC', 'PT', 'IP', 'EP']
+
+    def test_curve_then_angle_point_ip_station(self):
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0,   'R': 50},
+            {'n': 200.0, 'e': 300.0},
+            {'n': 700.0, 'e': 300.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        # PC.sta=150, arc=50·π/2=25π, PT.sta=150+25π, tan PT→IP=250
+        expected_ip_sta = 150.0 + 25.0 * math.pi + 250.0
+        ip = next(c for c in r.control if c.name == 'IP')
+        assert math.isclose(ip.sta, expected_ip_sta, abs_tol=1e-9)
+
+    # ---- T-G: angle point followed by curve ----
+
+    def test_angle_point_then_curve_types(self):
+        # BP(0,0) → IP₁(300,0) no-R (right 90°) → PI₂(300,300) R=80 (left 90°) → EP(700,300)
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 300.0, 'e': 0.0},               # no R → IP
+            {'n': 300.0, 'e': 300.0, 'R': 80},
+            {'n': 700.0, 'e': 300.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'T', 'C', 'T']
+        assert [c.name for c in r.control] == ['BP', 'IP', 'PC', 'PT', 'EP']
+
+    def test_angle_point_then_curve_pc_position(self):
+        # After IP₁(300,0) heading east, PI₂(300,300) with R=80 left turn 90°:
+        # T = 80·tan(45°) = 80 → PC=(300, 220)
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 300.0, 'e': 0.0},
+            {'n': 300.0, 'e': 300.0, 'R': 80},
+            {'n': 700.0, 'e': 300.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        pc = next(c for c in r.control if c.name == 'PC')
+        assert math.isclose(pc.n, 300.0, abs_tol=1e-6)
+        assert math.isclose(pc.e, 220.0, abs_tol=1e-6)
+
+    # ---- T-H: two consecutive angle points ----
+
+    def test_two_consecutive_angle_points(self):
+        # BP(0,0) → IP₁(400,0) → IP₂(400,300) → EP(700,300)
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 400.0, 'e': 0.0},
+            {'n': 400.0, 'e': 300.0},
+            {'n': 700.0, 'e': 300.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'T', 'T']
+        assert [c.name for c in r.control] == ['BP', 'IP', 'IP', 'EP']
+        assert math.isclose(r.control[1].sta, 400.0,  abs_tol=1e-9)
+        assert math.isclose(r.control[2].sta, 700.0,  abs_tol=1e-9)
+        assert math.isclose(r.control[3].sta, 1000.0, abs_tol=1e-9)
+
+    # ---- T-I: chain continuity holds for alignment containing IP ----
+
+    def test_chain_continuity_with_angle_point(self):
+        from smt.alignment import calculate_exit_state
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0,   'R': 50},
+            {'n': 200.0, 'e': 300.0},
+            {'n': 700.0, 'e': 300.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        for i in range(len(r.elements) - 1):
+            ex  = calculate_exit_state(r.elements[i])
+            nxt = r.elements[i + 1]
+            assert math.isclose(ex.n, nxt.n, abs_tol=1e-9), (
+                f'Chain break N at boundary {i}→{i+1}'
+            )
+            assert math.isclose(ex.e, nxt.e, abs_tol=1e-9), (
+                f'Chain break E at boundary {i}→{i+1}'
+            )

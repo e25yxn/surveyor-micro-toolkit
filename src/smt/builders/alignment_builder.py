@@ -83,6 +83,11 @@ def _build_curve_sub_elements(
             subs.append({'kind': 'C', 'R': r_circular, 'len': r_circular * delta})
         return subs, issue
 
+    # EXTENSION: beyond oracle — treat missing R or R=0 as an angle point.
+    # Oracle would produce NaN; we return empty subs to signal a no-curve PI.
+    if not vert.get('R'):
+        return [], None
+
     R = abs(float(vert['R']))
     ls_in  = float(vert['LsIn']  if vert.get('LsIn')  is not None else (vert.get('Ls') or 0.0))
     ls_out = float(vert['LsOut'] if vert.get('LsOut') is not None else (vert.get('Ls') or 0.0))
@@ -112,6 +117,11 @@ def _get_control_names(subs: list[dict[str, Any]]) -> dict[str, Any]:
 
     Returns dict with keys 'start', 'end', 'jct' (list of junction names).
     """
+    # EXTENSION: beyond oracle — defensive guard against IndexError when subs is
+    # empty (angle point).  build_alignment_from_pi handles 'IP' naming directly
+    # and never calls this function for empty subs, but guard here for safety.
+    if not subs:
+        return {'start': 'IP', 'end': 'IP', 'jct': []}
     start = 'TS' if subs[0]['kind'] == 'SPIN' else 'PC'
     end   = 'ST' if subs[-1]['kind'] == 'SPOUT' else 'PT'
     jct: list[str] = []
@@ -189,6 +199,19 @@ def build_alignment_from_pi(vertices: list[dict[str, Any]]) -> BuildResult:
         subs, issue = _build_curve_sub_elements(vertices[v], abs_delta)
         if issue:
             issues.append(f'PI#{v}: {issue}')
+
+        # EXTENSION: beyond oracle — no-curve PI (angle point or collinear).
+        # Emits a tangent element to the PI vertex, records it as 'IP', and continues.
+        # This also avoids ZeroDivisionError when det = sin(delta) = 0 (collinear case).
+        if not subs:
+            tan_len = wcb.calculate_distance_2d(prev_n, prev_e, vertex_n, vertex_e)
+            sta_pi  = prev_sta + tan_len
+            elements.append(make_element(
+                'T', prev_sta, sta_pi, prev_n, prev_e, fpmath.rad_to_deg(azimuth_in), 0,
+            ))
+            control.append(ControlPoint(name='IP', sta=sta_pi, n=vertex_n, e=vertex_e))
+            prev_n, prev_e, prev_sta = vertex_n, vertex_e, sta_pi
+            continue
 
         # Solve 2×2 system: d1·uIn + d2·uOut = V
         # where V = end displacement of curve group placed at origin.
