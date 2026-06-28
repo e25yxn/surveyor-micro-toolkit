@@ -61,7 +61,7 @@ class FieldCrossCheckResult(NamedTuple):
 
     sta    : chainage of the foot-of-perpendicular on the centre-line (m)
     offset : perpendicular offset — +right, −left (m)
-    disc   : survey discrepancy carried through from input (m; sign from fieldbook)
+    disc   : survey discrepancy carried through from input as raw string
     """
     name: str
     n: float
@@ -69,7 +69,7 @@ class FieldCrossCheckResult(NamedTuple):
     z: float
     sta: float
     offset: float
-    disc: float
+    disc: str
 
 
 # ---------------------------------------------------------------------------
@@ -157,8 +157,8 @@ def bulk_cross_check(
     returns the result enriched with alignment position.  The disc value
     (survey closure discrepancy) is carried through unchanged.
 
-    field_points : list of dicts — keys 'name' (str), 'n', 'e', 'z', 'disc' (float).
-                   'disc' defaults to 0.0 when absent.
+    field_points : list of dicts — keys 'name' (str), 'n', 'e', 'z' (float), 'disc' (any).
+                   'disc' is converted to str; defaults to '' when absent.
     Returns      : one FieldCrossCheckResult per input point, in input order.
     Raises       : ValueError when a point cannot be projected onto the alignment
                    (propagated from calculate_coordinate_to_station).
@@ -169,7 +169,7 @@ def bulk_cross_check(
         n    = float(fp['n'])
         e    = float(fp['e'])
         z    = float(fp['z'])
-        disc = float(fp.get('disc', 0.0))
+        disc = str(fp.get('disc', ''))
         so   = al.calculate_coordinate_to_station(elements, n, e)
         results.append(FieldCrossCheckResult(
             name=name, n=n, e=e, z=z,

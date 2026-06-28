@@ -207,14 +207,14 @@ class TestBulkCrossCheck:
         assert r.offset < 0.0   # left of travel
 
     def test_disc_carried_through(self, tangent_elements):
-        fp = [{'name': 'PT04', 'n': 1000.0, 'e': 2050.0, 'z': 85.0, 'disc': 0.013}]
+        fp = [{'name': 'PT04', 'n': 1000.0, 'e': 2050.0, 'z': 85.0, 'disc': '0.013'}]
         r = ck.bulk_cross_check(tangent_elements, fp)[0]
-        assert math.isclose(r.disc, 0.013, abs_tol=1e-9)
+        assert r.disc == '0.013'
 
-    def test_disc_defaults_to_zero(self, tangent_elements):
+    def test_disc_defaults_to_empty(self, tangent_elements):
         fp = [{'name': 'PT05', 'n': 1000.0, 'e': 2050.0, 'z': 85.0}]
         r = ck.bulk_cross_check(tangent_elements, fp)[0]
-        assert r.disc == 0.0
+        assert r.disc == ''
 
     def test_result_type(self, tangent_elements):
         fp = [{'name': 'PT06', 'n': 1000.0, 'e': 2050.0, 'z': 85.0, 'disc': 0.0}]

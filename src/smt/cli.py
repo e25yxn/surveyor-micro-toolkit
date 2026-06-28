@@ -82,7 +82,7 @@ def _read_field_csv(path: str) -> list[dict[str, Any]]:
         padded = line + [''] * 5
         name = padded[0].strip()
         n, e, z = float(padded[1]), float(padded[2]), float(padded[3])
-        disc = float(padded[4]) if padded[4].strip() else 0.0
+        disc = padded[4].strip()
         points.append({'name': name, 'n': n, 'e': e, 'z': z, 'disc': disc})
     return points
 
@@ -100,7 +100,7 @@ def _run_cross_check(args: argparse.Namespace) -> int:
     for r in rows:
         print(
             f'{r.name:<12} {r.sta:>10.3f} {r.offset:>10.3f}'
-            f' {r.n:>12.3f} {r.e:>12.3f} {r.z:>9.3f} {r.disc:>8.4f}'
+            f' {r.n:>12.3f} {r.e:>12.3f} {r.z:>9.3f} {r.disc:>8}'
         )
     return 0
 
