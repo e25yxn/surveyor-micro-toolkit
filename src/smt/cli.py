@@ -5,8 +5,8 @@ it only reads a CSV element table and delegates to alignment.py, then formats
 the result for stdout.
 
 Subcommands:
-  smt fwd <table.csv> <sta> [--offset 0]   station(+offset) -> N,E
-  smt inv <table.csv> <n> <e>              N,E -> sta,offset
+  smt station-to-coord <table.csv> <sta> [--offset 0]   station(+offset) -> N,E
+  smt coord-to-station <table.csv> <n> <e>              N,E -> sta,offset
 
 CSV format matches the element table (header row required):
   StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition
@@ -106,7 +106,7 @@ def _run_cross_check(args: argparse.Namespace) -> int:
 
 
 def _run_fwd(args: argparse.Namespace) -> int:
-    """fwd: station (+offset) -> grid coordinate N,E."""
+    """station-to-coord: station (+offset) -> grid coordinate N,E."""
     elements = _read_alignment(args.table)
     pt = alignment.calculate_station_to_coordinate(elements, args.sta, args.offset)
     print(f'{pt.n},{pt.e}')
@@ -114,7 +114,7 @@ def _run_fwd(args: argparse.Namespace) -> int:
 
 
 def _run_inv(args: argparse.Namespace) -> int:
-    """inv: grid coordinate N,E -> station,offset."""
+    """coord-to-station: grid coordinate N,E -> station,offset."""
     elements = _read_alignment(args.table)
     so = alignment.calculate_coordinate_to_station(elements, args.n, args.e)
     print(f'{so.sta},{so.offset}')
@@ -128,14 +128,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest='command', required=True)
 
-    parser_forward = sub.add_parser('fwd', help='station (+offset) -> N,E')
+    parser_forward = sub.add_parser('station-to-coord', help='station (+offset) -> N,E')
     parser_forward.add_argument('table', help='path to CSV element table')
     parser_forward.add_argument('sta', type=float, help='station (chainage)')
     parser_forward.add_argument('--offset', type=float, default=0.0,
                                 help='perpendicular offset (+ right, - left); default 0')
     parser_forward.set_defaults(func=_run_fwd)
 
-    parser_inverse = sub.add_parser('inv', help='N,E -> station,offset')
+    parser_inverse = sub.add_parser('coord-to-station', help='N,E -> station,offset')
     parser_inverse.add_argument('table', help='path to CSV element table')
     parser_inverse.add_argument('n', type=float, help='northing')
     parser_inverse.add_argument('e', type=float, help='easting')

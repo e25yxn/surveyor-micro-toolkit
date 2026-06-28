@@ -17,7 +17,7 @@
 - [x] เฟส 3: `vertical`, `crossfall`, `surface` (แนวดิ่ง / ยกโค้ง / ผิว 3 มิติ)
 - [x] เฟส 4: `builders/alignment_builder`, `builders/vertical_builder` (สร้างแนวจาก PI/VPI)
 - [x] เฟส 5: `check` (cross-check — เทียบค่าคำนวณกับค่าจากแบบ)
-- [x] เฟส 6: CLI (`smt fwd` / `smt inv`) + Notebook สอนแนวราบ
+- [x] เฟส 6: CLI (`smt station-to-coord` / `smt coord-to-station`) + Notebook สอนแนวราบ
 
 ดูรายละเอียดกฎการพัฒนาและแผนต่อยอดที่ `CLAUDE.md` และ `docs/blueprint.md`
 
@@ -43,8 +43,8 @@ print(p.n, p.e)             # 20000.0  10519.6152
 
 ```bash
 pip install -e .
-smt fwd elements.csv 519.615 --offset 0
-smt inv elements.csv 20000 10519.6152
+smt station-to-coord elements.csv 519.615 --offset 0
+smt coord-to-station elements.csv 20000 10519.6152
 ```
 
 ### ผ่าน Notebook (สื่อสอน)
@@ -65,7 +65,7 @@ src/smt/
   vertical.py, crossfall.py, surface.py   แนวดิ่ง / ยกโค้ง / ผิว 3 มิติ
   builders/                    สร้างแนวจาก PI / VPI
   check.py                     cross-check (เทียบค่าคำนวณกับค่าจากแบบ)
-  cli.py                       command-line interface (smt fwd / smt inv)
+  cli.py                       command-line interface (smt station-to-coord / smt coord-to-station)
 tests/          เทสต์ + golden fixtures (tests/golden/tables.json)
 reference/      engine JS เดิม (oracle ที่ผ่าน AllTests 45/45)
 docs/           lesson.md (บทเรียนหลักการ) + blueprint.md (แผนแม่บท) + naming_convention.md

@@ -33,7 +33,7 @@ def table(tmp_path: Path) -> str:
 
 
 def test_fwd_centerline(table, capsys):
-    rc = cli.main(['fwd', table, '40'])
+    rc = cli.main(['station-to-coord', table, '40'])
     assert rc == 0
     n_str, e_str = capsys.readouterr().out.strip().split(',')
     assert math.isclose(float(n_str), 1000.0, abs_tol=1e-6)
@@ -42,7 +42,7 @@ def test_fwd_centerline(table, capsys):
 
 def test_fwd_with_offset(table, capsys):
     # +10 offset = right of east-bound travel = south (N decreases by 10)
-    rc = cli.main(['fwd', table, '40', '--offset', '10'])
+    rc = cli.main(['station-to-coord', table, '40', '--offset', '10'])
     assert rc == 0
     n_str, e_str = capsys.readouterr().out.strip().split(',')
     assert math.isclose(float(n_str), 990.0, abs_tol=1e-6)
@@ -51,7 +51,7 @@ def test_fwd_with_offset(table, capsys):
 
 def test_inv_recovers_station_and_offset(table, capsys):
     # Point 10 south of sta=40 centre line -> sta=40, offset=+10.
-    rc = cli.main(['inv', table, '990', '2040'])
+    rc = cli.main(['coord-to-station', table, '990', '2040'])
     assert rc == 0
     sta_str, off_str = capsys.readouterr().out.strip().split(',')
     assert math.isclose(float(sta_str), 40.0, abs_tol=1e-3)
@@ -59,9 +59,9 @@ def test_inv_recovers_station_and_offset(table, capsys):
 
 
 def test_fwd_inv_roundtrip(table, capsys):
-    cli.main(['fwd', table, '55', '--offset', '-7'])
+    cli.main(['station-to-coord', table, '55', '--offset', '-7'])
     n_str, e_str = capsys.readouterr().out.strip().split(',')
-    cli.main(['inv', table, n_str, e_str])
+    cli.main(['coord-to-station', table, n_str, e_str])
     sta_str, off_str = capsys.readouterr().out.strip().split(',')
     assert math.isclose(float(sta_str), 55.0, abs_tol=1e-3)
     assert math.isclose(float(off_str), -7.0, abs_tol=1e-3)
@@ -73,7 +73,7 @@ def test_fwd_inv_roundtrip(table, capsys):
 
 def test_missing_file_returns_exit_code_1(capsys):
     """Non-existent CSV file must produce exit code 1 and print to stderr."""
-    rc = cli.main(['fwd', 'nonexistent_file_xyz.csv', '40'])
+    rc = cli.main(['station-to-coord', 'nonexistent_file_xyz.csv', '40'])
     err = capsys.readouterr().err
     assert rc == 1
     assert 'error' in err.lower()
@@ -82,7 +82,7 @@ def test_missing_file_returns_exit_code_1(capsys):
 def test_fwd_station_outside_alignment_returns_exit_code_1(table, capsys):
     """Station beyond the alignment end must produce exit code 1."""
     # fixture table covers sta 0..100; sta=200 is outside
-    rc = cli.main(['fwd', table, '200'])
+    rc = cli.main(['station-to-coord', table, '200'])
     err = capsys.readouterr().err
     assert rc == 1
     assert 'error' in err.lower()
@@ -92,7 +92,7 @@ def test_fwd_empty_csv_returns_exit_code_1(tmp_path, capsys):
     """Header-only CSV (0 elements) must produce exit code 1."""
     p = tmp_path / 'empty.csv'
     p.write_text(_EMPTY_TABLE, encoding='utf-8')
-    rc = cli.main(['fwd', str(p), '0'])
+    rc = cli.main(['station-to-coord', str(p), '0'])
     err = capsys.readouterr().err
     assert rc == 1
     assert 'error' in err.lower()
