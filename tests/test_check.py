@@ -165,3 +165,64 @@ def test_check_vertical_far_outside_raises(segs: list) -> None:
     far_outside = [{'name': 'X', 'sta': -1000.0, 'elev': 100.0}]
     with pytest.raises(ValueError):
         ck.check_vertical(segs, far_outside)
+
+
+# ---------------------------------------------------------------------------
+# TestBulkCrossCheck
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope='module')
+def tangent_elements() -> list[al.Element]:
+    """Single east-running tangent: sta 0–200, entry (N=1000, E=2000, az=90°)."""
+    return al.parse_alignment_table([
+        ['StaStart', 'StaEnd', 'N', 'E', 'Azimuth', 'Radius', 'Type', 'Transition'],
+        [0.0, 200.0, 1000.0, 2000.0, 90.0, 0.0, 'T', ''],
+    ])
+
+
+class TestBulkCrossCheck:
+    def test_empty_returns_empty(self, tangent_elements):
+        assert ck.bulk_cross_check(tangent_elements, []) == []
+
+    def test_centerline_point(self, tangent_elements):
+        # Point on centre-line at E=2100 → sta=100, offset=0
+        fp = [{'name': 'PT01', 'n': 1000.0, 'e': 2100.0, 'z': 85.0, 'disc': 0.0}]
+        rows = ck.bulk_cross_check(tangent_elements, fp)
+        assert len(rows) == 1
+        r = rows[0]
+        assert r.name == 'PT01'
+        assert math.isclose(r.sta,    100.0, abs_tol=1e-6)
+        assert math.isclose(r.offset,   0.0, abs_tol=1e-6)
+
+    def test_right_offset(self, tangent_elements):
+        # East-running tangent: south (+5 m) is left, north (−5 m) is right
+        # az=90° → right = south (N−5), left = north (N+5) per sign convention
+        fp = [{'name': 'PT02', 'n': 995.0, 'e': 2050.0, 'z': 85.0, 'disc': 0.0}]
+        r = ck.bulk_cross_check(tangent_elements, fp)[0]
+        assert r.offset > 0.0   # right of travel
+
+    def test_left_offset(self, tangent_elements):
+        fp = [{'name': 'PT03', 'n': 1005.0, 'e': 2050.0, 'z': 85.0, 'disc': 0.0}]
+        r = ck.bulk_cross_check(tangent_elements, fp)[0]
+        assert r.offset < 0.0   # left of travel
+
+    def test_disc_carried_through(self, tangent_elements):
+        fp = [{'name': 'PT04', 'n': 1000.0, 'e': 2050.0, 'z': 85.0, 'disc': 0.013}]
+        r = ck.bulk_cross_check(tangent_elements, fp)[0]
+        assert math.isclose(r.disc, 0.013, abs_tol=1e-9)
+
+    def test_disc_defaults_to_zero(self, tangent_elements):
+        fp = [{'name': 'PT05', 'n': 1000.0, 'e': 2050.0, 'z': 85.0}]
+        r = ck.bulk_cross_check(tangent_elements, fp)[0]
+        assert r.disc == 0.0
+
+    def test_result_type(self, tangent_elements):
+        fp = [{'name': 'PT06', 'n': 1000.0, 'e': 2050.0, 'z': 85.0, 'disc': 0.0}]
+        r = ck.bulk_cross_check(tangent_elements, fp)[0]
+        assert isinstance(r, ck.FieldCrossCheckResult)
+
+    def test_outside_alignment_raises(self, tangent_elements):
+        # Point far to the west (E=1000) cannot project onto sta 0–200
+        fp = [{'name': 'FAR', 'n': 1000.0, 'e': 1000.0, 'z': 85.0, 'disc': 0.0}]
+        with pytest.raises(ValueError):
+            ck.bulk_cross_check(tangent_elements, fp)

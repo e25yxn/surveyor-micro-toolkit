@@ -718,3 +718,145 @@ class TestDefensiveBuilder:
         report = ab.check_against_drawing(ctrl, drawing)
         assert len(report) == 1
         assert report[0]['name'] == 'PC'
+
+
+# ---------------------------------------------------------------------------
+# TestParsePiTable
+# ---------------------------------------------------------------------------
+
+_HDR = ['POINT', 'N', 'E', 'Sta', 'R', 'Ls', 'LsIn', 'LsOut', 'Trans', 'Delta']
+
+
+def _rows(*data_rows):
+    """Return rows with header prepended."""
+    return [_HDR] + [list(r) for r in data_rows]
+
+
+class TestParsePiTable:
+    def test_bp_ep_only(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '', '', '', '', '', ''],
+            ['EP', '1100', '2100', '',  '', '', '', '', '', ''],
+        )
+        verts = ab.parse_pi_table(rows)
+        assert len(verts) == 2
+        assert verts[0] == {'n': 1000.0, 'e': 2000.0, 'sta': 0.0}
+        assert verts[1] == {'n': 1100.0, 'e': 2100.0}
+
+    def test_simple_circle(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '',    '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '300', '', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '',    '', '', '', '', ''],
+        )
+        verts = ab.parse_pi_table(rows)
+        pi = verts[1]
+        assert pi['R'] == 300.0
+        assert 'Ls' not in pi
+        assert 'LsIn' not in pi
+
+    def test_symmetric_spiral(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '',    '',    '', '', '', ''],
+            ['PI', '1100', '2100', '',  '400', '100', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '',    '',    '', '', '', ''],
+        )
+        pi = ab.parse_pi_table(rows)[1]
+        assert pi['R'] == 400.0
+        assert pi['Ls'] == 100.0
+        assert 'LsIn' not in pi
+
+    def test_asymmetric_spiral(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '',    '', '50', '90', '', ''],
+            ['PI', '1100', '2100', '',  '500', '', '50', '90', '', ''],
+            ['EP', '1200', '2200', '',  '',    '', '',   '',   '', ''],
+        )
+        pi = ab.parse_pi_table(rows)[1]
+        assert pi['LsIn']  == 50.0
+        assert pi['LsOut'] == 90.0
+        assert 'Ls' not in pi
+
+    def test_bloss_transition(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '',    '',    '', '', 'BLOSS', ''],
+            ['PI', '1100', '2100', '',  '300', '100', '', '', 'BLOSS', ''],
+            ['EP', '1200', '2200', '',  '',    '',    '', '', '',      ''],
+        )
+        pi = ab.parse_pi_table(rows)[1]
+        assert pi.get('trans') == 'BLOSS'
+
+    def test_angle_point_zero_r(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '',  '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '0', '', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '',  '', '', '', '', ''],
+        )
+        pi = ab.parse_pi_table(rows)[1]
+        assert 'R' not in pi
+        assert 'compound' not in pi
+
+    def test_angle_point_blank_r(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '', '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '', '', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '', '', '', '', '', ''],
+        )
+        pi = ab.parse_pi_table(rows)[1]
+        assert 'R' not in pi
+        assert 'compound' not in pi
+
+    def test_compound(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '', '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '', '', '', '', '', ''],      # no R → compound
+            ['',   '',     '',     '',  '300', '', '', '', '', '20'], # arc 1 with delta
+            ['',   '',     '',     '',  '150', '', '', '', '', ''],   # arc 2 (last, no delta)
+            ['EP', '1200', '2200', '',  '', '', '', '', '', ''],
+        )
+        verts = ab.parse_pi_table(rows)
+        pi = verts[1]
+        assert 'compound' in pi
+        assert 'R' not in pi
+        assert len(pi['compound']) == 2
+        assert pi['compound'][0] == {'R': 300.0, 'delta': 20.0}
+        assert pi['compound'][1] == {'R': 150.0}
+
+    def test_compound_last_arc_no_delta(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '', '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '', '', '', '', '', ''],
+            ['',   '',     '',     '',  '400', '', '', '', '', '30'],
+            ['',   '',     '',     '',  '250', '', '', '', '', ''],   # blank delta
+            ['EP', '1200', '2200', '',  '', '', '', '', '', ''],
+        )
+        pi = ab.parse_pi_table(rows)[1]
+        last_arc = pi['compound'][-1]
+        assert 'delta' not in last_arc
+
+    def test_roundtrip_build(self):
+        # Simple two-PI alignment: circle then angle point — must build without issues
+        rows = _rows(
+            ['BP', '19970', '20040', '0',  '',    '', '', '', '', ''],
+            ['PI', '20100', '20500', '',   '300', '', '', '', '', ''],
+            ['PI', '20500', '21000', '',   '0',   '', '', '', '', ''],  # angle point
+            ['EP', '21000', '22000', '',   '',    '', '', '', '', ''],
+        )
+        verts = ab.parse_pi_table(rows)
+        result = ab.build_alignment_from_pi(verts)
+        assert isinstance(result, ab.BuildResult)
+        assert result.issues == []
+        assert len(result.elements) >= 3
+
+    def test_blank_lines_tolerated(self):
+        # Extra blank CSV rows must not create compound arcs
+        rows = [_HDR,
+                ['BP', '1000', '2000', '0', '', '', '', '', '', ''],
+                ['', '', '', '', '', '', '', '', '', ''],  # blank line
+                ['PI', '1100', '2100', '', '300', '', '', '', '', ''],
+                ['EP', '1200', '2200', '', '', '', '', '', '', ''],
+                ]
+        verts = ab.parse_pi_table(rows)
+        pi = verts[1]
+        assert pi['R'] == 300.0
+        assert 'compound' not in pi

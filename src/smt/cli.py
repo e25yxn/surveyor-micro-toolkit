@@ -18,7 +18,11 @@ import csv
 import sys
 from typing import Any
 
-from . import alignment
+from . import alignment, check
+from .builders.alignment_builder import (
+    build_alignment_from_pi,
+    parse_pi_table,
+)
 
 
 def _read_alignment(path: str) -> list[alignment.Element]:
@@ -51,6 +55,54 @@ def _read_alignment(path: str) -> list[alignment.Element]:
             trans.strip(),
         ])
     return alignment.parse_alignment_table(rows)
+
+
+def _read_pi_table(path: str) -> list[dict[str, Any]]:
+    """Read a PI-table CSV and return a vertex list for build_alignment_from_pi."""
+    with open(path, newline='', encoding='utf-8') as f:
+        rows = list(csv.reader(f))
+    if not rows:
+        raise ValueError(f'{path} is empty')
+    return parse_pi_table(rows)
+
+
+def _read_field_csv(path: str) -> list[dict[str, Any]]:
+    """Read a field survey CSV.
+
+    Column order: NAME, N, E, Z, DISC.  DISC is optional (defaults to 0.0).
+    """
+    with open(path, newline='', encoding='utf-8') as f:
+        raw = list(csv.reader(f))
+    if not raw:
+        raise ValueError(f'{path} is empty')
+    points = []
+    for line in raw[1:]:
+        if not line or all(c.strip() == '' for c in line):
+            continue
+        padded = line + [''] * 5
+        name = padded[0].strip()
+        n, e, z = float(padded[1]), float(padded[2]), float(padded[3])
+        disc = float(padded[4]) if padded[4].strip() else 0.0
+        points.append({'name': name, 'n': n, 'e': e, 'z': z, 'disc': disc})
+    return points
+
+
+def _run_cross_check(args: argparse.Namespace) -> int:
+    """cross-check: PI CSV + field CSV -> station/offset table."""
+    vertices = _read_pi_table(args.alignment)
+    build_result = build_alignment_from_pi(vertices)
+    for issue in build_result.issues:
+        print(f'warning: {issue}', file=sys.stderr)
+    field_points = _read_field_csv(args.field)
+    rows = check.bulk_cross_check(build_result.elements, field_points)
+    print(f'{"NAME":<12} {"STA":>10} {"OFFSET":>10} {"N":>12} {"E":>12} {"Z":>9} {"DISC":>8}')
+    print('-' * 77)
+    for r in rows:
+        print(
+            f'{r.name:<12} {r.sta:>10.3f} {r.offset:>10.3f}'
+            f' {r.n:>12.3f} {r.e:>12.3f} {r.z:>9.3f} {r.disc:>8.4f}'
+        )
+    return 0
 
 
 def _run_fwd(args: argparse.Namespace) -> int:
@@ -88,6 +140,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_inverse.add_argument('n', type=float, help='northing')
     parser_inverse.add_argument('e', type=float, help='easting')
     parser_inverse.set_defaults(func=_run_inv)
+
+    parser_xc = sub.add_parser(
+        'cross-check',
+        help='locate field survey points on a PI-defined alignment',
+    )
+    parser_xc.add_argument('alignment', help='PI table CSV (POINT,N,E,Sta,R,Ls,...)')
+    parser_xc.add_argument('field',     help='field survey CSV (NAME,N,E,Z,DISC)')
+    parser_xc.set_defaults(func=_run_cross_check)
 
     return parser
 

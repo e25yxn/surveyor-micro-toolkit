@@ -96,3 +96,73 @@ def test_fwd_empty_csv_returns_exit_code_1(tmp_path, capsys):
     err = capsys.readouterr().err
     assert rc == 1
     assert 'error' in err.lower()
+
+
+# ---------------------------------------------------------------------------
+# cross-check subcommand
+# ---------------------------------------------------------------------------
+
+_PI_TABLE = """\
+POINT,N,E,Sta,R,Ls,LsIn,LsOut,Trans,Delta
+BP,1000,2000,0,,,,,,
+PI,1000,2500,,100,,,,,
+EP,1500,2500,,,,,,,
+"""
+
+_FIELD_CSV = """\
+NAME,N,E,Z,DISC
+PT01,1000,2250,85.000,0.001
+"""
+
+_PI_TABLE_ANGLE = """\
+POINT,N,E,Sta,R,Ls,LsIn,LsOut,Trans,Delta
+BP,1000,2000,0,,,,,,
+PI,1000,2500,,0,,,,,
+EP,1500,2500,,,,,,,
+"""
+
+
+@pytest.fixture()
+def pi_csv(tmp_path):
+    p = tmp_path / 'pi.csv'
+    p.write_text(_PI_TABLE, encoding='utf-8')
+    return str(p)
+
+
+@pytest.fixture()
+def field_csv(tmp_path):
+    p = tmp_path / 'field.csv'
+    p.write_text(_FIELD_CSV, encoding='utf-8')
+    return str(p)
+
+
+def test_cross_check_basic(pi_csv, field_csv, capsys):
+    rc = cli.main(['cross-check', pi_csv, field_csv])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert 'NAME' in out
+    assert 'STA' in out
+    assert 'PT01' in out
+
+
+def test_cross_check_missing_alignment(tmp_path, field_csv, capsys):
+    rc = cli.main(['cross-check', str(tmp_path / 'no_such.csv'), field_csv])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'error' in err.lower()
+
+
+def test_cross_check_missing_field(pi_csv, tmp_path, capsys):
+    rc = cli.main(['cross-check', pi_csv, str(tmp_path / 'no_such.csv')])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'error' in err.lower()
+
+
+def test_cross_check_angle_point_pi(tmp_path, field_csv, capsys):
+    p = tmp_path / 'pi_angle.csv'
+    p.write_text(_PI_TABLE_ANGLE, encoding='utf-8')
+    rc = cli.main(['cross-check', str(p), field_csv])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert 'PT01' in out

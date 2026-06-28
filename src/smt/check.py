@@ -56,6 +56,22 @@ class VerticalCheckResult(NamedTuple):
     is_ok: bool
 
 
+class FieldCrossCheckResult(NamedTuple):
+    """Inverse result for one field survey point located on the alignment.
+
+    sta    : chainage of the foot-of-perpendicular on the centre-line (m)
+    offset : perpendicular offset — +right, −left (m)
+    disc   : survey discrepancy carried through from input (m; sign from fieldbook)
+    """
+    name: str
+    n: float
+    e: float
+    z: float
+    sta: float
+    offset: float
+    disc: float
+
+
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
@@ -127,6 +143,37 @@ def check_horizontal(
             name=name, sta=sta_draw,
             delta_n=delta_n, delta_e=delta_e, gap_metres=gap_metres,
             is_ok=gap_metres <= tol,
+        ))
+    return results
+
+
+def bulk_cross_check(
+    elements: list[al.Element],
+    field_points: list[dict[str, Any]],
+) -> list[FieldCrossCheckResult]:
+    """Locate field survey points on the horizontal alignment.
+
+    Runs an inverse calculation (N, E → sta, offset) for each point and
+    returns the result enriched with alignment position.  The disc value
+    (survey closure discrepancy) is carried through unchanged.
+
+    field_points : list of dicts — keys 'name' (str), 'n', 'e', 'z', 'disc' (float).
+                   'disc' defaults to 0.0 when absent.
+    Returns      : one FieldCrossCheckResult per input point, in input order.
+    Raises       : ValueError when a point cannot be projected onto the alignment
+                   (propagated from calculate_coordinate_to_station).
+    """
+    results: list[FieldCrossCheckResult] = []
+    for fp in field_points:
+        name = str(fp['name'])
+        n    = float(fp['n'])
+        e    = float(fp['e'])
+        z    = float(fp['z'])
+        disc = float(fp.get('disc', 0.0))
+        so   = al.calculate_coordinate_to_station(elements, n, e)
+        results.append(FieldCrossCheckResult(
+            name=name, n=n, e=e, z=z,
+            sta=so.sta, offset=so.offset, disc=disc,
         ))
     return results
 

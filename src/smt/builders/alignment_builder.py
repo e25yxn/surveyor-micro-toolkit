@@ -158,6 +158,104 @@ def _calculate_end_displacement(
 
 
 # ---------------------------------------------------------------------------
+# Public: parser
+# ---------------------------------------------------------------------------
+
+def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
+    """Parse a PI-table (first row = headers) into a vertex list for
+    build_alignment_from_pi.
+
+    Column order (position-based; names ignored):
+      0 POINT   — 'BP' | 'EP' | non-blank = PI vertex | blank = compound sub-row
+      1 N       — northing  (blank for compound sub-rows)
+      2 E       — easting   (blank for compound sub-rows)
+      3 Sta     — starting chainage (BP only)
+      4 R       — radius metres; blank or '0' = angle point (EXT-001)
+      5 Ls      — symmetric spiral length
+      6 LsIn    — entry spiral length (overrides Ls when non-blank)
+      7 LsOut   — exit spiral length (overrides Ls when non-blank)
+      8 Trans   — CLOTHOID (default) | BLOSS | COSINE | SINE
+      9 Delta   — arc deflection degrees (compound sub-rows; blank on last arc)
+
+    Blank-POINT rows with a non-blank R are compound sub-arcs attached to the
+    preceding PI vertex.  Blank-POINT rows with blank R are ignored (blank lines).
+
+    Raises ValueError for malformed numeric cells (propagated from float()).
+    """
+    vertices: list[dict[str, Any]] = []
+    pending_pi: dict[str, Any] | None = None
+    compound_arcs: list[dict[str, Any]] = []
+
+    def _flush_pending() -> None:
+        nonlocal pending_pi
+        if pending_pi is None:
+            return
+        if compound_arcs:
+            v: dict[str, Any] = {'n': pending_pi['n'], 'e': pending_pi['e']}
+            v['compound'] = compound_arcs.copy()
+            compound_arcs.clear()
+        else:
+            v = dict(pending_pi)
+        vertices.append(v)
+        pending_pi = None
+
+    for row in rows[1:]:            # skip header row
+        r = list(row) + [''] * 10  # pad to avoid IndexError
+        point = str(r[0]).strip()
+
+        if not point:
+            # compound sub-row — only meaningful when R is non-blank
+            r_raw = str(r[4]).strip()
+            if not r_raw:
+                continue
+            arc: dict[str, Any] = {'R': float(r_raw)}
+            delta_raw = str(r[9]).strip()
+            if delta_raw:
+                arc['delta'] = float(delta_raw)
+            compound_arcs.append(arc)
+            continue
+
+        _flush_pending()
+
+        n = float(r[1])
+        e = float(r[2])
+
+        if point == 'BP':
+            sta_raw = str(r[3]).strip()
+            vertices.append({'n': n, 'e': e, 'sta': float(sta_raw) if sta_raw else 0.0})
+            continue
+
+        if point == 'EP':
+            vertices.append({'n': n, 'e': e})
+            continue
+
+        # PI vertex
+        pi_dict: dict[str, Any] = {'n': n, 'e': e}
+        r_raw = str(r[4]).strip()
+        if r_raw and float(r_raw) != 0.0:
+            pi_dict['R'] = float(r_raw)
+            ls_raw    = str(r[5]).strip()
+            lsin_raw  = str(r[6]).strip()
+            lsout_raw = str(r[7]).strip()
+            if lsin_raw or lsout_raw:
+                if lsin_raw:
+                    pi_dict['LsIn'] = float(lsin_raw)
+                if lsout_raw:
+                    pi_dict['LsOut'] = float(lsout_raw)
+            elif ls_raw:
+                pi_dict['Ls'] = float(ls_raw)
+            trans = str(r[8]).strip()
+            if trans:
+                pi_dict['trans'] = trans
+        # else: R absent or 0 → angle point (no 'R' key); may gain 'compound' later
+
+        pending_pi = pi_dict
+
+    _flush_pending()
+    return vertices
+
+
+# ---------------------------------------------------------------------------
 # Public: builder
 # ---------------------------------------------------------------------------
 
