@@ -166,3 +166,51 @@ def test_cross_check_angle_point_pi(tmp_path, field_csv, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert 'PT01' in out
+
+
+# ---------------------------------------------------------------------------
+# build subcommand
+# ---------------------------------------------------------------------------
+
+def test_build_creates_output_files(pi_csv, tmp_path, capsys):
+    rc = cli.main(['build', pi_csv, '--out-dir', str(tmp_path)])
+    assert rc == 0
+    assert (tmp_path / 'elements_output.csv').exists()
+    assert (tmp_path / 'controls_so_output.csv').exists()
+
+
+def test_build_element_csv_header(pi_csv, tmp_path, capsys):
+    cli.main(['build', pi_csv, '--out-dir', str(tmp_path)])
+    with open(tmp_path / 'elements_output.csv', encoding='utf-8') as f:
+        header = f.readline().strip()
+    assert header == 'StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition'
+
+
+def test_build_control_csv_header(pi_csv, tmp_path, capsys):
+    cli.main(['build', pi_csv, '--out-dir', str(tmp_path)])
+    with open(tmp_path / 'controls_so_output.csv', encoding='utf-8') as f:
+        header = f.readline().strip()
+    assert header == 'Name,STA,N,E'
+
+
+def test_build_terminal_output(pi_csv, tmp_path, capsys):
+    cli.main(['build', pi_csv, '--out-dir', str(tmp_path)])
+    out = capsys.readouterr().out
+    assert 'Elements' in out
+    assert 'Control Points' in out
+
+
+def test_build_missing_input_returns_exit_1(tmp_path, capsys):
+    rc = cli.main(['build', str(tmp_path / 'no_such.csv'), '--out-dir', str(tmp_path)])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'error' in err.lower()
+
+
+def test_build_default_out_dir(pi_csv, capsys):
+    import os
+    rc = cli.main(['build', pi_csv])
+    assert rc == 0
+    out_dir = os.path.dirname(os.path.abspath(pi_csv))
+    assert os.path.exists(os.path.join(out_dir, 'elements_output.csv'))
+    assert os.path.exists(os.path.join(out_dir, 'controls_so_output.csv'))

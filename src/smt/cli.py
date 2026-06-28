@@ -18,7 +18,7 @@ import csv
 import sys
 from typing import Any
 
-from . import alignment, check
+from . import alignment, check, fpmath
 from .builders.alignment_builder import (
     build_alignment_from_pi,
     parse_pi_table,
@@ -87,6 +87,65 @@ def _read_field_csv(path: str) -> list[dict[str, Any]]:
     return points
 
 
+def _radius_from_element(el: alignment.Element) -> float:
+    """Return signed design radius for output CSV (0 = tangent)."""
+    if el.k_in != 0:
+        return 1.0 / el.k_in
+    if el.k_out != 0:
+        return 1.0 / el.k_out
+    return 0.0
+
+
+def _run_build(args: argparse.Namespace) -> int:
+    """build: PI table CSV -> elements_output.csv + controls_so_output.csv."""
+    import os
+    vertices = _read_pi_table(args.alignment)
+    build_result = build_alignment_from_pi(vertices)
+    for issue in build_result.issues:
+        print(f'warning: {issue}', file=sys.stderr)
+
+    out_dir = args.out_dir if args.out_dir else os.path.dirname(os.path.abspath(args.alignment))
+    os.makedirs(out_dir, exist_ok=True)
+
+    el_path = os.path.join(out_dir, 'elements_output.csv')
+    el_header = ['StaStart', 'StaEnd', 'N', 'E', 'Azimuth', 'Radius', 'Type', 'Transition']
+    el_rows = []
+    for el in build_result.elements:
+        el_rows.append([
+            f'{el.sta_start:.3f}',
+            f'{el.sta_end:.3f}',
+            f'{el.n:.3f}',
+            f'{el.e:.3f}',
+            f'{fpmath.rad_to_deg(el.azimuth):.6f}',
+            f'{_radius_from_element(el):.3f}',
+            el.type,
+            el.transition,
+        ])
+    with open(el_path, 'w', newline='', encoding='utf-8') as f:
+        csv.writer(f).writerows([el_header] + el_rows)
+
+    cp_path = os.path.join(out_dir, 'controls_so_output.csv')
+    cp_header = ['Name', 'STA', 'N', 'E']
+    cp_rows = [[cp.name, f'{cp.sta:.3f}', f'{cp.n:.3f}', f'{cp.e:.3f}']
+               for cp in build_result.control]
+    with open(cp_path, 'w', newline='', encoding='utf-8') as f:
+        csv.writer(f).writerows([cp_header] + cp_rows)
+
+    print(f'\n=== Elements ({len(build_result.elements)} rows) -> {el_path} ===')
+    print(f'{"StaStart":>10} {"StaEnd":>10} {"N":>12} {"E":>12} {"Az(deg)":>12} {"Radius":>10} {"Type":<6} {"Trans"}')
+    print('-' * 90)
+    for row in el_rows:
+        print(f'{row[0]:>10} {row[1]:>10} {row[2]:>12} {row[3]:>12} {row[4]:>12} {row[5]:>10} {row[6]:<6} {row[7]}')
+
+    print(f'\n=== Control Points ({len(build_result.control)} rows) -> {cp_path} ===')
+    print(f'{"Name":<6} {"STA":>12} {"N":>14} {"E":>14}')
+    print('-' * 50)
+    for row in cp_rows:
+        print(f'{row[0]:<6} {row[1]:>12} {row[2]:>14} {row[3]:>14}')
+
+    return 0
+
+
 def _run_cross_check(args: argparse.Namespace) -> int:
     """cross-check: PI CSV + field CSV -> station/offset table."""
     vertices = _read_pi_table(args.alignment)
@@ -148,6 +207,18 @@ def _build_parser() -> argparse.ArgumentParser:
     parser_xc.add_argument('alignment', help='PI table CSV (POINT,N,E,Sta,R,Ls,...)')
     parser_xc.add_argument('field',     help='field survey CSV (NAME,N,E,Z,DISC)')
     parser_xc.set_defaults(func=_run_cross_check)
+
+    parser_build = sub.add_parser(
+        'build',
+        help='build element table + control points from PI table CSV',
+    )
+    parser_build.add_argument('alignment', help='PI table CSV (POINT,N,E,R,Ls,...)')
+    parser_build.add_argument(
+        '--out-dir',
+        default=None,
+        help='output folder (default: same folder as input file)',
+    )
+    parser_build.set_defaults(func=_run_build)
 
     return parser
 
