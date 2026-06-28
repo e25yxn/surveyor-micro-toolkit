@@ -48,12 +48,13 @@ SAFE - SMALL - STABLE - MODULAR.
 - Don't change public signatures of passing modules; add, don't break.
 
 ## Status
-All phases complete — 341/341 tests passing.
+All phases complete — 387/387 tests passing.
 - Core engine: 9 modules ported and validated against oracle
-- CLI: `smt fwd` / `smt inv` complete
+- CLI: `smt fwd` / `smt inv` / `smt cross-check` complete
 - Notebook: 01_horizontal_alignment.ipynb complete
 - Extensions: EXT-001 no-curve PI (angle point) — see docs/extensions.md
-- Next: defensive tests Part 2, LandXML I/O, web stake-out app
+- Bulk field cross-check: parse_pi_table + bulk_cross_check + CLI (3aa8e30)
+- Next: LandXML I/O, web stake-out app
 
 ## Module map (.gs -> .py)
 | reference (.gs)        | src/smt (.py)                  | status |

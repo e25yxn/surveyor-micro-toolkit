@@ -1,5 +1,32 @@
 # Session Log
 
+## [2026-06-28] Bulk Field Cross-Check Feature
+
+- ทำ: วางแผน (plan_bulk_crosscheck.md) + implement 3 ส่วนหลัก + 46 tests ใหม่
+  - `parse_pi_table(rows)` ใน `builders/alignment_builder.py`: แปลง PI CSV → vertex list
+    รองรับ simple circle, symmetric/asymmetric spiral, compound, angle point, BLOSS/COSINE/SINE
+  - `FieldCrossCheckResult` + `bulk_cross_check()` ใน `check.py`: inverse (N,E → sta,offset)
+    สำหรับ field survey points; ส่ง disc ผ่านไม่แตะ
+  - `smt cross-check <alignment_pi.csv> <field.csv>` CLI subcommand ใน `cli.py`
+  - Tests: TestParsePiTable (11 cases), TestBulkCrossCheck (8 cases), CLI tests (4 cases)
+- คำสั่ง: pytest -q, ruff check src/, mypy src/smt/
+- ผล: PASS (387/387) — mypy clean, ruff ไม่มี error ใหม่ (4 pre-existing E701 ไม่เกี่ยว)
+- commit: 3aa8e30
+
+## [2026-06-28] Add AlignmentBuilderV2.gs — EXT-001 no-curve PI (JS reference)
+
+- ทำ: copy AlignmentBuilder.gs เป็น AlignmentBuilderV2.gs แล้วเพิ่ม 3 จุดสำหรับ EXT-001
+  - `curveSubs_`: เพิ่ม early return `{subs:[], issue:null}` เมื่อ R หายหรือ R=0
+  - `names_`: เพิ่ม guard `if (!subs || subs.length === 0)` → return IP scheme
+  - `buildFromPI`: เพิ่ม angle-point branch → emit tangent + `'IP'` control point
+  - เพิ่ม header comment "EXT-001: no-curve PI support — mirrors Python alignment_builder.py (commit cdf896d)"
+- ต้นฉบับ `reference/AlignmentBuilder.gs` ไม่ถูกแตะ
+- คำสั่ง: Write tool → `.git\smt_commit_msg.txt` แล้ว `git add` + `git commit -F`
+- ผล: PASS — commit สำเร็จ ไม่กระทบ test ใดๆ
+- commit: 7846cb6
+
+---
+
 ## [2026-06-28] Part 2 — Defensive edge-case tests (vertical, crossfall, surface, check, builders)
 
 - ทำ: เพิ่ม 23 tests ครอบ coverage gaps ที่ audit ระบุใน 6 ไฟล์ test
