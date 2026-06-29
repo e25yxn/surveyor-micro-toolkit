@@ -1,5 +1,22 @@
 # Session Log
 
+## [2026-06-30] สร้าง SMT_FPMath.bas — VBA port of fpmath.py
+
+- ทำ: สร้าง `reference/vba/SMT_FPMath.bas` (VBA Module) พอร์ต 5 functions จาก `src/smt/fpmath.py`
+  1. `SMT_Pi()` — คืนค่า π ด้วย `4 * Atn(1)` เต็ม Double precision
+  2. `SMT_DegToRad(deg)` — degrees → radians
+  3. `SMT_RadToDeg(rad)` — radians → degrees
+  4. `SMT_NormalizeAngle(az)` — normalize rad ให้อยู่ใน [0, 2π)
+  5. `SMT_AngleDiff(a, b)` — signed shortest diff (a-b) ใน (-π, π]
+  - Private helper `SMT_FloorMod` ใช้ `Int()` แทน VBA `Mod` (ซึ่งแปลงเป็น Long ก่อน ทำให้ Double ผิด)
+  - ท้ายไฟล์: expected values เทียบ Python golden data ครบ 8 กรณี
+  - อัปเดต `reference/vba/README.md`: วิธี import .bas เข้า Excel, column mapping SMT_Elements, sign convention
+- คำสั่ง: Write tool (ไม่มี test รัน — VBA module ต้องทดสอบใน Excel)
+- ผล: ไฟล์สร้างสำเร็จ — ยังไม่ได้ commit
+- หมายเหตุ: VBA Mod operator ทำงานกับ Integer/Long เท่านั้น ต้องใช้ `a - Int(a/n)*n` สำหรับ Double floor-mod
+
+---
+
 ## [2026-06-29] smt fit-radius: เพิ่ม CLI subcommand เรียก optimizer
 
 - ทำ: เพิ่ม `smt fit-radius` subcommand ใน `src/smt/cli.py` + 2 tests ใน `tests/test_cli.py`
