@@ -214,3 +214,50 @@ def test_build_default_out_dir(pi_csv, capsys):
     out_dir = os.path.dirname(os.path.abspath(pi_csv))
     assert os.path.exists(os.path.join(out_dir, 'elements_output.csv'))
     assert os.path.exists(os.path.join(out_dir, 'controls_so_output.csv'))
+
+
+# ---------------------------------------------------------------------------
+# compare-drawing subcommand
+# ---------------------------------------------------------------------------
+
+# east-bound tangent (table fixture): at sta=0 -> N=1000,E=2000; sta=80 -> N=1000,E=2080
+_DRAWING_CSV = """\
+Name,STA,N,E
+BP,0,1000,2000
+PI,50,1000,2050
+CP1,80,1000,2080
+"""
+
+
+@pytest.fixture()
+def drawing_csv(tmp_path: Path) -> str:
+    p = tmp_path / 'drawing.csv'
+    p.write_text(_DRAWING_CSV, encoding='utf-8')
+    return str(p)
+
+
+def test_compare_drawing_basic(table, drawing_csv, capsys):
+    rc = cli.main(['compare-drawing', table, drawing_csv])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert 'BP' in out
+    assert 'PI' in out
+    assert 'HIP' in out
+    assert 'CP1' in out
+    assert 'OK' in out
+
+
+def test_compare_drawing_missing_file(table, capsys):
+    rc = cli.main(['compare-drawing', table, 'no_such_drawing.csv'])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'error' in err.lower()
+
+
+def test_compare_drawing_hip_no_crash(table, tmp_path, capsys):
+    p = tmp_path / 'hip.csv'
+    p.write_text('Name,STA,N,E\nHIP,50,1000,2050\n', encoding='utf-8')
+    rc = cli.main(['compare-drawing', table, str(p)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert 'HIP' in out

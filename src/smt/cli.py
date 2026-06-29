@@ -7,6 +7,7 @@ the result for stdout.
 Subcommands:
   smt station-to-coord <table.csv> <sta> [--offset 0]   station(+offset) -> N,E
   smt coord-to-station <table.csv> <n> <e>              N,E -> sta,offset
+  smt compare-drawing  <elements.csv> <drawing.csv>     drawing coords vs calculated
 
 CSV format matches the element table (header row required):
   StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import sys
 from typing import Any
 
@@ -84,6 +86,22 @@ def _read_field_csv(path: str) -> list[dict[str, Any]]:
         n, e, z = float(padded[1]), float(padded[2]), float(padded[3])
         disc = padded[4].strip()
         points.append({'name': name, 'n': n, 'e': e, 'z': z, 'disc': disc})
+    return points
+
+
+def _read_drawing_csv(path: str) -> list[dict[str, Any]]:
+    """Read a drawing control-point CSV (Name,STA,N,E) into a list of dicts."""
+    with open(path, newline='', encoding='utf-8') as f:
+        raw = list(csv.reader(f))
+    if not raw:
+        raise ValueError(f'{path} is empty')
+    points = []
+    for line in raw[1:]:
+        if not line or all(c.strip() == '' for c in line):
+            continue
+        name = line[0].strip()
+        sta, n, e = float(line[1]), float(line[2]), float(line[3])
+        points.append({'name': name, 'sta': sta, 'n': n, 'e': e})
     return points
 
 
@@ -167,6 +185,43 @@ def _run_cross_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_compare_drawing(args: argparse.Namespace) -> int:
+    """compare-drawing: elements CSV + drawing CSV -> coordinate comparison table."""
+    elements = _read_alignment(args.elements)
+    points = _read_drawing_csv(args.drawing)
+    tol = args.tol
+
+    print(
+        f'{"Name":<8} {"STA":>12} {"draw_N":>14} {"draw_E":>14}'
+        f' {"calc_N":>14} {"calc_E":>14} {"delta_N":>10} {"delta_E":>10} {"gap_m":>10}  OK'
+    )
+    print('-' * 116)
+
+    for pt in points:
+        name = pt['name']
+        sta = pt['sta']
+        draw_n = pt['n']
+        draw_e = pt['e']
+        upper = name.upper()
+        if upper.startswith('PI') or upper.startswith('HIP'):
+            print(
+                f'{name:<8} {sta:>12.6f} {draw_n:>14.6f} {draw_e:>14.6f}'
+                f' {"":>14} {"":>14} {"":>10} {"":>10} {"":>10}  HIP'
+            )
+            continue
+        calc = alignment.calculate_station_to_coordinate(elements, sta, 0.0)
+        delta_n = calc.n - draw_n
+        delta_e = calc.e - draw_e
+        gap_m = math.sqrt(delta_n ** 2 + delta_e ** 2)
+        ok = 'OK' if gap_m <= tol else 'FAIL'
+        print(
+            f'{name:<8} {sta:>12.6f} {draw_n:>14.6f} {draw_e:>14.6f}'
+            f' {calc.n:>14.6f} {calc.e:>14.6f}'
+            f' {delta_n:>10.6f} {delta_e:>10.6f} {gap_m:>10.6f}  {ok}'
+        )
+    return 0
+
+
 def _run_fwd(args: argparse.Namespace) -> int:
     """station-to-coord: station (+offset) -> grid coordinate N,E."""
     elements = _read_alignment(args.table)
@@ -222,6 +277,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help='output folder (default: same folder as input file)',
     )
     parser_build.set_defaults(func=_run_build)
+
+    parser_cd = sub.add_parser(
+        'compare-drawing',
+        help='compare drawing control points against calculated coordinates',
+    )
+    parser_cd.add_argument('elements', help='element table CSV (StaStart,StaEnd,N,E,...)')
+    parser_cd.add_argument('drawing',  help='drawing control-point CSV (Name,STA,N,E)')
+    parser_cd.add_argument(
+        '--tol', type=float, default=0.010,
+        help='gap closure tolerance in metres (default 0.010)',
+    )
+    parser_cd.set_defaults(func=_run_compare_drawing)
 
     return parser
 
