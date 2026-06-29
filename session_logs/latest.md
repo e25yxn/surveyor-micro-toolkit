@@ -1,5 +1,20 @@
 # Session Log
 
+## [2026-06-30] สร้าง SMT_WCB.bas — VBA port of wcb.py
+
+- ทำ: สร้าง `reference/vba/SMT_WCB.bas` (VBA Module) พอร์ต 4 functions จาก `src/smt/wcb.py`
+  1. `SMT_Azimuth(n1,e1,n2,e2)` — WCB azimuth rad [0,2π), guard coincident point
+  2. `SMT_Distance(n1,e1,n2,e2)` — plan distance via Sqr(dN²+dE²)
+  3. `SMT_CalcForward(n,e,az,dist,result)` — forward calc, result="N"/"E"
+  4. `SMT_CalcOffset(n,e,az,dist,offset,result)` — forward + perpendicular offset
+  - Private helper `SMT_Atan2(y,x)`: atan2 ครบ 5 quadrant cases (VBA ไม่มี built-in atan2)
+  - Dependency: SMT_FPMath — เรียก `SMT_Pi()` และ `SMT_NormalizeAngle()` อย่าคำนวณซ้ำ
+  - Expected values ท้ายไฟล์ตรงกับ Python golden data ทุกกรณี
+- คำสั่ง: Write tool (ไม่มี test รัน — VBA module ต้องทดสอบใน Excel)
+- ผล: ไฟล์สร้างสำเร็จ — ยังไม่ได้ commit
+
+---
+
 ## [2026-06-30] สร้าง SMT_FPMath.bas — VBA port of fpmath.py
 
 - ทำ: สร้าง `reference/vba/SMT_FPMath.bas` (VBA Module) พอร์ต 5 functions จาก `src/smt/fpmath.py`
