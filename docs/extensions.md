@@ -67,3 +67,51 @@ All code paths and tests added for this extension are marked with the comment:
 ### Regression guarantee
 All 250 pre-existing oracle tests continue to pass (verified in commit `cdf896d`).
 Angle-point paths are additive; no existing public signature was changed.
+## EXT-002 — Radius Optimisation (fit_radius)
+
+**วันที่:** 2026-06-29
+**Commit:** ececeaa (optimizer.py) + ecb9496 (smt fit-radius CLI)
+**ไฟล์:** `src/smt/optimizer.py`, `src/smt/cli.py`
+**Tests:** `tests/test_optimizer.py` (9 cases)
+
+### Oracle ทำอะไรไม่ได้
+
+Oracle (`reference/AlignmentBuilder.gs`) รับ R ที่กำหนดมาแล้วคำนวณ alignment ให้เท่านั้น
+ไม่มีความสามารถในการหาค่า R ที่ทำให้ alignment ตรงกับแบบมากที่สุด
+
+### สิ่งที่เพิ่ม
+
+`fit_radius(pi_rows, drawing_points, fix_names, tol, max_iter)` — ใช้ scipy Nelder-Mead
+หาค่า R ของแต่ละ PI ที่ทำให้ sum of squared gaps ระหว่างจุดที่คำนวณได้กับจุดจากแบบน้อยที่สุด
+
+**หลักการทางคณิตศาสตร์:**
+- Objective function: Σ[(N_calc - N_draw)² + (E_calc - E_draw)²] สำหรับจุด PC/PT/BP/EP
+- Method: Nelder-Mead (gradient-free, robust กับ function ที่ไม่ smooth)
+- Sign convention: เก็บ sign ของ R แยก optimize เฉพาะ abs(R) เพื่อไม่ให้ flip ทิศทางเลี้ยว
+- Bounds: R ≥ 1.0m เสมอ (ป้องกัน R → 0)
+- Penalty: 1e6 per point เมื่อ build มี issues หรือ station อยู่นอก alignment
+
+### ผลการทดสอบ (ramp01n01_SO.csv)
+
+| | ก่อน optimize | หลัง optimize |
+|---|---|---|
+| gap รวม | 14.7mm | 1.2mm |
+| max gap จุดเดียว | ~7.4mm | 0.73mm |
+| iterations | — | 289 |
+| converged | — | True |
+
+R ที่ได้เปลี่ยนน้อยมาก (ΔR < 0.1m บน R=150m) ยืนยันว่า gap เดิมมาจาก rounding
+ของทศนิยม 3 ตำแหน่งในแบบ ไม่ใช่ error จริงในการออกแบบ
+
+### CLI
+
+```
+smt fit-radius <pi_csv> <drawing_csv> [--fix PI1,PI2] [--tol 1e-6] [--max-iter 10000]
+```
+
+### ข้อควรระวัง
+
+- ต้องติดตั้ง scipy ก่อน: `pip install -e ".[optimize]"`
+- ถ้าแบบให้ค่า 3 ทศนิยม: optimizer จะได้ R ที่ "แปลก" เล็กน้อย (เช่น 149.905 แทน 150)
+  เพราะ compensate rounding — ใช้ R กลมๆ เดิมก็เพียงพอสำหรับงานส่วนใหญ่
+- IP (angle point, R=0) ถูก skip อัตโนมัติ ไม่ optimize

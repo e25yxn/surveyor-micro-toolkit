@@ -1,5 +1,18 @@
 # Session Log
 
+## [2026-06-29] smt fit-radius: เพิ่ม CLI subcommand เรียก optimizer
+
+- ทำ: เพิ่ม `smt fit-radius` subcommand ใน `src/smt/cli.py` + 2 tests ใน `tests/test_cli.py`
+  1. `_run_fit_radius(args)`: อ่าน PI CSV ด้วย `csv.reader` โดยตรง (raw rows), อ่าน drawing CSV ด้วย `_read_drawing_csv`, เรียก `fit_radius()`, แสดง R_initial vs R_optimized table + gap_before/gap_after + verification table (rebuild alignment ด้วย R optimised แล้วคำนวณ gap ทีละจุด)
+  2. Parser: `smt fit-radius <alignment> <drawing> [--fix PI1,PI2] [--tol 1e-6] [--max-iter 10000]`
+  3. `main()`: เพิ่ม `ImportError` ใน exception handler (สำหรับกรณี scipy ไม่ได้ติดตั้ง)
+  4. Tests: `test_fit_radius_basic` (exit 0, 'gap_before'/'gap_after' ใน output), `test_fit_radius_missing_file` (exit 1)
+- คำสั่ง: `pytest tests/test_cli.py -v`, `pytest -q`, `smt fit-radius test_data\ramp01n01_SO.csv test_data\r01n01_so_crosscheck.csv`
+- ผล: PASS (407/407) — smoke test: gap_before=14.7mm → gap_after=1.2mm, 5 free PIs, 289 iters, converged=True, ทุก verification point < 0.75mm
+- commit: ecb9496
+
+---
+
 ## [2026-06-29 18:52] สร้าง optimizer.py — fit_radius (Nelder-Mead)
 
 - ทำ: สร้าง `src/smt/optimizer.py` (EXTENSION: beyond oracle) และ `tests/test_optimizer.py` + เพิ่ม `optimize = ["scipy>=1.10"]` ใน `pyproject.toml`
