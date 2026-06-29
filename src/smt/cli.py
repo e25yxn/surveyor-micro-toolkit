@@ -222,6 +222,76 @@ def _run_compare_drawing(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_fit_radius(args: argparse.Namespace) -> int:
+    """fit-radius: optimise PI radii to minimise coordinate residuals against drawing points."""
+    from .optimizer import fit_radius as _fit_radius
+
+    with open(args.alignment, newline='', encoding='utf-8') as f:
+        pi_rows: list[Any] = list(csv.reader(f))
+    if not pi_rows:
+        raise ValueError(f'{args.alignment} is empty')
+
+    drawing_points = _read_drawing_csv(args.drawing)
+    fix_names_raw = [s.strip() for s in args.fix.split(',') if s.strip()]
+    fix_names = fix_names_raw if fix_names_raw else None
+
+    result = _fit_radius(pi_rows, drawing_points, fix_names, args.tol, args.max_iter)
+
+    print(f'\n=== fit-radius: {len(result.names)} free PI(s), {result.n_points} drawing point(s) ===')
+    if result.names:
+        print(f'{"PI":<12} {"R_initial":>14} {"R_optimized":>14}')
+        print('-' * 42)
+        for name, r0, ro in zip(result.names, result.r_initial, result.r_optimized):
+            print(f'{name:<12} {r0:>14.6f} {ro:>14.6f}')
+
+    print(f'\ngap_before: {result.gap_before:.6f} m')
+    print(f'gap_after:  {result.gap_after:.6f} m')
+    print(f'iterations: {result.iterations}  converged: {result.converged}')
+
+    if result.names and drawing_points:
+        header = pi_rows[0]
+        point_col: int | None = next(
+            (i for i, c in enumerate(header) if str(c).strip().lower() == 'point'), None
+        )
+        r_col: int | None = next(
+            (i for i, c in enumerate(header) if str(c).strip().lower() in ('r', 'radius')), None
+        )
+        if point_col is not None and r_col is not None:
+            name_to_r = dict(zip(result.names, result.r_optimized))
+            patched = [list(row) for row in pi_rows]
+            for row in patched[1:]:
+                if point_col < len(row):
+                    pname = str(row[point_col]).strip()
+                    if pname in name_to_r and r_col < len(row):
+                        row[r_col] = str(name_to_r[pname])
+            try:
+                vertices = parse_pi_table(patched)
+                built = build_alignment_from_pi(vertices)
+                active_pts = [
+                    dp for dp in drawing_points
+                    if not str(dp.get('name', '')).strip().upper().startswith(('PI', 'HIP'))
+                ]
+                print('\n=== Verification (gap after optimisation) ===')
+                print(f'{"Name":<10} {"STA":>12} {"calc_N":>14} {"calc_E":>14} {"gap_m":>10}')
+                print('-' * 64)
+                for dp in active_pts:
+                    try:
+                        pt = alignment.calculate_station_to_coordinate(
+                            built.elements, float(dp['sta'])
+                        )
+                        gap = math.hypot(pt.n - float(dp['n']), pt.e - float(dp['e']))
+                        print(
+                            f'{dp["name"]:<10} {float(dp["sta"]):>12.6f}'
+                            f' {pt.n:>14.6f} {pt.e:>14.6f} {gap:>10.6f}'
+                        )
+                    except (ValueError, IndexError):
+                        print(f'{dp["name"]:<10} {"OUTSIDE_ALIGNMENT":>30}')
+            except Exception as exc:
+                print(f'warning: verification table failed: {exc}', file=sys.stderr)
+
+    return 0
+
+
 def _run_fwd(args: argparse.Namespace) -> int:
     """station-to-coord: station (+offset) -> grid coordinate N,E."""
     elements = _read_alignment(args.table)
@@ -290,6 +360,26 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser_cd.set_defaults(func=_run_compare_drawing)
 
+    parser_fr = sub.add_parser(
+        'fit-radius',
+        help='optimise PI radii to minimise coordinate residuals (requires scipy)',
+    )
+    parser_fr.add_argument('alignment', help='PI table CSV (POINT,N,E,R,...)')
+    parser_fr.add_argument('drawing',   help='drawing control-point CSV (Name,STA,N,E)')
+    parser_fr.add_argument(
+        '--fix', default='',
+        help='comma-separated PI names to hold constant (not optimised)',
+    )
+    parser_fr.add_argument(
+        '--tol', type=float, default=1e-6,
+        help='Nelder-Mead xatol tolerance (default 1e-6)',
+    )
+    parser_fr.add_argument(
+        '--max-iter', type=int, default=10000,
+        help='maximum Nelder-Mead iterations (default 10000)',
+    )
+    parser_fr.set_defaults(func=_run_fit_radius)
+
     return parser
 
 
@@ -299,7 +389,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
-    except (ValueError, FileNotFoundError) as exc:
+    except (ValueError, FileNotFoundError, ImportError) as exc:
         print(f'error: {exc}', file=sys.stderr)
         return 1
 

@@ -261,3 +261,23 @@ def test_compare_drawing_hip_no_crash(table, tmp_path, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert 'HIP' in out
+
+
+# ---------------------------------------------------------------------------
+# fit-radius subcommand
+# ---------------------------------------------------------------------------
+
+def test_fit_radius_basic(pi_csv, drawing_csv, capsys):
+    pytest.importorskip('scipy', reason='scipy not installed; pip install surveyor-micro-toolkit[optimize]')
+    rc = cli.main(['fit-radius', pi_csv, drawing_csv])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert 'gap_before' in out
+    assert 'gap_after' in out
+
+
+def test_fit_radius_missing_file(capsys):
+    rc = cli.main(['fit-radius', 'no_such_pi.csv', 'no_such_drawing.csv'])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'error' in err.lower()
