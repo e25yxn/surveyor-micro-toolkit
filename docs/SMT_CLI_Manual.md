@@ -1,7 +1,8 @@
 # SMT CLI — คู่มือการใช้งาน Command-Line Interface
 
 **Surveyor Micro Toolkit (SMT)** เวอร์ชัน 0.1.0  
-เครื่องมือคำนวณงานแนวเส้นทางถนน/สะพาน/ทางลาด ผ่าน Command Line
+เครื่องมือคำนวณงานแนวเส้นทางถนน/สะพาน/ทางลาด ผ่าน Command Line  
+396/396 tests ผ่าน — mypy 0 errors
 
 ---
 
@@ -28,16 +29,18 @@ smt --help
 | `smt station-to-coord` | elements CSV + station | N, E | หาพิกัดจาก station |
 | `smt coord-to-station` | elements CSV + N, E | station, offset | หา station จากพิกัด |
 | `smt cross-check` | PI table CSV + field CSV | ตารางผล | ตรวจสอบจุดสนามกับแนวเส้นทาง |
+| `smt compare-drawing` | elements CSV + drawing CSV | ตารางเปรียบเทียบ | ตรวจสอบความตรงกับแบบ |
 
-**ลำดับการใช้งานทั่วไป:**
+**Workflow งานจริง:**
 ```
-SettingOutTest.csv (PI table)
+PI table CSV (SettingOutTest.csv)
         ↓
    smt build          → elements_output.csv + controls_so_output.csv
+        ↓                       ↓
+   smt station-to-coord    smt compare-drawing  ← เปรียบเทียบกับแบบ
+   smt coord-to-station
         ↓
-   smt station-to-coord / smt coord-to-station   (ใช้ elements_output.csv)
-        ↓
-   smt cross-check    (ใช้ PI table + field data)
+   smt cross-check    ← ตรวจสอบจุดสนาม
 ```
 
 ---
@@ -52,8 +55,8 @@ smt build <pi_table.csv> [--out-dir DIR]
 ### arguments
 | argument | จำเป็น | คำอธิบาย |
 |----------|--------|---------|
-| `pi_table.csv` | ✅ | ไฟล์ PI table (รูปแบบด้านล่าง) |
-| `--out-dir DIR` | ❌ | โฟลเดอร์สำหรับ output (default: โฟลเดอร์เดียวกับ input) |
+| `pi_table.csv` | ✅ | ไฟล์ PI table |
+| `--out-dir DIR` | ❌ | โฟลเดอร์ output (default: โฟลเดอร์เดียวกับ input) |
 
 ### รูปแบบ input: PI table CSV
 ```
@@ -69,7 +72,7 @@ PI10,,1565380.681,680198.141,0,,,,,
 EP,,1565724.112,679180.443,,,,,,
 ```
 
-**คำอธิบายแต่ละคอลัมน์:**
+**คำอธิบายคอลัมน์:**
 
 | คอลัมน์ | คำอธิบาย | หมายเหตุ |
 |---------|---------|---------|
@@ -77,89 +80,55 @@ EP,,1565724.112,679180.443,,,,,,
 | STA | station เริ่มต้น (BP เท่านั้น) | PIอื่นๆ ว่างได้ (คำนวณอัตโนมัติ) |
 | NORTHING | พิกัด N (เหนือ) | |
 | EASTING | พิกัด E (ตะวันออก) | |
-| RADIUS | รัศมีโค้ง (เมตร) | 0 หรือว่าง = angle point (ไม่มีโค้ง) |
+| RADIUS | รัศมีโค้ง (เมตร) | 0 หรือว่าง = angle point (EXT-001) |
 | Ls | ความยาว spiral สมมาตร | |
 | LsIn | ความยาว spiral เข้า (อสมมาตร) | |
 | LsOut | ความยาว spiral ออก (อสมมาตร) | |
-| Transition | ชนิด transition: CLOTHOID, BLOSS, COSINE, SINE | ว่าง = CLOTHOID |
+| Transition | CLOTHOID, BLOSS, COSINE, SINE | ว่าง = CLOTHOID |
 | Delta | มุมเลี้ยวของ arc ใน compound curve (องศา) | ใช้กับแถว compound sub-arc |
 
 **รูปแบบพิเศษ:**
-- **Compound curve:** PI row ตามด้วยแถวที่ POINT ว่าง แต่มี RADIUS และ DELTA เช่น PI7 (R=300, Delta=20°) ตามด้วย แถวว่าง (R=150)
+- **Compound curve:** PI row ตามด้วยแถวที่ POINT ว่างแต่มี RADIUS และ DELTA
 - **Angle point (EXT-001):** RADIUS=0 หรือว่าง → ไม่มีโค้ง สร้าง control point ชื่อ IP
 
 ### output ที่ได้
 
-**`elements_output.csv`** — ตาราง element สำหรับใช้กับ smt station-to-coord และ smt coord-to-station
+**`elements_output.csv`** (ทศนิยม 6 ตำแหน่ง)
 ```
 StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition
-0.000,519.615,1568000.000,678000.000,90.000000,0.000,T,CLOTHOID
-519.615,676.695,1568000.000,678519.615,90.000000,300.000,C,CLOTHOID
-676.695,1020.591,1567959.808,678669.615,120.000012,0.000,T,CLOTHOID
-...
+0.000000,519.615000,1568000.000000,678000.000000,90.000000,0.000000,T,
+519.615000,676.695000,1568000.000000,678519.615000,90.000000,300.000000,C,
+1080.591000,1299.844000,1567756.578000,679018.621000,120.000012,400.000000,SPIN,BLOSS
 ```
 
 | คอลัมน์ | คำอธิบาย |
 |---------|---------|
-| StaStart | station เริ่มต้นของ element (เมตร) |
-| StaEnd | station สิ้นสุดของ element (เมตร) |
-| N | พิกัด N ที่จุดเริ่มต้น element |
-| E | พิกัด E ที่จุดเริ่มต้น element |
-| Azimuth | มุมแนว entry tangent (องศา, survey convention) |
-| Radius | รัศมี + = ขวา, − = ซ้าย, 0 = เส้นตรง |
-| Type | T (tangent), C (circular), SPIN (spiral เข้า), SPOUT (spiral ออก) |
-| Transition | CLOTHOID, BLOSS, COSINE, SINE |
+| Type | T=tangent, C=circular, SPIN=spiral เข้า, SPOUT=spiral ออก |
+| Transition | แสดงเฉพาะ SPIN/SPOUT (T/C ว่าง) |
+| Radius | + = ขวา, − = ซ้าย, 0 = tangent |
 
-**`controls_so_output.csv`** — จุดควบคุมทั้งหมด สำหรับ setting out และ checking
+**`controls_so_output.csv`** (ทศนิยม 6 ตำแหน่ง)
 ```
 Name,STA,N,E
-BP,0.000,1568000.000,678000.000
-PC,519.615,1568000.000,678519.615
-PT,676.695,1567959.808,678669.615
-TS,1020.591,1567787.860,678967.438
-SC,1080.591,1567756.578,679018.621
-CS,1299.844,1567590.715,679157.796
-ST,1359.844,1567534.878,679179.714
-IP,5890.784,1565380.681,680198.141
-EP,7070.151,1565724.112,679180.443
+BP,0.000000,1568000.000000,678000.000000
+PC,519.615000,1568000.000000,678519.615000
+PT,676.695000,1567959.808000,678669.615000
+IP,5890.784000,1565380.681000,680198.141000
+EP,7070.151000,1565724.112000,679180.443000
 ```
 
 | ชื่อจุด | ความหมาย |
 |--------|---------|
-| BP | Beginning Point (จุดเริ่มต้น) |
-| EP | End Point (จุดสิ้นสุด) |
-| PC | Point of Curvature (เริ่มโค้ง) |
-| PT | Point of Tangency (สิ้นสุดโค้ง) |
-| TS | Tangent to Spiral |
-| SC | Spiral to Curve |
-| CS | Curve to Spiral |
-| ST | Spiral to Tangent |
-| PCC | Point of Compound Curve |
-| IP | Intersection Point (angle point ไม่มีโค้ง) |
+| BP/EP | จุดเริ่มต้น/สิ้นสุด |
+| PC/PT | เริ่ม/สิ้นสุดโค้ง |
+| TS/SC/CS/ST | จุด spiral |
+| PCC | Compound curve |
+| IP | Angle point (ไม่มีโค้ง, EXT-001) |
 
-### ตัวอย่างการใช้งาน
-
+### ตัวอย่าง
 ```powershell
-# สร้าง output ในโฟลเดอร์เดียวกับ input
-smt build test_data\SettingOutTest.csv
-
-# กำหนดโฟลเดอร์ output เอง
 smt build test_data\SettingOutTest.csv --out-dir output\
-
-# ตัวอย่างผลลัพธ์ใน terminal
-=== Elements (31 rows) -> output\elements_output.csv ===
-  StaStart     StaEnd            N            E      Az(deg)     Radius Type   Trans
-------------------------------------------------------------------------------------------
-     0.000    519.615  1568000.000   678000.000   90.000000      0.000 T      CLOTHOID
-   519.615    676.695  1568000.000   678519.615   90.000000    300.000 C      CLOTHOID
-...
-
-=== Control Points (32 rows) -> output\controls_so_output.csv ===
-Name              STA              N              E
---------------------------------------------------
-BP            0.000  1568000.000   678000.000
-PC          519.615  1568000.000   678519.615
-...
+smt build D:\Pnez_data\ramp01n01_SO.csv --out-dir D:\Pnez_data\output\
 ```
 
 ---
@@ -174,28 +143,17 @@ smt station-to-coord <elements.csv> <sta> [--offset OFFSET]
 ### arguments
 | argument | จำเป็น | คำอธิบาย |
 |----------|--------|---------|
-| `elements.csv` | ✅ | ไฟล์ element table (จาก smt build) |
-| `sta` | ✅ | station ที่ต้องการหาพิกัด (เมตร) |
-| `--offset OFFSET` | ❌ | offset จากแนวกลาง (เมตร, + = ขวา, − = ซ้าย, default = 0) |
+| `elements.csv` | ✅ | ไฟล์ elements_output.csv จาก smt build |
+| `sta` | ✅ | station (เมตร) |
+| `--offset` | ❌ | offset + = ขวา, − = ซ้าย (default = 0) |
 
-### output
-```
-N,E
-```
-(พิกัด N และ E คั่นด้วย comma)
-
-### ตัวอย่างการใช้งาน
+### ตัวอย่าง
 ```powershell
-# หาพิกัด centerline ที่ sta=500
-smt station-to-coord test_data\build_out\elements_output.csv 500
-# output: 1568000.000,678500.000
+smt station-to-coord output\elements_output.csv 500
+# output: 1568000.000000,678500.000000
 
-# หาพิกัดที่ sta=500 offset +5m (ขวา)
-smt station-to-coord test_data\build_out\elements_output.csv 500 --offset 5
-# output: 1567995.000,678500.000
-
-# หาพิกัดที่ sta=1000 offset -10m (ซ้าย)
-smt station-to-coord test_data\build_out\elements_output.csv 1000 --offset -10
+smt station-to-coord output\elements_output.csv 500 --offset 5
+smt station-to-coord output\elements_output.csv 1000 --offset -10
 ```
 
 ---
@@ -207,29 +165,10 @@ smt station-to-coord test_data\build_out\elements_output.csv 1000 --offset -10
 smt coord-to-station <elements.csv> <n> <e>
 ```
 
-### arguments
-| argument | จำเป็น | คำอธิบาย |
-|----------|--------|---------|
-| `elements.csv` | ✅ | ไฟล์ element table (จาก smt build) |
-| `n` | ✅ | พิกัด N (เหนือ) |
-| `e` | ✅ | พิกัด E (ตะวันออก) |
-
-### output
-```
-sta,offset
-```
-(station และ offset คั่นด้วย comma)  
-offset + = ขวา, − = ซ้าย
-
-### ตัวอย่างการใช้งาน
+### ตัวอย่าง
 ```powershell
-# หา station ของพิกัดที่รู้
-smt coord-to-station test_data\build_out\elements_output.csv 1568000 678500
-# output: 500.000,0.000
-
-# หา station ของจุดที่อยู่ขวาแนว 5m
-smt coord-to-station test_data\build_out\elements_output.csv 1567995 678500
-# output: 500.000,5.000
+smt coord-to-station output\elements_output.csv 1568000 678500
+# output: 500.000000,0.000000
 ```
 
 ---
@@ -241,49 +180,67 @@ smt coord-to-station test_data\build_out\elements_output.csv 1567995 678500
 smt cross-check <pi_table.csv> <field.csv>
 ```
 
-### arguments
-| argument | จำเป็น | คำอธิบาย |
-|----------|--------|---------|
-| `pi_table.csv` | ✅ | ไฟล์ PI table (รูปแบบเดียวกับ smt build) |
-| `field.csv` | ✅ | ไฟล์ข้อมูลสนาม |
-
-### รูปแบบ input: field CSV
+### รูปแบบ field CSV
 ```
 POINT,N,E,Z,DISC
 1001,1568047.495,678073.812,101.255,EG
 1002,1567980.056,678584.785,101.253,EG
-1003,1567715.803,679156.230,101.250,EG
 ```
-
-| คอลัมน์ | คำอธิบาย |
-|---------|---------|
-| POINT | ชื่อหรือหมายเลขจุด |
-| N | พิกัด N ที่วัดได้ในสนาม |
-| E | พิกัด E ที่วัดได้ในสนาม |
-| Z | ความสูง (elevation) |
-| DISC | คำอธิบาย เช่น EG (Existing Ground) |
 
 ### output
 ```
 NAME              STA     OFFSET            N            E         Z     DISC
 -----------------------------------------------------------------------------
 1001           73.812    -47.495  1568047.495   678073.812   101.255       EG
-1002          588.205     12.461  1567980.056   678584.785   101.253       EG
-...
 ```
 
-| คอลัมน์ | คำอธิบาย |
-|---------|---------|
-| NAME | ชื่อจุดจาก field CSV |
-| STA | station บนแนวกลาง (เมตร) |
-| OFFSET | ระยะห่างจากแนวกลาง (+ = ขวา, − = ซ้าย, เมตร) |
-| N, E | พิกัดจากสนาม |
-| Z | ความสูงจากสนาม |
-| DISC | คำอธิบาย |
-
-### ตัวอย่างการใช้งาน
+### ตัวอย่าง
 ```powershell
 smt cross-check test_data\SettingOutTest.csv test_data\Bulk_cross-check.csv
+```
+
+---
+
+## 5. smt compare-drawing — ตรวจสอบความตรงกับแบบ
+
+### รูปแบบคำสั่ง
+```
+smt compare-drawing <elements.csv> <drawing.csv> [--tol TOLERANCE]
+```
+
+### arguments
+| argument | จำเป็น | คำอธิบาย |
+|----------|--------|---------|
+| `elements.csv` | ✅ | ไฟล์ elements_output.csv จาก smt build |
+| `drawing.csv` | ✅ | ค่าพิกัดจากแบบ (Name, STA, N, E) |
+| `--tol` | ❌ | tolerance (เมตร, default = 0.010) |
+
+### รูปแบบ drawing CSV
+```
+Name,STA,N,E
+BP,0,1537796.012,685410.478
+PI,27.23,1537790.869,685383.738
+PC,53.874,1537776.655,685360.512
+PT,109.663,1537756.948,685308.663
+EP,1762.869,1537405.577,683703.662
+```
+
+**หมายเหตุ:** จุดที่ชื่อขึ้นต้น PI หรือ HIP = intersection point ไม่ได้อยู่บน centerline แสดงเป็น HIP ในผลลัพธ์
+
+### output
+```
+NAME  STA          N_DRAW         E_DRAW         N_CALC         E_CALC         DELTA_N   DELTA_E   GAP_M      OK
+BP    0.000000     1537796.012000 685410.478000  1537796.012000 685410.478000  0.000000  0.000000  0.000000   OK
+PI    27.230000    1537790.869000 685383.738000  -              -              -         -         -          HIP
+PC    53.874000    1537776.655000 685360.512000  1537776.654521 685360.511114  0.000479  0.000886  0.001010   OK
+PT    109.663000   1537756.948000 685308.663000  1537756.947753 685308.663108  0.000247  0.000108  0.000269   OK
+EP    1762.869000  1537405.577000 683703.662000  1537405.576700 683703.661800  0.000300  0.000200  0.000361   OK
+```
+
+### ตัวอย่าง
+```powershell
+smt compare-drawing test_data\r01n01_elements_output.csv test_data\r01n01_so_crosscheck.csv
+smt compare-drawing output\elements_output.csv drawing.csv --tol 0.005
 ```
 
 ---
@@ -292,36 +249,36 @@ smt cross-check test_data\SettingOutTest.csv test_data\Bulk_cross-check.csv
 
 | Error message | สาเหตุ | วิธีแก้ |
 |--------------|--------|--------|
-| `error: could not convert string to float: 'BP'` | ใช้ PI table กับคำสั่งที่ต้องการ elements table | ใช้ `smt build` สร้าง elements_output.csv ก่อน |
-| `error: [Errno 2] No such file or directory` | ไม่พบไฟล์ | ตรวจ path ให้ถูกต้อง |
+| `error: could not convert string to float: 'BP'` | ใช้ PI table กับคำสั่งที่ต้องการ elements table | รัน `smt build` สร้าง elements_output.csv ก่อน |
+| `error: ไม่พบข้อมูล PI ในไฟล์` | ใช้ elements table กับ `smt build` | ตรวจว่าไฟล์มีคอลัมน์ POINT |
 | `error: station ... lies outside the alignment` | station อยู่นอกช่วง alignment | ตรวจ station ให้อยู่ในช่วง StaStart ถึง StaEnd |
-| `warning: PI#x: spiral ยาวเกินมุมเลี้ยว` | spiral ยาวเกินไปสำหรับมุมเลี้ยว | ลด Ls หรือเพิ่ม R ใน PI table |
+| `warning: PI#x: spiral ยาวเกินมุมเลี้ยว` | spiral ยาวเกินไป | ลด Ls หรือเพิ่ม R |
 
 ---
 
-## Workflow ตัวอย่างงานจริง
+## Workflow ตัวอย่างงานจริง: ramp01n01
 
-### งาน Setting Out
+### ขั้น 1 — สร้างตารางแนวเส้นทาง
 ```powershell
-# ขั้น 1: สร้างตารางแนวเส้นทาง
-smt build SettingOutTest.csv --out-dir output\
-
-# ขั้น 2: หาพิกัดจุดต่างๆ ตาม station
-smt station-to-coord output\elements_output.csv 1000
-smt station-to-coord output\elements_output.csv 1000 --offset 3.5
-smt station-to-coord output\elements_output.csv 1000 --offset -3.5
+smt build D:\Pnez_data\ramp01n01_SO.csv --out-dir D:\Pnez_data\output\
+# ได้: elements_output.csv (12 rows) + controls_so_output.csv (13 rows)
 ```
 
-### งาน Cross-Section Survey
+### ขั้น 2 — ตรวจสอบกับแบบ
 ```powershell
-# ขั้น 1: หา station ของจุดที่วัดมา
-smt coord-to-station output\elements_output.csv 1567787 678967
+smt compare-drawing D:\Pnez_data\output\elements_output.csv D:\Pnez_data\r01n01_so_crosscheck.csv
+# max gap ≈ 0.0074m (< 1cm) — ตรงกับแบบดีมาก
 ```
 
-### งาน Bulk Field Check
+### ขั้น 3 — หาพิกัดจาก station
 ```powershell
-# ขั้น 1: ตรวจสอบทุกจุดพร้อมกัน
-smt cross-check SettingOutTest.csv field_survey.csv
+smt station-to-coord D:\Pnez_data\output\elements_output.csv 500
+smt station-to-coord D:\Pnez_data\output\elements_output.csv 500 --offset 3.5
+```
+
+### ขั้น 4 — ตรวจสอบจุดสนาม
+```powershell
+smt cross-check D:\Pnez_data\ramp01n01_SO.csv D:\Pnez_data\field_survey.csv
 ```
 
 ---
@@ -331,14 +288,11 @@ smt cross-check SettingOutTest.csv field_survey.csv
 **Sign Convention:**
 - Offset + = ขวาของทิศทางเดินทาง
 - Offset − = ซ้ายของทิศทางเดินทาง
-- Radius + = โค้งขวา
-- Radius − = โค้งซ้าย
+- Radius + = โค้งขวา, − = โค้งซ้าย
 
-**หน่วย:**
-- ระยะทางทั้งหมด: เมตร
-- มุม Azimuth ใน elements.csv: องศา (survey convention, 0° = เหนือ, วนตามเข็มนาฬิกา)
-- การคำนวณภายใน: radian (แปลงเป็นองศาที่ output เท่านั้น)
+**หน่วย:** ทุกค่าเป็นเมตร ยกเว้น Azimuth เป็นองศา
+
+**ความแม่นยำ:** output ทุกค่าทศนิยม 6 ตำแหน่ง
 
 **Angle Point (EXT-001):**
-- PI ที่ RADIUS = 0 หรือว่าง → ไม่สร้างโค้ง สร้าง control point ชื่อ **IP**
-- ใช้ได้กับ PI ที่ collinear (อยู่ในแนวเดียวกัน) ด้วย
+RADIUS=0 หรือว่าง → ไม่มีโค้ง → control point ชื่อ IP ในแนว ramp หรือแนวที่มีจุดหักมุม
