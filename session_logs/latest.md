@@ -1,5 +1,21 @@
 # Session Log
 
+## [2026-06-29 18:52] สร้าง optimizer.py — fit_radius (Nelder-Mead)
+
+- ทำ: สร้าง `src/smt/optimizer.py` (EXTENSION: beyond oracle) และ `tests/test_optimizer.py` + เพิ่ม `optimize = ["scipy>=1.10"]` ใน `pyproject.toml`
+  - `FitResult` dataclass: names, r_initial, r_optimized, gap_before, gap_after, n_points, iterations, converged, message
+  - `fit_radius(pi_rows, drawing_points, fix_names, tol, max_iter)`:
+    - หา free PIs จาก header (R≠0, ไม่อยู่ใน fix_names) เก็บ sign แยก optimize abs(R)
+    - กรอง drawing points ออก PI*/HIP*
+    - objective = Σgap² (penalty 1e6 ต่อจุดถ้า station นอก alignment หรือ build มี issues)
+    - scipy Nelder-Mead + bounds=(1.0, None) per R
+    - gap_before/after = √(Σgap²) หน่วยเมตร
+  - แก้ geometry test ครั้งแรก (EP collinear → ZeroDivisionError) แล้วผ่าน
+- คำสั่ง: `pytest tests/test_optimizer.py -v`, `pytest -q`, `mypy src/smt/optimizer.py`, `ruff check src/smt/optimizer.py`
+- ผล: PASS (405/405) — mypy clean, ruff clean — real data test: gap_before≈7.4mm, gap_after≤gap_before, ΔR<1m
+
+---
+
 ## [2026-06-29] smt compare-drawing: เพิ่ม subcommand เปรียบเทียบ drawing vs calculated
 
 - ทำ: เพิ่ม CLI subcommand `smt compare-drawing` ใน `src/smt/cli.py`
