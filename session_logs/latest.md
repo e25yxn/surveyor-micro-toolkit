@@ -1,5 +1,35 @@
 # Session Log
 
+## [2026-06-29] smt compare-drawing: เพิ่ม subcommand เปรียบเทียบ drawing vs calculated
+
+- ทำ: เพิ่ม CLI subcommand `smt compare-drawing` ใน `src/smt/cli.py`
+  1. `_read_drawing_csv(path)`: อ่าน CSV header Name,STA,N,E → list of dict
+  2. `_run_compare_drawing(args)`: สำหรับแต่ละ drawing point ถ้าชื่อขึ้นต้น PI หรือ HIP → แสดง HIP ไม่คำนวณ; ถ้าอื่น → คำนวณ delta_N, delta_E, gap_m (6 ทศนิยม), OK/FAIL vs --tol
+  3. parser: รับ `elements` (elements CSV), `drawing` (drawing CSV), `--tol` default 0.010
+  4. เพิ่ม `import math` ที่ top-level imports
+- tests: เพิ่ม 3 cases ใน `tests/test_cli.py`
+  - `test_compare_drawing_basic`: exit 0, ตรวจ BP/PI/HIP/CP1/OK ใน output
+  - `test_compare_drawing_missing_file`: exit 1, 'error' ใน stderr
+  - `test_compare_drawing_hip_no_crash`: HIP-only drawing → exit 0, 'HIP' ใน output
+- คำสั่ง: `pytest -q`, `smt compare-drawing test_data\r01n01_elements_output.csv test_data\r01n01_so_crosscheck.csv`
+- ผล: PASS (396/396) — smoke test ผ่านทุก row: gap_m ทุก point ≤ 0.010 m (max ~0.0074 m)
+- commit: 3954047
+
+---
+
+## [2026-06-29] smt build: 6-decimal output, fix Transition column, add PI guard
+
+- ทำ: แก้ `_run_build` ใน `src/smt/cli.py` 3 เรื่อง
+  1. ทศนิยม 6 ตำแหน่ง: StaStart, StaEnd, N, E, Radius ใน `elements_output.csv`
+     และ STA, N, E ใน `controls_so_output.csv` (เดิม 3 ตำแหน่ง)
+  2. Transition column: T/C → ว่าง, SPIN/SPOUT → แสดงค่าจริง (เดิมแสดงค่า el.transition ทุก type)
+  3. Guard: ถ้า `parse_pi_table` คืน `[]` → raise ValueError ภาษาไทย แทน IndexError traceback
+- คำสั่ง: `pytest -q`, `smt build test_data\SettingOutTest.csv --out-dir test_data\build_out`
+- ผล: PASS (393/393) — smoke test ผ่าน, guard แสดง error สวยงาม
+- commit: dad90fb
+
+---
+
 ## [2026-06-28 19:02] Add smt build subcommand
 
 - ทำ: เพิ่ม CLI subcommand `smt build` ใน `cli.py` + 6 tests ใน `test_cli.py`
