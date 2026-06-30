@@ -10,6 +10,7 @@
 | `SMT_Vertical.bas` | VBA port of `src/smt/vertical.py` — elevation at any station |
 | `SMT_Crossfall.bas` | VBA port of `src/smt/crossfall.py` — crossfall / superelevation at any station |
 | `SMT_LocalCoord.bas` | Local ↔ Global coordinate conversion (port of CHOStoNE / NEtoCHOS) |
+| `SMT_Rotation3D.bas` | 3-D rotation matrices (RotX/RotY/RotZ) + alignment WCB at any station |
 | `SMT_Calcuator.xlsm` | Example workbook (macro-enabled) |
 
 ---
@@ -206,4 +207,43 @@ AziBEG is always in **decimal degrees** (survey: 0=North, clockwise+); converted
 =SMT_LocalToE($B$1,$B$2,$B$3,A6,B6)   ' local (chn=A6,ofs=B6) -> Easting
 =SMT_GlobalToChn($B$1,$B$2,$B$3,C6,D6)' global (N=C6,E=D6)  -> Chainage
 =SMT_GlobalToOfs($B$1,$B$2,$B$3,C6,D6)' global (N=C6,E=D6)  -> Offset
+```
+
+---
+
+## SMT_Rotation3D function reference
+
+Requires: `SMT_FPMath` module (for `SMT_WCBatSta` only; rotation functions have no module dependency).
+
+### 3-D rotation functions
+
+Input `pts`: 1-based Variant array, n rows × 3 cols (col1=X, col2=Y, col3=Z).  
+`angle_rad`: rotation angle in **radians** (positive = CCW when viewed along +axis).  
+Returns a **new** Variant array — the original `pts` is not modified.
+
+| Function | Arguments | Axis | Unchanged |
+|----------|-----------|------|-----------|
+| `SMT_RotX(pts, angle_rad)` | Variant, Double | X | X |
+| `SMT_RotY(pts, angle_rad)` | Variant, Double | Y | Y |
+| `SMT_RotZ(pts, angle_rad)` | Variant, Double | Z | Z |
+
+### WCB at station
+
+Uses `SMT_Elements` Named Range (same 8-col layout as `SMT_Align`). Returns WCB in **decimal degrees**, normalised to [0, 360).
+
+| Function | Arguments | Returns | Notes |
+|----------|-----------|---------|-------|
+| `SMT_WCBatSta(sta, rng)` | sta: Double; rng: Range | `Double` (degrees) | Tangent azimuth at sta; #VALUE! if out of range |
+
+Output is in degrees — feeds directly into `SMT_LocalToN` / `SMT_LocalToE` as the `aziBEG` argument.
+
+### Example usage
+
+```vba
+' Rotate a block of XYZ points (cells A1:C5) around Z by 45 degrees:
+result = SMT_RotZ(Range("A1:C5").Value, SMT_DegToRad(45))
+
+' WCB at a station, then use as aziBEG for local->global:
+az = SMT_WCBatSta(A2, SMT_Elements)
+=SMT_LocalToN(N0, E0, az, chn, ofs)
 ```
