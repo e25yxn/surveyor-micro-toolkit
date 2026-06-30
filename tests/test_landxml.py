@@ -28,7 +28,7 @@ def _find_all(root: ET.Element, tag: str) -> list[ET.Element]:
 
 def _ne(el: ET.Element, tag: str) -> tuple[float, float]:
     text = el.find(f'{{{NS}}}{tag}').text
-    e_str, n_str = text.split()   # output format is "E N"
+    n_str, e_str = text.split()   # output format is "N E"
     return float(n_str), float(e_str)
 
 
@@ -148,10 +148,11 @@ class TestSimpleCurve:
         assert math.isclose(math.hypot(cn - en, ce - ee), 300.0, abs_tol=1e-3)
 
     def test_rotation_right(self):
+        # Physical right-hand turn (k>0); Civil 3D chord convention → rot="left"
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('rot') == 'right'
+        assert curve.get('rot') == 'left'
 
     def test_radius_attribute(self):
         xml = export_alignment_landxml(_build(_verts_curve()))
@@ -160,7 +161,7 @@ class TestSimpleCurve:
         assert math.isclose(float(curve.get('radius')), 300.0, abs_tol=1e-6)
 
     def test_left_turn_rotation(self):
-        """Curve that goes left must have rot='left'."""
+        """Physical left-hand turn (k<0); Civil 3D chord convention → rot='right'."""
         verts = [
             {'n':    0.0, 'e':   0.0},
             {'n':    0.0, 'e': 500.0, 'R': 300.0},
@@ -169,7 +170,7 @@ class TestSimpleCurve:
         xml = export_alignment_landxml(_build(verts))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('rot') == 'left'
+        assert curve.get('rot') == 'right'
 
 
 class TestSpiralIn:
