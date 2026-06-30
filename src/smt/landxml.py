@@ -5,7 +5,8 @@ that Civil 3D 2023 can import directly.
 
 Coordinates: "N E" format (northing first), 6 decimal places.
 Azimuths: decimal degrees.  Units: metric, linearUnit=meter.
-Sign convention (Civil 3D chord direction): k>0 → rot="left"; k<0 → rot="right".
+Sign convention: k>0 → rot="right" (right turn); k<0 → rot="left" (left turn).
+dirStart/dirEnd = entry/exit azimuth in decimal degrees on every Curve and Spiral.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ import math
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
+from . import fpmath
 from .alignment import Element, calculate_exit_state
 from .builders.alignment_builder import BuildResult
 
@@ -45,7 +47,14 @@ def _curve_center(n: float, e: float, azimuth_rad: float, k: float) -> tuple[flo
 
 
 def _rotation(k: float) -> str:
-    return 'left' if k > 0 else 'right'
+    return 'right' if k > 0 else 'left'
+
+
+def _exit_azimuth_deg(i: int, elements: list[Element]) -> float:
+    if i < len(elements) - 1:
+        return fpmath.rad_to_deg(elements[i + 1].azimuth)
+    state = calculate_exit_state(elements[-1])
+    return fpmath.rad_to_deg(state.azimuth)
 
 
 def _spiral_lx_type(transition: str) -> str:
@@ -71,8 +80,9 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
     """Convert BuildResult to LandXML 1.2 XML string (Civil 3D 2023 compatible).
 
     Units: metric/meter.  Coordinates: "N E" (northing first), 6 dp.
-    rot="left" for k>0, rot="right" for k<0 (Civil 3D chord-direction convention).
-    Curve elements include a <Center> child tag.
+    rot="right" for k>0 (right turn), rot="left" for k<0 (left turn).
+    Curve: <Center> child tag; dirStart/dirEnd (entry/exit azimuth, decimal degrees).
+    Spiral: dirStart/dirEnd (entry/exit azimuth, decimal degrees).
     radiusStart/radiusEnd="INF" for the infinite-radius end of spiral elements.
     """
     elements = build_result.elements
@@ -121,7 +131,9 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Curve',
                                 rot=_rotation(k),
                                 radius=f'{R:.6f}',
-                                length=f'{length:.6f}')
+                                length=f'{length:.6f}',
+                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}',
+                                dirEnd=f'{_exit_azimuth_deg(i, elements):.6f}')
             _sub(tag, 'Start',  _coord(el.n, el.e))
             _sub(tag, 'Center', _coord(cn, ce))
             _sub(tag, 'End',    _coord(end_n, end_e))
@@ -135,7 +147,9 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 radiusStart='INF',
                                 radiusEnd=f'{R_out:.6f}',
                                 spiType='toCurve',
-                                length=f'{length:.6f}')
+                                length=f'{length:.6f}',
+                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}',
+                                dirEnd=f'{_exit_azimuth_deg(i, elements):.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 
@@ -148,7 +162,9 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 radiusStart=f'{R_in:.6f}',
                                 radiusEnd='INF',
                                 spiType='fromCurve',
-                                length=f'{length:.6f}')
+                                length=f'{length:.6f}',
+                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}',
+                                dirEnd=f'{_exit_azimuth_deg(i, elements):.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 

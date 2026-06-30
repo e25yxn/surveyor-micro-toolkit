@@ -148,11 +148,24 @@ class TestSimpleCurve:
         assert math.isclose(math.hypot(cn - en, ce - ee), 300.0, abs_tol=1e-3)
 
     def test_rotation_right(self):
-        # Physical right-hand turn (k>0); Civil 3D chord convention → rot="left"
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('rot') == 'left'
+        assert curve.get('rot') == 'right'
+
+    def test_curve_dir_start(self):
+        # BP→PI direction is East → entry WCB = 90°
+        xml = export_alignment_landxml(_build(_verts_curve()))
+        root = _parse(xml)
+        curve = _find_all(root, 'Curve')[0]
+        assert math.isclose(float(curve.get('dirStart')), 90.0, abs_tol=1e-3)
+
+    def test_curve_dir_end(self):
+        # 90° right-hand deflection: exit WCB = 90° + 90° = 180°
+        xml = export_alignment_landxml(_build(_verts_curve()))
+        root = _parse(xml)
+        curve = _find_all(root, 'Curve')[0]
+        assert math.isclose(float(curve.get('dirEnd')), 180.0, abs_tol=1e-3)
 
     def test_radius_attribute(self):
         xml = export_alignment_landxml(_build(_verts_curve()))
@@ -161,7 +174,6 @@ class TestSimpleCurve:
         assert math.isclose(float(curve.get('radius')), 300.0, abs_tol=1e-6)
 
     def test_left_turn_rotation(self):
-        # Physical left-hand turn (k<0); Civil 3D chord convention → rot="right"
         verts = [
             {'n':    0.0, 'e':   0.0},
             {'n':    0.0, 'e': 500.0, 'R': 300.0},
@@ -170,7 +182,7 @@ class TestSimpleCurve:
         xml = export_alignment_landxml(_build(verts))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('rot') == 'right'
+        assert curve.get('rot') == 'left'
 
 
 class TestSpiralIn:
@@ -233,6 +245,20 @@ class TestSpiralIn:
             assert spiral.find(f'{{{NS}}}Start') is not None
             assert spiral.find(f'{{{NS}}}End') is not None
             assert spiral.find(f'{{{NS}}}Center') is None
+
+    def test_spin_dir_start(self):
+        # SPIN entry is same direction as the approach tangent → 90°
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('spiType') == 'toCurve')
+        assert math.isclose(float(spin.get('dirStart')), 90.0, abs_tol=1e-3)
+
+    def test_spin_dir_end_is_float(self):
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('spiType') == 'toCurve')
+        dir_end = float(spin.get('dirEnd'))
+        assert dir_end > 90.0   # right-hand spiral bends azimuth clockwise
 
 
 class TestAnglePoint:
