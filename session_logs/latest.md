@@ -1,5 +1,55 @@
 # Session Log
 
+## [2026-06-30] จัดโครงสร้าง reference/vba/ ใหม่ — 7 modules → 5 modules
+
+- ทำ: รวมไฟล์ VBA ใน `reference/vba/` จาก 7 ไฟล์เป็น 5 ไฟล์
+  - `SMT_Core.bas` ใหม่: รวม SMT_FPMath + SMT_WCB (FPMath ก่อน, WCB ตาม)
+  - `SMT_Alignment.bas` ใหม่: เปลี่ยนชื่อจาก SMT_Align + ดูด SMT_WCBatSta มาจาก SMT_Rotation3D
+  - `SMT_Geometry.bas` ใหม่: รวม SMT_LocalCoord + RotX/RotY/RotZ จาก SMT_Rotation3D
+  - `SMT_Vertical.bas`, `SMT_Crossfall.bas` คงเดิม ไม่เปลี่ยน
+  - ลบ: SMT_FPMath.bas, SMT_WCB.bas, SMT_Align.bas, SMT_LocalCoord.bas, SMT_Rotation3D.bas
+  - อัปเดต Attribute VB_Name ทุกไฟล์ใหม่
+  - เขียน README.md ใหม่ทั้งหมด: dependency diagram (ASCII) + function reference ครบ 5 modules
+- คำสั่ง: Write tool (SMT_Core/Alignment/Geometry.bas + README) → Remove-Item → git add -u → git commit -F
+- ผล: commit 8a15ee7 — 6 files changed, 379 insertions, 399 deletions
+- โครงสร้างใหม่: SMT_Core → SMT_Alignment (dep Core), SMT_Vertical, SMT_Crossfall, SMT_Geometry (dep Core)
+
+## [2026-06-30] สร้าง SMT_Rotation3D.bas — 3-D rotation + WCB at station
+
+- ทำ: สร้าง `reference/vba/SMT_Rotation3D.bas` — 2 ส่วน
+- ส่วน 1: SMT_RotX, SMT_RotY, SMT_RotZ (port จาก code อาจารย์, แก้ 4 จุด)
+  - Fix1: Dim i As Long (เดิม Integer ล้น >32767)
+  - Fix2: nRows As Long
+  - Fix3: คืน array ใหม่ (เดิม ByRef แก้ต้นฉบับ)
+  - Fix4: cosA/sinA คำนวณครั้งเดียวก่อน loop
+  - Convention: right-hand rule CCW, angle in radians, pts 1-based n×3 Variant
+- ส่วน 2: SMT_WCBatSta(sta, rng) — tangent WCB (degrees,[0,360)) ที่ station ใดๆ
+  - T: theta=0 | C: theta=d/R | SPIN: d²/(2RL) | SPOUT: d/R-d²/(2RL)
+  - คืน degrees เพื่อใช้กับ SMT_LocalToN/E ได้ทันที
+- อัปเดต `reference/vba/README.md` เพิ่ม SMT_Rotation3D reference tables
+- คำสั่ง: Write tool → git add → git commit -F
+- ผล: commit fd36af5 — 2 files changed, 246 insertions
+- Expected values:
+  RotZ([1,0,0], pi/2) = [0,1,0] | SMT_WCBatSta(0, SMT_Elements) = 90.0
+
+## [2026-06-30] สร้าง SMT_LocalCoord.bas — Local ↔ Global coordinate conversion
+
+- ทำ: สร้าง `reference/vba/SMT_LocalCoord.bas` port และปรับปรุงจาก CHOStoNE/NEtoCHOS
+  - `SMT_LocalToN(n0,e0,aziBEG,chn,ofs)` — Local→Northing
+  - `SMT_LocalToE(n0,e0,aziBEG,chn,ofs)` — Local→Easting
+  - `SMT_GlobalToChn(n0,e0,aziBEG,n,e)` — Global→Chainage
+  - `SMT_GlobalToOfs(n0,e0,aziBEG,n,e)` — Global→Offset (+right/-left)
+- Forward: DS=Sqr(chn²+ofs²); localAz=SMT_Atan2(ofs,chn); globalAz=NormalizeAngle(localAz+aziBEG_rad); N=n0+DS*Cos, E=e0+DS*Sin
+- Inverse: Chn=dN*Cos(az)+dE*Sin(az); Ofs=-dN*Sin(az)+dE*Cos(az)
+- Private SMT_Atan2 ซ้ำมาจาก SMT_WCB (VBA ไม่อนุญาต cross-module Private access)
+- aziBEG รับเป็น degrees แปลง radians ทันทีใน entry point
+- อัปเดต `reference/vba/README.md` เพิ่ม SMT_LocalCoord reference table
+- คำสั่ง: Write tool (SMT_LocalCoord.bas + README) → git add → git commit -F
+- ผล: commit e6ba7eb — 2 files changed, 213 insertions
+- Expected values ท้ายไฟล์ (Origin=1000,2000 az=90°):
+  LocalToN(100,0)=1000.0 | LocalToE(100,0)=2100.0 | LocalToN(0,50)=950.0
+  GlobalToChn(1000,2100)=100.0 | GlobalToOfs(950,2000)=50.0
+
 ## [2026-06-30] สร้าง SMT_Crossfall.bas — VBA port of crossfall.py (crossfall/superelevation lookup)
 
 - ทำ: สร้าง `reference/vba/SMT_Crossfall.bas` พอร์ต 2 public functions จาก `src/smt/crossfall.py`
