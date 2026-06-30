@@ -28,7 +28,7 @@ def _find_all(root: ET.Element, tag: str) -> list[ET.Element]:
 
 def _ne(el: ET.Element, tag: str) -> tuple[float, float]:
     text = el.find(f'{{{NS}}}{tag}').text
-    n_str, e_str = text.split()
+    e_str, n_str = text.split()   # output format is "E N"
     return float(n_str), float(e_str)
 
 

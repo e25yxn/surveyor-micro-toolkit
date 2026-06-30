@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LandXML xmlns="http://www.landxml.org/schema/LandXML-1.2" version="1.2" date="2026-06-30" time="22:09:57">
+  <Units>
+    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" angularUnit="decimal dd" directionUnit="decimal dd" />
+  </Units>
+  <Alignments>
+    <Alignment name="SettingOutTest" length="7070.150994" staStart="0.000000">
+      <CoordGeom>
+        <Line length="519.615210">
+          <Start>678000.000000 1568000.000000</Start>
+          <End>678519.615210 1568000.000000</End>
+        </Line>
+        <Curve rot="right" radius="300.000000" length="157.079693">
+          <Start>678519.615210 1568000.000000</Start>
+          <Center>678519.615210 1567700.000000</Center>
+          <End>678669.615262 1567959.807591</End>
+        </Curve>
+        <Line length="343.896029">
+          <Start>678669.615262 1567959.807591</Start>
+          <End>678967.437925 1567787.859516</End>
+        </Line>
+        <Spiral type="clothoid" rot="right" radiusStart="INF" radiusEnd="400.000000" spiType="toCurve" length="60.000000">
+          <Start>678967.437925 1567787.859516</Start>
+          <End>679018.620523 1567756.577860</End>
+        </Spiral>
+        <Curve rot="right" radius="400.000000" length="219.252751">
+          <Start>679018.620523 1567756.577860</Start>
+          <Center>678793.226281 1567426.127508</Center>
+          <End>679157.795745 1567590.715192</End>
+        </Curve>
+        <Spiral type="clothoid" rot="right" radiusStart="400.000000" radiusEnd="INF" spiType="fromCurve" length="60.000000">
+          <Start>679157.795745 1567590.715192</Start>
+          <End>679179.714365 1567534.878157</End>
+        </Spiral>
+        <Line length="248.613875">
+          <Start>679179.714365 1567534.878157</Start>
+          <End>679264.745230 1567301.257501</End>
+        </Line>
+        <Spiral type="bloss" rot="left" radiusStart="INF" radiusEnd="400.000000" spiType="toCurve" length="60.000000">
+          <Start>679264.745230 1567301.257501</Start>
+          <End>679286.523946 1567245.366410</End>
+        </Spiral>
+        <Curve rot="left" radius="400.000000" length="219.253084">
+          <Start>679286.523946 1567245.366410</Start>
+          <Center>679651.093410 1567409.954095</Center>
+          <End>679425.699443 1567079.503554</End>
+        </Curve>
+        <Spiral type="bloss" rot="left" radiusStart="400.000000" radiusEnd="INF" spiType="fromCurve" length="60.000000">
+          <Start>679425.699443 1567079.503554</Start>
+          <End>679476.959596 1567048.350333</End>
+        </Spiral>
+        <Line length="231.613070">
+          <Start>679476.959596 1567048.350333</Start>
+          <End>679677.542472 1566932.543924</End>
+        </Line>
+        <Spiral type="cosineCurve" rot="right" radiusStart="INF" radiusEnd="500.000000" spiType="toCurve" length="70.000000">
+          <Start>679677.542472 1566932.543924</Start>
+          <End>679737.409081 1566896.298121</End>
+        </Spiral>
+        <Curve rot="right" radius="500.000000" length="235.432666">
+          <Start>679737.409081 1566896.298121</Start>
+          <Center>679457.735452 1566481.831402</Center>
+          <End>679894.999879 1566724.318146</End>
+        </Curve>
+        <Spiral type="cosineCurve" rot="right" radiusStart="500.000000" radiusEnd="INF" spiType="fromCurve" length="70.000000">
+          <Start>679894.999879 1566724.318146</Start>
+          <End>679925.890111 1566661.520353</End>
+        </Spiral>
+        <Line length="214.581248">
+          <Start>679925.890111 1566661.520353</Start>
+          <End>680016.576169 1566467.043746</End>
+        </Line>
+        <Spiral type="sineCurve" rot="left" radiusStart="INF" radiusEnd="500.000000" spiType="toCurve" length="70.000000">
+          <Start>680016.576169 1566467.043746</Start>
+          <End>680047.401644 1566404.214595</End>
+        </Spiral>
+        <Curve rot="left" radius="500.000000" length="235.432070">
+          <Start>680047.401644 1566404.214595</Start>
+          <Center>680484.666071 1566646.701338</Center>
+          <End>680204.991948 1566232.234953</End>
+        </Curve>
+        <Spiral type="sineCurve" rot="left" radiusStart="500.000000" radiusEnd="INF" spiType="fromCurve" length="70.000000">
+          <Start>680204.991948 1566232.234953</Start>
+          <End>680264.895398 1566196.050856</End>
+        </Spiral>
+        <Line length="315.687048">
+          <Start>680264.895398 1566196.050856</Start>
+          <End>680538.288312 1566038.207179</End>
+        </Line>
+        <Spiral type="clothoid" rot="right" radiusStart="INF" radiusEnd="400.000000" spiType="toCurve" length="50.000000">
+          <Start>680538.288312 1566038.207179</Start>
+          <End>680581.051968 1566012.315061</End>
+        </Spiral>
+        <Curve rot="right" radius="400.000000" length="244.158717">
+          <Start>680581.051968 1566012.315061</Start>
+          <Center>680359.805738 1565679.073249</Center>
+          <End>680732.111222 1565825.321757</End>
+        </Curve>
+        <Spiral type="clothoid" rot="right" radiusStart="400.000000" radiusEnd="INF" spiType="fromCurve" length="90.000000">
+          <Start>680732.111222 1565825.321757</Start>
+          <End>680758.632596 1565739.371140</End>
+        </Spiral>
+        <Line length="519.863258">
+          <Start>680758.632596 1565739.371140</Start>
+          <End>680893.183516 1565237.221902</End>
+        </Line>
+        <Curve rot="right" radius="150.000000" length="130.899907">
+          <Start>680893.183516 1565237.221902</Start>
+          <Center>680748.294674 1565198.398928</Center>
+          <End>680871.167428 1565112.362387</End>
+        </Curve>
+        <Line length="446.490338">
+          <Start>680871.167428 1565112.362387</Start>
+          <End>680615.070868 1564746.619070</End>
+        </Line>
+        <Curve rot="right" radius="50.000000" length="139.626345">
+          <Start>680615.070868 1564746.619070</Start>
+          <Center>680574.113283 1564775.297917</Center>
+          <End>680525.817001 1564788.238903</End>
+        </Curve>
+        <Line length="288.428133">
+          <Start>680525.817001 1564788.238903</Start>
+          <End>680600.467891 1565066.839033</End>
+        </Line>
+        <Curve rot="left" radius="40.000000" length="48.869261">
+          <Start>680600.467891 1565066.839033</Start>
+          <Center>680561.830865 1565077.191822</Center>
+          <End>680584.773912 1565109.957912</End>
+        </Curve>
+        <Line length="471.991524">
+          <Start>680584.773912 1565109.957912</Start>
+          <End>680198.141000 1565380.681000</End>
+        </Line>
+        <Line length="585.424659">
+          <Start>680198.141000 1565380.681000</Start>
+          <End>679615.854000 1565320.151000</End>
+        </Line>
+        <Line length="593.942109">
+          <Start>679615.854000 1565320.151000</Start>
+          <End>679180.443000 1565724.112000</End>
+        </Line>
+      </CoordGeom>
+    </Alignment>
+  </Alignments>
+</LandXML>

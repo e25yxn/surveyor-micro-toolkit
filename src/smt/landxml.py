@@ -53,7 +53,7 @@ def _spiral_lx_type(transition: str) -> str:
 
 
 def _coord(n: float, e: float) -> str:
-    return f'{n:.6f} {e:.6f}'
+    return f'{e:.6f} {n:.6f}'
 
 
 def _sub(parent: ET.Element, tag: str, text: str | None = None, **attrs: str) -> ET.Element:
