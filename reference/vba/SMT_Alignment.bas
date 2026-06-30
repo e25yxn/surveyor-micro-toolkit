@@ -1,9 +1,10 @@
-Attribute VB_Name = "SMT_Align"
+Attribute VB_Name = "SMT_Alignment"
 Option Explicit
 
 ' ============================================================
-' SMT_Align.bas  --  VBA port of src/smt/alignment.py
-' SMT (Surveyor Micro Toolkit) -- Horizontal alignment lookup
+' SMT_Alignment.bas  --  Horizontal alignment lookup + tangent azimuth
+' Merged from: SMT_Align.bas (alignment.py port) + SMT_WCBatSta
+'              (formerly Part 2 of SMT_Rotation3D.bas)
 '
 ' Named Range SMT_Elements layout (8 columns per row, no header):
 '   col1=StaStart  col2=StaEnd  col3=N       col4=E
@@ -14,7 +15,7 @@ Option Explicit
 '   offset: +right of travel / -left.  radius: +right curve / -left curve.
 '   k = 1/R (signed curvature).
 '   Azimuth in col5 is decimal degrees; converted to radians immediately on read.
-' Dependency: SMT_FPMath and SMT_WCB modules must be imported in the same workbook.
+' Dependency: SMT_Core module must be imported in the same workbook.
 ' ============================================================
 
 Private Const SMT_SPIRAL_STEPS As Long = 48  ' Simpson intervals (must be even)
@@ -22,7 +23,7 @@ Private Const SMT_STA_TOL As Double = 0.0001 ' station range tolerance (metres)
 
 ' ============================================================
 ' Private: atan2(y, x)
-' Duplicated here because SMT_WCB version is Private.
+' Duplicated here because SMT_Core version is Private.
 ' Returns angle of vector (x, y) from +x axis, range (-pi, pi].
 ' ============================================================
 
@@ -493,6 +494,94 @@ Public Function SMT_CoordToOffset(n As Double, e As Double, rng As Range) As Var
 End Function
 
 ' ============================================================
+' Public: WCB (azimuth, decimal degrees) at a given station
+' ============================================================
+
+Public Function SMT_WCBatSta(sta As Double, rng As Range) As Variant
+    ' WCB (whole-circle bearing / azimuth) of the alignment centre-line tangent
+    ' at station sta, in decimal degrees, normalised to [0, 360).
+    '
+    ' sta : arc distance along alignment (metres).
+    ' rng : SMT_Elements Named Range -- 8 columns, no header:
+    '         col1=StaStart  col2=StaEnd  col3=N  col4=E
+    '         col5=Azimuth(decimal deg)   col6=Radius(signed m)
+    '         col7=Type(T/C/SPIN/SPOUT)   col8=Transition
+    '
+    ' Type formulas (d = sta - StaStart, L = StaEnd - StaStart):
+    '   T    : WCB = Azimuth  (constant tangent)
+    '   C    : theta = d / R                       [rad]; R = signed radius
+    '   SPIN : theta = d^2 / (2*R*L)               [rad]; clothoid k(s)=s/(R*L)
+    '   SPOUT: theta = d/R - d^2 / (2*R*L)         [rad]; clothoid k_in=1/R -> k_out=0
+    '   WCB  = Azimuth_deg + SMT_RadToDeg(theta), then normalised to [0, 360).
+    '
+    ' Sign: R>0 = right curve = azimuth increases; R<0 = left = azimuth decreases.
+    ' Returns #VALUE! when sta is outside all elements.
+    Dim nRows As Long, i As Long
+    Dim staStart As Double, staEnd As Double
+    Dim azDeg As Double, radius As Double
+    Dim typStr As String
+    Dim isLast As Boolean
+    Dim d As Double, L As Double
+    Dim theta_rad As Double, wcb_raw As Double
+
+    nRows = rng.Rows.Count
+    For i = 1 To nRows
+        staStart = CDbl(rng.Cells(i, 1).Value)
+        staEnd   = CDbl(rng.Cells(i, 2).Value)
+        isLast   = (i = nRows)
+        If sta >= staStart And (sta < staEnd Or (isLast And sta <= staEnd)) Then
+            azDeg  = CDbl(rng.Cells(i, 5).Value)   ' entry azimuth at StaStart (degrees)
+            radius = CDbl(rng.Cells(i, 6).Value)   ' signed radius (m); 0 = tangent
+            typStr = CStr(rng.Cells(i, 7).Value)
+            d = sta - staStart
+            L = staEnd - staStart
+
+            Select Case UCase(Trim(typStr))
+                Case "T"
+                    theta_rad = 0#   ' tangent: azimuth is constant
+
+                Case "C"
+                    ' Circular arc: uniform curvature k = 1/R
+                    ' theta = d / R  (radians; sign follows R: +right, -left)
+                    If radius <> 0# Then
+                        theta_rad = d / radius
+                    Else
+                        theta_rad = 0#
+                    End If
+
+                Case "SPIN"
+                    ' Clothoid spiral-in (tangent -> curve):
+                    ' k(s) = s / (R*L),  theta = integral_0^d k ds = d^2 / (2*R*L)
+                    If radius <> 0# And L <> 0# Then
+                        theta_rad = (d * d) / (2# * radius * L)
+                    Else
+                        theta_rad = 0#
+                    End If
+
+                Case "SPOUT"
+                    ' Clothoid spiral-out (curve -> tangent):
+                    ' k(s) = 1/R - s/(R*L),  theta = d/R - d^2 / (2*R*L)
+                    If radius <> 0# And L <> 0# Then
+                        theta_rad = d / radius - (d * d) / (2# * radius * L)
+                    Else
+                        theta_rad = 0#
+                    End If
+
+                Case Else
+                    theta_rad = 0#   ' unknown type: treat as tangent
+            End Select
+
+            wcb_raw = azDeg + SMT_RadToDeg(theta_rad)
+            ' Normalise to [0, 360) via radians round-trip
+            SMT_WCBatSta = SMT_RadToDeg(SMT_NormalizeAngle(SMT_DegToRad(wcb_raw)))
+            Exit Function
+        End If
+    Next i
+
+    SMT_WCBatSta = CVErr(xlErrValue)   ' sta outside all elements
+End Function
+
+' ============================================================
 ' Expected values -- verified against Python (src/smt/alignment.py)
 ' using the project dataset loaded into the SMT_Elements Named Range:
 '
@@ -500,4 +589,9 @@ End Function
 '   SMT_StaToE(519.615, 0, SMT_Elements)             = 678519.615
 '   SMT_CoordToSta(1568000, 678000, SMT_Elements)    = 0.0
 '   SMT_CoordToOffset(1568000, 678000, SMT_Elements) = 0.0
+'
+'   SMT_WCBatSta(0, SMT_Elements) = 90.0
+'     First element: Type=T, Azimuth=90 deg -> WCB = 90.0
+'   For C element with R=300, az=90, sta=StaStart+157.08 (quarter circle):
+'     theta = 157.08/300 = 0.5236 rad = 30.0 deg -> WCB = 120.0 deg
 ' ============================================================

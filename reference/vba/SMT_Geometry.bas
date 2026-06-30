@@ -1,34 +1,47 @@
-Attribute VB_Name = "SMT_LocalCoord"
+Attribute VB_Name = "SMT_Geometry"
 Option Explicit
 
 ' ============================================================
-' SMT_LocalCoord.bas  --  Local <-> Global coordinate conversion
-' SMT (Surveyor Micro Toolkit)
-' Port and improvement of CHOStoNE / NEtoCHOS (original VBA).
+' SMT_Geometry.bas  --  Local/Global coordinate conversion + 3-D rotations
+' Merged from: SMT_LocalCoord.bas + SMT_RotX/RotY/RotZ (formerly Part 1
+'              of SMT_Rotation3D.bas)
 '
-' Local coordinate system:
-'   Origin  : (N0, E0) in global grid (metres)
-'   X-axis  : points along azimuth AziBEG (survey convention: 0=North, CW+)
-'   Chainage: distance along X-axis  (metres, + forward)
-'   Offset  : perpendicular distance (+right of travel / -left)
+' Part 1 -- Local <-> Global coordinate conversion (SMT_LocalCoord):
+'   Port and improvement of CHOStoNE / NEtoCHOS (original VBA).
 '
-' Sign convention (offset):
-'   + right of travel direction (clockwise from AziBEG)
-'   - left  of travel direction
+'   Local coordinate system:
+'     Origin  : (N0, E0) in global grid (metres)
+'     X-axis  : points along azimuth AziBEG (survey convention: 0=North, CW+)
+'     Chainage: distance along X-axis  (metres, + forward)
+'     Offset  : perpendicular distance (+right of travel / -left)
 '
-' AziBEG is always received in decimal degrees; converted to radians
-' immediately on entry -- never passed in radians.
+'   AziBEG is always received in decimal degrees; converted to radians
+'   immediately on entry -- never passed in radians.
 '
-' Dependency: SMT_FPMath module (SMT_Pi, SMT_DegToRad, SMT_NormalizeAngle).
+' Part 2 -- 3-D rotation matrices (SMT_Rotation3D Part 1):
+'   Port of professor's original code, 4 fixes applied:
+'   (1) Dim i As Long        (was Integer -- overflows > 32767 rows)
+'   (2) nRows As Long        (was Integer)
+'   (3) Returns new array    (was ByRef -- no longer mutates the caller's data)
+'   (4) cosA / sinA computed once before the loop (not inside every iteration)
+'
+'   Convention: right-hand rule, standard math CCW rotation.
+'   RotX(a): Y' =  cosA*Y - sinA*Z,  Z' =  sinA*Y + cosA*Z
+'   RotY(a): X' =  cosA*X + sinA*Z,  Z' = -sinA*X + cosA*Z
+'   RotZ(a): X' =  cosA*X - sinA*Y,  Y' =  sinA*X + cosA*Y
+'   angle_rad is already in radians -- no conversion needed.
+'
+' Dependency: SMT_Core module must be imported in the same workbook.
 ' ============================================================
 
 ' ============================================================
-' Private: atan2(y, x) -- standard math convention
-' Duplicated here because SMT_WCB version is Private (no cross-module access in VBA).
-' Returns angle of vector (x, y) from +x axis, range (-pi, pi].
+' Part 1 -- Local <-> Global coordinate conversion
 ' ============================================================
 
 Private Function SMT_Atan2(y As Double, x As Double) As Double
+    ' Standard atan2(y, x) -- standard math convention.
+    ' Duplicated here because SMT_Core version is Private (no cross-module access in VBA).
+    ' Returns angle of vector (x, y) from +x axis, range (-pi, pi].
     Dim PI As Double
     PI = SMT_Pi()
     If x > 0# Then
@@ -46,10 +59,6 @@ Private Function SMT_Atan2(y As Double, x As Double) As Double
     End If
 End Function
 
-' ============================================================
-' Private: shared forward computation (local -> global azimuth + distance)
-' ============================================================
-
 Private Sub SMT_LocalToGlobal(aziBEG_rad As Double, chn As Double, ofs As Double, _
                                ByRef ds As Double, ByRef globalAz As Double)
     ' Converts local (chn, ofs) to polar form in the global frame.
@@ -65,10 +74,6 @@ Private Sub SMT_LocalToGlobal(aziBEG_rad As Double, chn As Double, ofs As Double
     localAz = SMT_Atan2(ofs, chn)                           ' local survey azimuth (rad)
     globalAz = SMT_NormalizeAngle(localAz + aziBEG_rad)     ' rotate to global frame
 End Sub
-
-' ============================================================
-' Public: Local -> Northing
-' ============================================================
 
 Public Function SMT_LocalToN(n0 As Double, e0 As Double, aziBEG As Double, _
                               chn As Double, ofs As Double) As Double
@@ -91,10 +96,6 @@ Public Function SMT_LocalToN(n0 As Double, e0 As Double, aziBEG As Double, _
     SMT_LocalToN = n0 + ds * Cos(globalAz)
 End Function
 
-' ============================================================
-' Public: Local -> Easting
-' ============================================================
-
 Public Function SMT_LocalToE(n0 As Double, e0 As Double, aziBEG As Double, _
                               chn As Double, ofs As Double) As Double
     ' Easting of the point at local position (chn, ofs).
@@ -116,10 +117,6 @@ Public Function SMT_LocalToE(n0 As Double, e0 As Double, aziBEG As Double, _
     SMT_LocalToE = e0 + ds * Sin(globalAz)
 End Function
 
-' ============================================================
-' Public: Global -> Chainage
-' ============================================================
-
 Public Function SMT_GlobalToChn(n0 As Double, e0 As Double, aziBEG As Double, _
                                  n As Double, e As Double) As Double
     ' Chainage of a global point (n, e) in the local coordinate system.
@@ -138,10 +135,6 @@ Public Function SMT_GlobalToChn(n0 As Double, e0 As Double, aziBEG As Double, _
     dE = e - e0
     SMT_GlobalToChn = dN * Cos(aziBEG_rad) + dE * Sin(aziBEG_rad)
 End Function
-
-' ============================================================
-' Public: Global -> Offset
-' ============================================================
 
 Public Function SMT_GlobalToOfs(n0 As Double, e0 As Double, aziBEG As Double, _
                                  n As Double, e As Double) As Double
@@ -165,7 +158,7 @@ Public Function SMT_GlobalToOfs(n0 As Double, e0 As Double, aziBEG As Double, _
 End Function
 
 ' ============================================================
-' Expected values -- verified against Python
+' Expected values (Part 1) -- verified against Python
 ' Origin = (N0=1000, E0=2000), AziBEG = 90 deg (pointing East)
 '
 '   SMT_LocalToN(1000, 2000, 90, 100,  0) = 1000.0
@@ -183,4 +176,86 @@ End Function
 '
 '   SMT_GlobalToOfs(1000, 2000, 90,  950, 2000) =  50.0
 '     dN=-50, dE=0 -> Ofs = -(-50)*sin(pi/2) + 0*cos(pi/2) = 50
+' ============================================================
+
+' ============================================================
+' Part 2 -- 3-D rotation functions
+' pts : 1-based Variant array, n rows x 3 cols (col1=X, col2=Y, col3=Z).
+' angle_rad : rotation angle in radians (positive = CCW when viewed along +axis).
+' Returns  : new Variant array same size as pts; original is NOT modified.
+' ============================================================
+
+Public Function SMT_RotX(pts As Variant, angle_rad As Double) As Variant
+    ' Rotation around the X-axis by angle_rad (radians).
+    ' X is unchanged; Y and Z rotate in the YZ plane.
+    ' Y' =  cos(a)*Y - sin(a)*Z
+    ' Z' =  sin(a)*Y + cos(a)*Z
+    Dim nRows As Long, i As Long
+    Dim cosA As Double, sinA As Double
+    Dim result() As Double
+    nRows = UBound(pts, 1)
+    ReDim result(1 To nRows, 1 To 3)
+    cosA = Cos(angle_rad)    ' computed once -- not inside the loop
+    sinA = Sin(angle_rad)
+    For i = 1 To nRows
+        result(i, 1) = pts(i, 1)                              ' X unchanged
+        result(i, 2) = cosA * pts(i, 2) - sinA * pts(i, 3)   ' Y'
+        result(i, 3) = sinA * pts(i, 2) + cosA * pts(i, 3)   ' Z'
+    Next i
+    SMT_RotX = result
+End Function
+
+Public Function SMT_RotY(pts As Variant, angle_rad As Double) As Variant
+    ' Rotation around the Y-axis by angle_rad (radians).
+    ' Y is unchanged; X and Z rotate in the XZ plane.
+    ' X' =  cos(a)*X + sin(a)*Z
+    ' Z' = -sin(a)*X + cos(a)*Z
+    Dim nRows As Long, i As Long
+    Dim cosA As Double, sinA As Double
+    Dim result() As Double
+    nRows = UBound(pts, 1)
+    ReDim result(1 To nRows, 1 To 3)
+    cosA = Cos(angle_rad)
+    sinA = Sin(angle_rad)
+    For i = 1 To nRows
+        result(i, 1) = cosA * pts(i, 1) + sinA * pts(i, 3)   ' X'
+        result(i, 2) = pts(i, 2)                              ' Y unchanged
+        result(i, 3) = -sinA * pts(i, 1) + cosA * pts(i, 3)  ' Z'
+    Next i
+    SMT_RotY = result
+End Function
+
+Public Function SMT_RotZ(pts As Variant, angle_rad As Double) As Variant
+    ' Rotation around the Z-axis by angle_rad (radians).
+    ' Z is unchanged; X and Y rotate in the XY plane.
+    ' X' =  cos(a)*X - sin(a)*Y
+    ' Y' =  sin(a)*X + cos(a)*Y
+    Dim nRows As Long, i As Long
+    Dim cosA As Double, sinA As Double
+    Dim result() As Double
+    nRows = UBound(pts, 1)
+    ReDim result(1 To nRows, 1 To 3)
+    cosA = Cos(angle_rad)
+    sinA = Sin(angle_rad)
+    For i = 1 To nRows
+        result(i, 1) = cosA * pts(i, 1) - sinA * pts(i, 2)   ' X'
+        result(i, 2) = sinA * pts(i, 1) + cosA * pts(i, 2)   ' Y'
+        result(i, 3) = pts(i, 3)                              ' Z unchanged
+    Next i
+    SMT_RotZ = result
+End Function
+
+' ============================================================
+' Expected values (Part 2) -- verified against Python / manual calculation
+' angle_rad = pi/2 = 90 deg;  pts = [[1, 0, 0]]  (1-row, 3-col, 1-based)
+'
+'   SMT_RotZ(pts, pi/2)(1,1) = 0.0   X' = cos(90)*1 - sin(90)*0 = 0
+'   SMT_RotZ(pts, pi/2)(1,2) = 1.0   Y' = sin(90)*1 + cos(90)*0 = 1
+'   SMT_RotZ(pts, pi/2)(1,3) = 0.0   Z' = Z = 0
+'   Result point: (0, 1, 0)  -- (1,0,0) rotated 90 deg CCW around Z-axis
+'
+'   SMT_RotX(pts, pi/2)(1,1) = 1.0   X' = X = 1
+'   SMT_RotX(pts, pi/2)(1,2) = 0.0   Y' = cos(90)*0 - sin(90)*0 = 0
+'   SMT_RotX(pts, pi/2)(1,3) = 0.0   Z' = sin(90)*0 + cos(90)*0 = 0
+'   (X-axis point is unchanged by RotX, as expected)
 ' ============================================================
