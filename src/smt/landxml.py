@@ -13,6 +13,7 @@ import math
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
+from . import fpmath
 from .alignment import Element, calculate_exit_state
 from .builders.alignment_builder import BuildResult
 
@@ -37,6 +38,17 @@ def _end_ne(i: int, elements: list[Element]) -> tuple[float, float]:
         return elements[i + 1].n, elements[i + 1].e
     state = calculate_exit_state(elements[-1])
     return state.n, state.e
+
+
+def _exit_azimuth_deg(i: int, elements: list[Element]) -> float:
+    """Exit azimuth of elements[i] in decimal degrees.
+
+    Equals entry azimuth of the next element; for the last element, integrates
+    the turning angle through the element geometry.
+    """
+    if i < len(elements) - 1:
+        return fpmath.rad_to_deg(elements[i + 1].azimuth)
+    return fpmath.rad_to_deg(calculate_exit_state(elements[-1]).azimuth)
 
 
 def _curve_center(n: float, e: float, azimuth_rad: float, k: float) -> tuple[float, float]:
@@ -117,10 +129,14 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             k = el.k_in
             R = abs(1.0 / k)
             cn, ce = _curve_center(el.n, el.e, el.azimuth, k)
+            dir_s = fpmath.rad_to_deg(el.azimuth)
+            dir_e = _exit_azimuth_deg(i, elements)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Curve',
                                 rot=_rotation(k),
                                 radius=f'{R:.6f}',
-                                length=f'{length:.6f}')
+                                length=f'{length:.6f}',
+                                dirStart=f'{dir_s:.6f}',
+                                dirEnd=f'{dir_e:.6f}')
             _sub(tag, 'Start',  _coord(el.n, el.e))
             _sub(tag, 'Center', _coord(cn, ce))
             _sub(tag, 'End',    _coord(end_n, end_e))
@@ -128,26 +144,34 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
         elif el.type == 'SPIN':
             k_out = el.k_out
             R_out = abs(1.0 / k_out)
+            dir_s = fpmath.rad_to_deg(el.azimuth)
+            dir_e = _exit_azimuth_deg(i, elements)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
                                 type=_spiral_lx_type(el.transition),
                                 rot=_rotation(k_out),
                                 radiusStart='INF',
                                 radiusEnd=f'{R_out:.6f}',
                                 spiType='toCurve',
-                                length=f'{length:.6f}')
+                                length=f'{length:.6f}',
+                                dirStart=f'{dir_s:.6f}',
+                                dirEnd=f'{dir_e:.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 
         elif el.type == 'SPOUT':
             k_in = el.k_in
             R_in = abs(1.0 / k_in)
+            dir_s = fpmath.rad_to_deg(el.azimuth)
+            dir_e = _exit_azimuth_deg(i, elements)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
                                 type=_spiral_lx_type(el.transition),
                                 rot=_rotation(k_in),
                                 radiusStart=f'{R_in:.6f}',
                                 radiusEnd='INF',
                                 spiType='fromCurve',
-                                length=f'{length:.6f}')
+                                length=f'{length:.6f}',
+                                dirStart=f'{dir_s:.6f}',
+                                dirEnd=f'{dir_e:.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 
