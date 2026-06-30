@@ -8,6 +8,7 @@
 | `SMT_WCB.bas` | VBA port of `src/smt/wcb.py` — azimuth / coordinate geometry |
 | `SMT_Align.bas` | VBA port of `src/smt/alignment.py` — forward + inverse alignment lookup |
 | `SMT_Vertical.bas` | VBA port of `src/smt/vertical.py` — elevation at any station |
+| `SMT_Crossfall.bas` | VBA port of `src/smt/crossfall.py` — crossfall / superelevation at any station |
 | `SMT_Calcuator.xlsm` | Example workbook (macro-enabled) |
 
 ---
@@ -145,4 +146,37 @@ Segment types determined by LVC and LVC2:
 
 ```vba
 =SMT_Elevation(A2, SMT_Vertical)          ' elevation at station in A2
+```
+
+---
+
+## SMT_Crossfall function reference
+
+No dependency on other SMT modules.
+
+Named Range **SMT_Crossfall** must have 6 columns per row (no header row):
+
+| Col | Field | Unit / Notes |
+|-----|-------|--------------|
+| 1 | StaStart | metres |
+| 2 | StaEnd | metres |
+| 3 | CF_L_Start | left crossfall at StaStart (%) |
+| 4 | CF_L_End | left crossfall at StaEnd (%) |
+| 5 | CF_R_Start | right crossfall at StaStart (%) |
+| 6 | CF_R_End | right crossfall at StaEnd (%) |
+
+Sign convention: **negative** = falls away from centre line (normal drainage); **positive** = falls toward centre line (superelevation).
+
+Interpolation: linear within each segment. When CF_Start = CF_End the value is constant.
+
+| Function | Arguments | Returns | Notes |
+|----------|-----------|---------|-------|
+| `SMT_CrossfallLeft(sta, rng)` | sta: Double; rng: Range | `Double` (%) | Left crossfall at sta |
+| `SMT_CrossfallRight(sta, rng)` | sta: Double; rng: Range | `Double` (%) | Right crossfall at sta |
+
+### Example usage in a cell formula
+
+```vba
+=SMT_CrossfallLeft(A2,  SMT_Crossfall)    ' left crossfall (%) at station in A2
+=SMT_CrossfallRight(A2, SMT_Crossfall)    ' right crossfall (%) at station in A2
 ```
