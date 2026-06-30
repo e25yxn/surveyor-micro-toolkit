@@ -160,12 +160,11 @@ class TestSimpleCurve:
         curve = _find_all(root, 'Curve')[0]
         assert math.isclose(float(curve.get('dirStart')), 90.0, abs_tol=1e-3)
 
-    def test_curve_dir_end(self):
-        # 90° right-hand deflection: exit WCB = 90° + 90° = 180°
+    def test_curve_no_dir_end(self):
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert math.isclose(float(curve.get('dirEnd')), 180.0, abs_tol=1e-3)
+        assert curve.get('dirEnd') is None
 
     def test_radius_attribute(self):
         xml = export_alignment_landxml(_build(_verts_curve()))
@@ -253,12 +252,11 @@ class TestSpiralIn:
         spin = next(s for s in _find_all(root, 'Spiral') if s.get('spiType') == 'toCurve')
         assert math.isclose(float(spin.get('dirStart')), 90.0, abs_tol=1e-3)
 
-    def test_spin_dir_end_is_float(self):
+    def test_spin_no_dir_end(self):
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
         spin = next(s for s in _find_all(root, 'Spiral') if s.get('spiType') == 'toCurve')
-        dir_end = float(spin.get('dirEnd'))
-        assert dir_end > 90.0   # right-hand spiral bends azimuth clockwise
+        assert spin.get('dirEnd') is None
 
 
 class TestAnglePoint:

@@ -6,7 +6,7 @@ that Civil 3D 2023 can import directly.
 Coordinates: "N E" format (northing first), 6 decimal places.
 Azimuths: decimal degrees.  Units: metric, linearUnit=meter.
 Sign convention: k>0 → rot="right" (right turn); k<0 → rot="left" (left turn).
-dirStart/dirEnd = entry/exit azimuth in decimal degrees on every Curve and Spiral.
+dirStart = entry azimuth in decimal degrees on every Curve and Spiral.
 """
 from __future__ import annotations
 
@@ -47,13 +47,6 @@ def _rotation(k: float) -> str:
     return 'right' if k > 0 else 'left'
 
 
-def _exit_azimuth_deg(i: int, elements: list[Element]) -> float:
-    if i < len(elements) - 1:
-        return fpmath.rad_to_deg(elements[i + 1].azimuth)
-    state = calculate_exit_state(elements[-1])
-    return fpmath.rad_to_deg(state.azimuth)
-
-
 def _spiral_lx_type(transition: str) -> str:
     return _SPIRAL_TYPE.get(transition.upper(), 'clothoid')
 
@@ -78,8 +71,8 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
 
     Units: metric/meter.  Coordinates: "N E" (northing first), 6 dp.
     rot="right" for k>0 (right turn), rot="left" for k<0 (left turn).
-    Curve: <Center> child tag; dirStart/dirEnd (entry/exit azimuth, decimal degrees).
-    Spiral: dirStart/dirEnd (entry/exit azimuth, decimal degrees).
+    Curve: <Center> child tag; dirStart (entry azimuth, decimal degrees).
+    Spiral: dirStart (entry azimuth, decimal degrees).
     radiusStart/radiusEnd="INF" for the infinite-radius end of spiral elements.
     """
     elements = build_result.elements
@@ -129,8 +122,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 rot=_rotation(k),
                                 radius=f'{R:.6f}',
                                 length=f'{length:.6f}',
-                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}',
-                                dirEnd=f'{_exit_azimuth_deg(i, elements):.6f}')
+                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}')
             _sub(tag, 'Start',  _coord(el.n, el.e))
             _sub(tag, 'Center', _coord(cn, ce))
             _sub(tag, 'End',    _coord(end_n, end_e))
@@ -145,8 +137,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 radiusEnd=f'{R_out:.6f}',
                                 spiType='toCurve',
                                 length=f'{length:.6f}',
-                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}',
-                                dirEnd=f'{_exit_azimuth_deg(i, elements):.6f}')
+                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 
@@ -160,8 +151,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 radiusEnd='INF',
                                 spiType='fromCurve',
                                 length=f'{length:.6f}',
-                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}',
-                                dirEnd=f'{_exit_azimuth_deg(i, elements):.6f}')
+                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 
