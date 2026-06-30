@@ -1,5 +1,20 @@
 # Session Log
 
+## [2026-06-30] สร้าง SMT_Vertical.bas — VBA port of vertical.py (elevation lookup)
+
+- ทำ: สร้าง `reference/vba/SMT_Vertical.bas` พอร์ต 1 public function จาก `src/smt/vertical.py`
+  - `SMT_Elevation(sta, rng)` — คำนวณ elevation ที่ station ใดๆ จาก Named Range SMT_Vertical (7 คอลัมน์)
+- รองรับ 3 ประเภท segment:
+  - LVC=0 → tangent grade: `Level + G1/100 * lx`
+  - LVC>0, LVC2=0 → symmetric VC: `base + (G2-G1)/(200*LVC) * lx^2`
+  - LVC>0, LVC2>0 → asymmetric VC: middle ordinate `e = L1*L2/(200*(L1+L2))*(G2-G1)`, arm1/arm2 formula
+- Station range rule ตรง Python oracle: interior [StaStart,StaEnd), last [StaStart,StaEnd]
+- อัปเดต `reference/vba/README.md` เพิ่ม SMT_Vertical reference table
+- คำสั่ง: Write tool (SMT_Vertical.bas + README) → git add → git commit -F
+- ผล: commit e77f438 — 2 files changed, 224 insertions
+- Expected values (golden dataset):
+  sta=0→100.0 | sta=1200→117.34375 | sta=2750→100.715075 | sta=2900→100.858475
+
 ## [2026-06-30] สร้าง SMT_Align.bas — VBA port of alignment.py (forward + inverse)
 
 - ทำ: สร้าง `reference/vba/SMT_Align.bas` พอร์ต 4 public functions จาก `src/smt/alignment.py`
