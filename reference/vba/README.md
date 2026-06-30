@@ -7,6 +7,7 @@
 | `SMT_FPMath.bas` | VBA port of `src/smt/fpmath.py` — angle math utilities |
 | `SMT_WCB.bas` | VBA port of `src/smt/wcb.py` — azimuth / coordinate geometry |
 | `SMT_Align.bas` | VBA port of `src/smt/alignment.py` — forward + inverse alignment lookup |
+| `SMT_Vertical.bas` | VBA port of `src/smt/vertical.py` — elevation at any station |
 | `SMT_Calcuator.xlsm` | Example workbook (macro-enabled) |
 
 ---
@@ -108,4 +109,40 @@ Named Range **SMT_Elements** must have 8 columns per row (no header row):
 =SMT_StaToE(A2, B2, SMT_Elements)         ' Easting with offset B2 (+ right, - left)
 =SMT_CoordToSta(C2, D2, SMT_Elements)     ' station for grid point (C2=N, D2=E)
 =SMT_CoordToOffset(C2, D2, SMT_Elements)  ' offset from centre line
+```
+
+---
+
+## SMT_Vertical function reference
+
+No dependency on other SMT modules.
+
+Named Range **SMT_Vertical** must have 7 columns per row (no header row):
+
+| Col | Field | Unit / Notes |
+|-----|-------|--------------|
+| 1 | StaStart | metres |
+| 2 | StaEnd | metres |
+| 3 | Level | elevation at StaStart (metres) |
+| 4 | G1 | entry grade (%) |
+| 5 | G2 | exit grade (%) |
+| 6 | LVC | VC length (metres); 0 = tangent grade segment |
+| 7 | LVC2 | 2nd arm for asymmetric/compound VC (metres); 0 = symmetric |
+
+Segment types determined by LVC and LVC2:
+
+| LVC | LVC2 | Type |
+|-----|------|------|
+| 0 | — | Tangent grade |
+| > 0 | 0 | Symmetric parabolic VC |
+| > 0 | > 0 | Asymmetric (compound, unequal-tangent) VC |
+
+| Function | Arguments | Returns | Notes |
+|----------|-----------|---------|-------|
+| `SMT_Elevation(sta, rng)` | sta: Double; rng: Range | `Double` (metres) | Elevation at station sta |
+
+### Example usage in a cell formula
+
+```vba
+=SMT_Elevation(A2, SMT_Vertical)          ' elevation at station in A2
 ```
