@@ -24,9 +24,6 @@ ET.register_namespace('', _NS)
 
 _SPIRAL_TYPE = {
     'CLOTHOID': 'clothoid',
-    'BLOSS':    'bloss',
-    'COSINE':   'cosineCurve',
-    'SINE':     'sineCurve',
 }
 
 
