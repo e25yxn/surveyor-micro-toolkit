@@ -9,6 +9,7 @@
 | `SMT_Align.bas` | VBA port of `src/smt/alignment.py` — forward + inverse alignment lookup |
 | `SMT_Vertical.bas` | VBA port of `src/smt/vertical.py` — elevation at any station |
 | `SMT_Crossfall.bas` | VBA port of `src/smt/crossfall.py` — crossfall / superelevation at any station |
+| `SMT_LocalCoord.bas` | Local ↔ Global coordinate conversion (port of CHOStoNE / NEtoCHOS) |
 | `SMT_Calcuator.xlsm` | Example workbook (macro-enabled) |
 
 ---
@@ -179,4 +180,30 @@ Interpolation: linear within each segment. When CF_Start = CF_End the value is c
 ```vba
 =SMT_CrossfallLeft(A2,  SMT_Crossfall)    ' left crossfall (%) at station in A2
 =SMT_CrossfallRight(A2, SMT_Crossfall)    ' right crossfall (%) at station in A2
+```
+
+---
+
+## SMT_LocalCoord function reference
+
+Requires: `SMT_FPMath` module. No Named Range needed — all inputs are cell values.
+
+**Local coordinate system:** origin (N0, E0); X-axis along AziBEG; Chainage = distance along X; Offset = perpendicular (+right / −left).
+
+AziBEG is always in **decimal degrees** (survey: 0=North, clockwise+); converted to radians internally.
+
+| Function | Arguments | Returns | Notes |
+|----------|-----------|---------|-------|
+| `SMT_LocalToN(n0,e0,aziBEG,chn,ofs)` | all Double | `Double` (metres) | Local (chn, ofs) → global Northing |
+| `SMT_LocalToE(n0,e0,aziBEG,chn,ofs)` | all Double | `Double` (metres) | Local (chn, ofs) → global Easting |
+| `SMT_GlobalToChn(n0,e0,aziBEG,n,e)` | all Double | `Double` (metres) | Global (N, E) → Chainage |
+| `SMT_GlobalToOfs(n0,e0,aziBEG,n,e)` | all Double | `Double` (metres) | Global (N, E) → Offset (+right/−left) |
+
+### Example usage in a cell formula
+
+```vba
+=SMT_LocalToN($B$1,$B$2,$B$3,A6,B6)   ' local (chn=A6,ofs=B6) -> Northing
+=SMT_LocalToE($B$1,$B$2,$B$3,A6,B6)   ' local (chn=A6,ofs=B6) -> Easting
+=SMT_GlobalToChn($B$1,$B$2,$B$3,C6,D6)' global (N=C6,E=D6)  -> Chainage
+=SMT_GlobalToOfs($B$1,$B$2,$B$3,C6,D6)' global (N=C6,E=D6)  -> Offset
 ```
