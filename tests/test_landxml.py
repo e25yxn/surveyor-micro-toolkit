@@ -125,34 +125,32 @@ class TestSimpleCurve:
         root = _parse(xml)
         assert len(_find_all(root, 'Curve')) == 1
 
-    def test_curve_has_center_tag(self):
+    def test_no_center_tag(self):
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.find(f'{{{NS}}}Center') is not None
+        assert curve.find(f'{{{NS}}}Center') is None
 
-    def test_center_at_radius_from_start(self):
+    def test_delta_attribute(self):
+        # 90° right-hand deflection → delta = 90.0°
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        cn, ce = _ne(curve, 'Center')
-        sn, se = _ne(curve, 'Start')
-        assert math.isclose(math.hypot(cn - sn, ce - se), 300.0, abs_tol=1e-3)
+        assert math.isclose(float(curve.get('delta')), 90.0, abs_tol=1e-3)
 
-    def test_center_at_radius_from_end(self):
+    def test_chord_attribute(self):
+        # R=300, delta=90° → chord = 2*300*sin(45°) = 300√2 ≈ 424.264
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        cn, ce = _ne(curve, 'Center')
-        en, ee = _ne(curve, 'End')
-        assert math.isclose(math.hypot(cn - en, ce - ee), 300.0, abs_tol=1e-3)
+        expected_chord = 2.0 * 300.0 * math.sin(math.radians(45.0))
+        assert math.isclose(float(curve.get('chord')), expected_chord, abs_tol=1e-3)
 
     def test_rotation_right(self):
-        # Physical right-hand turn (k>0); Civil 3D chord convention → rot="left"
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('rot') == 'left'
+        assert curve.get('rot') == 'right'
 
     def test_radius_attribute(self):
         xml = export_alignment_landxml(_build(_verts_curve()))
@@ -161,7 +159,7 @@ class TestSimpleCurve:
         assert math.isclose(float(curve.get('radius')), 300.0, abs_tol=1e-6)
 
     def test_left_turn_rotation(self):
-        """Physical left-hand turn (k<0); Civil 3D chord convention → rot='right'."""
+        """Left-hand turn (k<0) → rot='left'."""
         verts = [
             {'n':    0.0, 'e':   0.0},
             {'n':    0.0, 'e': 500.0, 'R': 300.0},
@@ -170,7 +168,7 @@ class TestSimpleCurve:
         xml = export_alignment_landxml(_build(verts))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('rot') == 'right'
+        assert curve.get('rot') == 'left'
 
 
 class TestSpiralIn:

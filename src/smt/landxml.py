@@ -5,7 +5,7 @@ that Civil 3D 2023 can import directly.
 
 Coordinates: "N E" format (northing first), 6 decimal places.
 Azimuths: decimal degrees.  Units: metric, linearUnit=meter.
-Sign convention (Civil 3D chord direction): k>0 → rot="left"; k<0 → rot="right".
+Sign convention: k>0 → rot="right" (right turn); k<0 → rot="left" (left turn).
 """
 from __future__ import annotations
 
@@ -40,13 +40,8 @@ def _end_ne(i: int, elements: list[Element]) -> tuple[float, float]:
     return state.n, state.e
 
 
-def _curve_center(n: float, e: float, azimuth_rad: float, k: float) -> tuple[float, float]:
-    R = 1.0 / k   # signed: k>0 → right, k<0 → left
-    return n - R * math.sin(azimuth_rad), e + R * math.cos(azimuth_rad)
-
-
 def _rotation(k: float) -> str:
-    return 'left' if k > 0 else 'right'
+    return 'right' if k > 0 else 'left'
 
 
 def _spiral_lx_type(transition: str) -> str:
@@ -72,7 +67,8 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
     """Convert BuildResult to LandXML 1.2 XML string (Civil 3D 2023 compatible).
 
     Units: metric/meter.  Coordinates: "N E" (northing first), 6 dp.
-    rot="left" for k>0, rot="right" for k<0 (Civil 3D chord-direction convention).
+    rot="right" for k>0 (right turn), rot="left" for k<0 (left turn).
+    Curve: delta (central angle, decimal degrees) and chord (chord length, metres).
     radiusStart/radiusEnd="INF" for the infinite-radius end of spiral elements.
     dirStart = entry azimuth in decimal degrees on every Curve and Spiral.
     """
@@ -118,15 +114,18 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
         elif el.type == 'C':
             k = el.k_in
             R = abs(1.0 / k)
-            cn, ce = _curve_center(el.n, el.e, el.azimuth, k)
+            delta_rad = length / R
+            delta_deg = math.degrees(delta_rad)
+            chord = 2.0 * R * math.sin(delta_rad / 2.0)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Curve',
                                 rot=_rotation(k),
                                 radius=f'{R:.6f}',
                                 length=f'{length:.6f}',
-                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}')
-            _sub(tag, 'Start',  _coord(el.n, el.e))
-            _sub(tag, 'Center', _coord(cn, ce))
-            _sub(tag, 'End',    _coord(end_n, end_e))
+                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}',
+                                delta=f'{delta_deg:.6f}',
+                                chord=f'{chord:.6f}')
+            _sub(tag, 'Start', _coord(el.n, el.e))
+            _sub(tag, 'End',   _coord(end_n, end_e))
 
         elif el.type == 'SPIN':
             k_out = el.k_out
