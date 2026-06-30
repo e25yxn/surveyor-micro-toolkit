@@ -25,6 +25,7 @@ from .builders.alignment_builder import (
     build_alignment_from_pi,
     parse_pi_table,
 )
+from .landxml import export_alignment_landxml
 
 
 def _read_alignment(path: str) -> list[alignment.Element]:
@@ -308,6 +309,24 @@ def _run_inv(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_export_landxml(args: argparse.Namespace) -> int:
+    """export-landxml: PI table CSV -> LandXML 1.2 XML string or file."""
+    vertices = _read_pi_table(args.alignment)
+    if not vertices:
+        raise ValueError('ไม่พบข้อมูล PI ในไฟล์')
+    result = build_alignment_from_pi(vertices)
+    for issue in result.issues:
+        print(f'warning: {issue}', file=sys.stderr)
+    xml_str = export_alignment_landxml(result, name=args.name)
+    if args.out:
+        from pathlib import Path
+        Path(args.out).write_text(xml_str, encoding='utf-8')
+        print(f'saved: {args.out}')
+    else:
+        print(xml_str)
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='smt',
@@ -379,6 +398,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help='maximum Nelder-Mead iterations (default 10000)',
     )
     parser_fr.set_defaults(func=_run_fit_radius)
+
+    parser_lx = sub.add_parser(
+        'export-landxml',
+        help='export alignment as LandXML 1.2 (Civil 3D 2023)',
+    )
+    parser_lx.add_argument('alignment', help='PI table CSV (POINT,N,E,R,...)')
+    parser_lx.add_argument('--name', default='alignment',
+                           help='alignment name in XML (default: alignment)')
+    parser_lx.add_argument('--out', default=None,
+                           help='output .xml file (default: stdout)')
+    parser_lx.set_defaults(func=_run_export_landxml)
 
     return parser
 
