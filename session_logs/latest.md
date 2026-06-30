@@ -1,5 +1,20 @@
 # Session Log
 
+## [2026-06-30] สร้าง SMT_Crossfall.bas — VBA port of crossfall.py (crossfall/superelevation lookup)
+
+- ทำ: สร้าง `reference/vba/SMT_Crossfall.bas` พอร์ต 2 public functions จาก `src/smt/crossfall.py`
+  - `SMT_CrossfallLeft(sta, rng)`  — left crossfall (%) ที่ station sta
+  - `SMT_CrossfallRight(sta, rng)` — right crossfall (%) ที่ station sta
+- Named Range SMT_Crossfall: 6 คอลัมน์ (StaStart, StaEnd, CF_L_Start, CF_L_End, CF_R_Start, CF_R_End)
+- Algorithm: linear interpolation ภายใน segment: CF = CF_Start + (CF_End-CF_Start)*(sta-StaStart)/(StaEnd-StaStart)
+- Station range rule ตรง Python oracle: [StaStart,StaEnd) ยกเว้น last segment [StaStart,StaEnd]
+- Sign: ลบ=ลาดออกจาก centerline (ระบายน้ำปกติ), บวก=ลาดเข้าหา centerline (superelevation)
+- อัปเดต `reference/vba/README.md` เพิ่ม SMT_Crossfall reference table
+- คำสั่ง: Write tool (SMT_Crossfall.bas + README) → git add → git commit -F
+- ผล: commit c022258 — 2 files changed, 156 insertions
+- Expected values (project dataset):
+  sta=0→-2.0 | sta=530 Left→-1.0 (runout mid) | sta=700 Left→7.0 (full super) | sta=530 Right→-2.0
+
 ## [2026-06-30] สร้าง SMT_Vertical.bas — VBA port of vertical.py (elevation lookup)
 
 - ทำ: สร้าง `reference/vba/SMT_Vertical.bas` พอร์ต 1 public function จาก `src/smt/vertical.py`
