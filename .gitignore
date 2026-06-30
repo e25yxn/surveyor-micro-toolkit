@@ -13,3 +13,5 @@ build/
 output.png
 output/
 test_data/build_out/
+*.xlsm
+*.xlam

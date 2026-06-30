@@ -1,5 +1,20 @@
 # Session Log
 
+## [2026-06-30] สร้าง SMT_Align.bas — VBA port of alignment.py (forward + inverse)
+
+- ทำ: สร้าง `reference/vba/SMT_Align.bas` พอร์ต 4 public functions จาก `src/smt/alignment.py`
+  - `SMT_StaToN(sta, offset, rng)` — Forward: sta+offset → Northing
+  - `SMT_StaToE(sta, offset, rng)` — Forward: sta+offset → Easting
+  - `SMT_CoordToSta(n, e, rng)`    — Inverse: N,E → station
+  - `SMT_CoordToOffset(n, e, rng)` — Inverse: N,E → offset (+right/-left)
+- Algorithm: Tangent=dot-product/straight-line; Circular=chord-half-angle/centre-of-curvature; Spiral=Simpson 48 steps (ทุก transition shape) + bisection inverse 50 รอบ
+- อัปเดต `reference/vba/README.md` เพิ่ม SMT_Align function reference table
+- คำสั่ง: Write tool (SMT_Align.bas + README) → git add → git commit -F
+- ผล: commit 731bcc1 — 2 files changed, 540 insertions
+- Expected values ท้ายไฟล์:
+  SMT_StaToN(0,0,SMT_Elements)=1568000.0 | SMT_StaToE(519.615,0,SMT_Elements)=678519.615
+  SMT_CoordToSta(1568000,678000,SMT_Elements)=0.0 | SMT_CoordToOffset(...)=0.0
+
 ## [2026-06-30] สร้าง SMT_WCB.bas — VBA port of wcb.py
 
 - ทำ: สร้าง `reference/vba/SMT_WCB.bas` (VBA Module) พอร์ต 4 functions จาก `src/smt/wcb.py`
