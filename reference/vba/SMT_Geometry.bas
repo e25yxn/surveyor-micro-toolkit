@@ -117,7 +117,7 @@ Public Function SMT_LocalToE(n0 As Double, e0 As Double, aziBEG As Double, _
     SMT_LocalToE = e0 + ds * Sin(globalAz)
 End Function
 
-Public Function SMT_GlobalToChn(n0 As Double, e0 As Double, aziBEG As Double, _
+Public Function SMT_GlobalToY(n0 As Double, e0 As Double, aziBEG As Double, _
                                  n As Double, e As Double) As Double
     ' Chainage of a global point (n, e) in the local coordinate system.
     ' n0, e0  : global origin (metres).
@@ -133,10 +133,10 @@ Public Function SMT_GlobalToChn(n0 As Double, e0 As Double, aziBEG As Double, _
     aziBEG_rad = SMT_DegToRad(aziBEG)   ' degrees -> radians immediately on entry
     dN = n - n0
     dE = e - e0
-    SMT_GlobalToChn = dN * Cos(aziBEG_rad) + dE * Sin(aziBEG_rad)
+    SMT_GlobalToY = dN * Cos(aziBEG_rad) + dE * Sin(aziBEG_rad)
 End Function
 
-Public Function SMT_GlobalToOfs(n0 As Double, e0 As Double, aziBEG As Double, _
+Public Function SMT_GlobalToX(n0 As Double, e0 As Double, aziBEG As Double, _
                                  n As Double, e As Double) As Double
     ' Perpendicular offset of a global point (n, e) from the local X-axis.
     ' n0, e0  : global origin (metres).
@@ -154,7 +154,7 @@ Public Function SMT_GlobalToOfs(n0 As Double, e0 As Double, aziBEG As Double, _
     aziBEG_rad = SMT_DegToRad(aziBEG)   ' degrees -> radians immediately on entry
     dN = n - n0
     dE = e - e0
-    SMT_GlobalToOfs = -dN * Sin(aziBEG_rad) + dE * Cos(aziBEG_rad)
+    SMT_GlobalToX = -dN * Sin(aziBEG_rad) + dE * Cos(aziBEG_rad)
 End Function
 
 ' ============================================================
@@ -171,10 +171,10 @@ End Function
 '     DS=50, localAz=pi/2, globalAz=pi -> N = 1000 + 50*cos(pi) = 950
 '     (offset +50 right of East = South when aziBEG=90)
 '
-'   SMT_GlobalToChn(1000, 2000, 90, 1000, 2100) = 100.0
+'   SMT_GlobalToY(1000, 2000, 90, 1000, 2100) = 100.0
 '     dN=0, dE=100 -> Chn = 0*cos(pi/2) + 100*sin(pi/2) = 100
 '
-'   SMT_GlobalToOfs(1000, 2000, 90,  950, 2000) =  50.0
+'   SMT_GlobalToX(1000, 2000, 90,  950, 2000) =  50.0
 '     dN=-50, dE=0 -> Ofs = -(-50)*sin(pi/2) + 0*cos(pi/2) = 50
 ' ============================================================
 

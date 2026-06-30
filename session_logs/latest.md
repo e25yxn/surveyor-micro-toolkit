@@ -1,5 +1,30 @@
 # Session Log
 
+## [2026-06-30] เปลี่ยนชื่อ function ใน SMT_Geometry.bas + อัปเดต README
+
+- ทำ: เปลี่ยนชื่อ 2 functions ใน `reference/vba/SMT_Geometry.bas` (ทุกที่: declaration, comment, expected values)
+  - `SMT_GlobalToChn` → `SMT_GlobalToY`
+  - `SMT_GlobalToOfs` → `SMT_GlobalToX`
+- อัปเดต `reference/vba/README.md`: ชื่อ function ในตาราง reference และ example usage
+- คำสั่ง: Edit tool replace_all=true × 4 → git commit -F
+- ผล: commit รวมกับ notebooks/02_alignment_fitting.ipynb + alignment_fitting.png
+
+## [2026-06-30] สร้าง notebooks/02_alignment_fitting.ipynb — alignment fitting visualisation
+
+- ทำ: สร้าง Jupyter notebook 5 sections ใช้ข้อมูลจริง `test_data/ramp01n01_SO.csv` + `test_data/r01n01_so_crosscheck.csv`
+  - Section 1 Setup: load PI CSV (pi_rows ไว้ส่ง optimizer), build alignment เริ่มต้น, load drawing points → active_pts (non-PI/HIP)
+    Summary: 12 elements, 13 control pts, 15 drawing pts / 9 active
+  - Section 2 Before Plot: helper functions (_compute_gaps, _trace_centreline, _plot_alignment)
+    centreline สีน้ำเงิน, control pts สีน้ำเงิน, drawing pts X สีแดง, gap vectors ×100 สีแดง
+  - Section 3 Optimizer: fit_radius(pi_rows, drawing_points) → 5 free PIs, 289 iters, converged
+    gap_before → gap_after ลดลง
+  - Section 4 After Plot: patch pi_rows ด้วย r_optimized → rebuild → plot เหมือน Section 2
+    export PNG → notebooks/alignment_fitting.png (dpi=150)
+  - Section 5 Table: pandas DataFrame Name/STA/gap_before/gap_after/improvement% พร้อม green bar
+- tools: gen_notebook.py (nbformat) → nbconvert --execute --inplace → verified all cells pass, no errors
+- คำสั่ง: python gen_notebook.py → jupyter nbconvert --execute → git add → git commit -F
+- ผล: commit 215bc82 — 2 files, 588 insertions (02_alignment_fitting.ipynb + alignment_fitting.png)
+
 ## [2026-06-30] จัดโครงสร้าง reference/vba/ ใหม่ — 7 modules → 5 modules
 
 - ทำ: รวมไฟล์ VBA ใน `reference/vba/` จาก 7 ไฟล์เป็น 5 ไฟล์

@@ -24,7 +24,7 @@ SMT_Core
          └──► SMT_Geometry   (depends on SMT_Core)
                 ├── local/global conversion:
                 │     SMT_LocalToN, SMT_LocalToE,
-                │     SMT_GlobalToChn, SMT_GlobalToOfs
+                │     SMT_GlobalToY, SMT_GlobalToX
                 └── 3-D rotation matrices:
                       SMT_RotX, SMT_RotY, SMT_RotZ
 ```
@@ -249,8 +249,8 @@ AziBEG is always in **decimal degrees** (survey: 0=North, clockwise+); converted
 |----------|-----------|---------|-------|
 | `SMT_LocalToN(n0,e0,aziBEG,chn,ofs)` | all Double | `Double` (m) | Local (chn, ofs) → global Northing |
 | `SMT_LocalToE(n0,e0,aziBEG,chn,ofs)` | all Double | `Double` (m) | Local (chn, ofs) → global Easting |
-| `SMT_GlobalToChn(n0,e0,aziBEG,n,e)` | all Double | `Double` (m) | Global (N, E) → Chainage |
-| `SMT_GlobalToOfs(n0,e0,aziBEG,n,e)` | all Double | `Double` (m) | Global (N, E) → Offset (+right/−left) |
+| `SMT_GlobalToY(n0,e0,aziBEG,n,e)` | all Double | `Double` (m) | Global (N, E) → Chainage |
+| `SMT_GlobalToX(n0,e0,aziBEG,n,e)` | all Double | `Double` (m) | Global (N, E) → Offset (+right/−left) |
 
 ### Part 2 — 3-D rotation matrices
 
@@ -269,8 +269,8 @@ Returns a **new** Variant array — the original `pts` is not modified.
 ```vba
 =SMT_LocalToN($B$1,$B$2,$B$3,A6,B6)   ' local (chn=A6,ofs=B6) -> Northing
 =SMT_LocalToE($B$1,$B$2,$B$3,A6,B6)   ' local (chn=A6,ofs=B6) -> Easting
-=SMT_GlobalToChn($B$1,$B$2,$B$3,C6,D6)' global (N=C6,E=D6)  -> Chainage
-=SMT_GlobalToOfs($B$1,$B$2,$B$3,C6,D6)' global (N=C6,E=D6)  -> Offset
+=SMT_GlobalToY($B$1,$B$2,$B$3,C6,D6)' global (N=C6,E=D6)  -> Chainage
+=SMT_GlobalToX($B$1,$B$2,$B$3,C6,D6)' global (N=C6,E=D6)  -> Offset
 
 ' WCB at a station, then use as aziBEG for local->global:
 az = SMT_WCBatSta(A2, SMT_Elements)    ' tangent bearing in degrees
