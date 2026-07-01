@@ -270,6 +270,24 @@ class TestSpiralIn:
         spout = next(s for s in _find_all(root, 'Spiral') if s.get('radiusEnd') == 'INF')
         assert math.isclose(float(spout.get('theta')), 4.297183, abs_tol=1e-3)
 
+    def test_spin_geometry_attributes(self):
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
+        assert math.isclose(float(spin.get('totalX')), 59.966259, abs_tol=1e-3)
+        assert math.isclose(float(spin.get('totalY')), 1.499397, abs_tol=1e-3)
+        assert math.isclose(float(spin.get('tanLong')), 40.011792, abs_tol=1e-3)
+        assert math.isclose(float(spin.get('tanShort')), 20.010720, abs_tol=1e-3)
+
+    def test_spout_geometry_attributes(self):
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        spout = next(s for s in _find_all(root, 'Spiral') if s.get('radiusEnd') == 'INF')
+        assert math.isclose(float(spout.get('totalX')), 59.910032, abs_tol=1e-3)
+        assert math.isclose(float(spout.get('totalY')), 2.998072, abs_tol=1e-3)
+        assert math.isclose(float(spout.get('tanLong')), 20.010720, abs_tol=1e-3)
+        assert math.isclose(float(spout.get('tanShort')), 40.011792, abs_tol=1e-3)
+
 
 class TestAnglePoint:
     def test_no_crash(self):

@@ -1,5 +1,25 @@
 # Session Log
 
+## [2026-07-01] เพิ่ม totalX/totalY/tanLong/tanShort ใน Spiral element ทุกตัว
+
+- ทำ: แก้ `src/smt/landxml.py`
+  - เพิ่ม helper `_spiral_geometry(start_n, start_e, end_n, end_e, entry_azimuth_rad, theta_rad)`
+    คำนวณ dN/dE → totalX, totalY (หมุนเข้า local frame ตาม entry azimuth) → tanLong, tanShort
+    ตามสูตรที่กำหนด (tanLong = totalX - totalY/tan(theta), tanShort = totalY/sin(theta))
+  - refactor `_theta_deg` → `_theta_rad` (คืนค่า radian แทน แล้วแปลงเป็นองศาตอนใส่ attribute theta)
+    เพื่อให้ theta_rad ใช้ร่วมกับ _spiral_geometry ได้โดยไม่คำนวณซ้ำ
+  - เพิ่ม attributes `totalX`, `totalY`, `tanLong`, `tanShort` (เมตร, ทศนิยม 6 ตำแหน่ง) ในทุก Spiral
+    (SPIN และ SPOUT) รักษา rot, radiusStart, radiusEnd, spiType, length, theta ไว้เหมือนเดิม
+  - Curve element ไม่แตะเลย
+  - อัปเดต docstring
+  - เพิ่ม test ใหม่ใน `tests/test_landxml.py`: `test_spin_geometry_attributes`, `test_spout_geometry_attributes`
+    (ตรวจค่าตัวเลขจริงจาก fixture spiral symmetric R=400 Ls=60)
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
+- ผล: PASS 442/442 — smoke test: ตรวจ SettingOutTest.xml พบ Spiral ทุกตัวมี totalX/totalY/tanLong/tanShort ครบ, Curve ยังคงเดิมไม่เปลี่ยนแปลง
+- commit: (ดูด้านล่างหลัง commit)
+
+---
+
 ## [2026-07-01] ลบ dirStart/dirEnd ออกจาก Spiral, เพิ่ม theta แทน (Curve ไม่แตะ)
 
 - ทำ: แก้ `src/smt/landxml.py` ส่วนสร้าง Spiral (SPIN และ SPOUT)

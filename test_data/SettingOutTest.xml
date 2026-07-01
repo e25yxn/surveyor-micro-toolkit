@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LandXML xmlns="http://www.landxml.org/schema/LandXML-1.2" version="1.2" date="2026-07-01" time="13:03:31">
+<LandXML xmlns="http://www.landxml.org/schema/LandXML-1.2" version="1.2" date="2026-07-01" time="13:12:01">
   <Units>
     <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" angularUnit="decimal dd" directionUnit="decimal dd" />
   </Units>
@@ -19,7 +19,7 @@
           <Start>1567959.807591 678669.615262</Start>
           <End>1567787.859516 678967.437925</End>
         </Line>
-        <Spiral rot="cw" radiusStart="INF" radiusEnd="400.000000" spiType="clothoid" length="60.000000" theta="4.297183">
+        <Spiral rot="cw" radiusStart="INF" radiusEnd="400.000000" spiType="clothoid" length="60.000000" theta="4.297183" totalX="59.966259" totalY="1.499397" tanLong="40.011792" tanShort="20.010720">
           <Start>1567787.859516 678967.437925</Start>
           <End>1567756.577860 679018.620523</End>
         </Spiral>
@@ -28,7 +28,7 @@
           <Center>1567426.127508 678793.226281</Center>
           <End>1567590.715192 679157.795745</End>
         </Curve>
-        <Spiral rot="cw" radiusStart="400.000000" radiusEnd="INF" spiType="clothoid" length="60.000000" theta="4.297183">
+        <Spiral rot="cw" radiusStart="400.000000" radiusEnd="INF" spiType="clothoid" length="60.000000" theta="4.297183" totalX="59.910032" totalY="2.998072" tanLong="20.010720" tanShort="40.011792">
           <Start>1567590.715192 679157.795745</Start>
           <End>1567534.878157 679179.714365</End>
         </Spiral>
@@ -36,7 +36,7 @@
           <Start>1567534.878157 679179.714365</Start>
           <End>1567301.257501 679264.745230</End>
         </Line>
-        <Spiral rot="ccw" radiusStart="INF" radiusEnd="400.000000" spiType="bloss" length="60.000000" theta="4.297183">
+        <Spiral rot="ccw" radiusStart="INF" radiusEnd="400.000000" spiType="bloss" length="60.000000" theta="4.297183" totalX="59.969205" totalY="-1.349442" tanLong="77.928021" tanShort="-18.009445">
           <Start>1567301.257501 679264.745230</Start>
           <End>1567245.366410 679286.523946</End>
         </Spiral>
@@ -45,7 +45,7 @@
           <Center>1567409.954095 679651.093410</Center>
           <End>1567079.503554 679425.699443</End>
         </Curve>
-        <Spiral rot="ccw" radiusStart="400.000000" radiusEnd="INF" spiType="bloss" length="60.000000" theta="4.297183">
+        <Spiral rot="ccw" radiusStart="400.000000" radiusEnd="INF" spiType="bloss" length="60.000000" theta="4.297183" totalX="59.901734" totalY="-3.147826" tanLong="101.794023" tanShort="-42.010388">
           <Start>1567079.503554 679425.699443</Start>
           <End>1567048.350333 679476.959596</End>
         </Spiral>
@@ -53,7 +53,7 @@
           <Start>1567048.350333 679476.959596</Start>
           <End>1566932.543924 679677.542472</End>
         </Line>
-        <Spiral rot="cw" radiusStart="INF" radiusEnd="500.000000" spiType="sinusoid" length="70.000000" theta="4.010705">
+        <Spiral rot="cw" radiusStart="INF" radiusEnd="500.000000" spiType="sinusoid" length="70.000000" theta="4.010705" totalX="69.968905" totalY="1.456526" tanLong="49.195387" tanShort="20.824517">
           <Start>1566932.543924 679677.542472</Start>
           <End>1566896.298121 679737.409081</End>
         </Spiral>
@@ -62,7 +62,7 @@
           <Center>1566481.831402 679457.735452</Center>
           <End>1566724.318146 679894.999879</End>
         </Curve>
-        <Spiral rot="cw" radiusStart="500.000000" radiusEnd="INF" spiType="sinusoid" length="70.000000" theta="4.010705">
+        <Spiral rot="cw" radiusStart="500.000000" radiusEnd="INF" spiType="sinusoid" length="70.000000" theta="4.010705" totalX="69.899425" totalY="3.440865" tanLong="20.824517" tanShort="49.195387">
           <Start>1566724.318146 679894.999879</Start>
           <End>1566661.520353 679925.890111</End>
         </Spiral>
@@ -70,7 +70,7 @@
           <Start>1566661.520353 679925.890111</Start>
           <End>1566467.043746 680016.576169</End>
         </Line>
-        <Spiral rot="ccw" radiusStart="INF" radiusEnd="500.000000" spiType="sineHalfWave" length="70.000000" theta="4.010705">
+        <Spiral rot="ccw" radiusStart="INF" radiusEnd="500.000000" spiType="sineHalfWave" length="70.000000" theta="4.010705" totalX="69.969959" totalY="-1.384583" tanLong="89.717399" tanShort="-19.795921">
           <Start>1566467.043746 680016.576169</Start>
           <End>1566404.214595 680047.401644</End>
         </Spiral>
@@ -79,7 +79,7 @@
           <Center>1566646.701338 680484.666071</Center>
           <End>1566232.234953 680204.991948</End>
         </Curve>
-        <Spiral rot="ccw" radiusStart="500.000000" radiusEnd="INF" spiType="sineHalfWave" length="70.000000" theta="4.010705">
+        <Spiral rot="ccw" radiusStart="500.000000" radiusEnd="INF" spiType="sineHalfWave" length="70.000000" theta="4.010705" totalX="69.895444" totalY="-3.512706" tanLong="119.994967" tanShort="-50.222518">
           <Start>1566232.234953 680204.991948</Start>
           <End>1566196.050856 680264.895398</End>
         </Spiral>
@@ -87,7 +87,7 @@
           <Start>1566196.050856 680264.895398</Start>
           <End>1566038.207179 680538.288312</End>
         </Line>
-        <Spiral rot="cw" radiusStart="INF" radiusEnd="400.000000" spiType="clothoid" length="50.000000" theta="3.580986">
+        <Spiral rot="cw" radiusStart="INF" radiusEnd="400.000000" spiType="clothoid" length="50.000000" theta="3.580986" totalX="49.980472" totalY="1.041376" tanLong="33.340156" tanShort="16.672870">
           <Start>1566038.207179 680538.288312</Start>
           <End>1566012.315061 680581.051968</End>
         </Spiral>
@@ -96,7 +96,7 @@
           <Center>1565679.073249 680359.805738</Center>
           <End>1565825.321757 680732.111222</End>
         </Curve>
-        <Spiral rot="cw" radiusStart="400.000000" radiusEnd="INF" spiType="clothoid" length="90.000000" theta="6.445775">
+        <Spiral rot="cw" radiusStart="400.000000" radiusEnd="INF" spiType="clothoid" length="90.000000" theta="6.445775" totalX="89.696494" totalY="6.740242" tanLong="30.036208" tanShort="60.039825">
           <Start>1565825.321757 680732.111222</Start>
           <End>1565739.371140 680758.632596</End>
         </Spiral>
