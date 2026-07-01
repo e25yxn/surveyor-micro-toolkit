@@ -1,5 +1,17 @@
 # Session Log
 
+## [2026-07-01] แก้ _rotation ให้คืน "cw"/"ccw" แทน "right"/"left"
+
+- ทำ: แก้ `src/smt/landxml.py` ฟังก์ชัน `_rotation` — คืน `"cw"` เมื่อ k>0, `"ccw"` เมื่อ k<0
+  (อ้างอิงจากไฟล์ py-1.xml ที่ Civil 3D 2023 export จริง ใช้ rot="cw"/"ccw" เท่านั้น ไม่เคยใช้ "right"/"left")
+  - อัปเดต module docstring และ function docstring ให้ตรงกับค่าใหม่
+  - แก้ `tests/test_landxml.py`: `test_rotation_right` → `test_rotation_cw` (assert `'cw'`), `test_left_turn_rotation` assert `'ccw'` แทน `'left'`
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml` → `smt export-landxml test_data/ramp01n01_SO.csv --name ramp_test --out test_data/mainline_test.xml`
+- ผล: PASS 438/438 — smoke test: ทั้งสองไฟล์ export สำเร็จ, ตรวจ mainline_test.xml พบ rot="cw"/"ccw" เท่านั้น ไม่มี "right"/"left" หลงเหลือ
+- commit: (ดูด้านล่างหลัง commit)
+
+---
+
 ## [2026-07-01] แก้ spiral type mapping + dirStart/dirEnd Civil 3D convention + คืน dirEnd
 
 - ทำ: แก้ `src/smt/landxml.py` 3 จุดตามแผนที่อนุมัติ

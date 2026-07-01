@@ -147,11 +147,11 @@ class TestSimpleCurve:
         en, ee = _ne(curve, 'End')
         assert math.isclose(math.hypot(cn - en, ce - ee), 300.0, abs_tol=1e-3)
 
-    def test_rotation_right(self):
+    def test_rotation_cw(self):
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('rot') == 'right'
+        assert curve.get('rot') == 'cw'
 
     def test_curve_dir_start(self):
         # BP→PI direction is East (WCB 90°) → Civil dir = (450-90)%360 = 0°
@@ -182,7 +182,7 @@ class TestSimpleCurve:
         xml = export_alignment_landxml(_build(verts))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('rot') == 'left'
+        assert curve.get('rot') == 'ccw'
 
 
 class TestSpiralIn:

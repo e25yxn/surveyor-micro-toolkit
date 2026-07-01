@@ -5,7 +5,7 @@ that Civil 3D 2023 can import directly.
 
 Coordinates: "N E" format (northing first), 6 decimal places.
 Azimuths: decimal degrees.  Units: metric, linearUnit=meter.
-Sign convention: k>0 → rot="right" (right turn); k<0 → rot="left" (left turn).
+Sign convention: k>0 → rot="cw" (right turn); k<0 → rot="ccw" (left turn).
 dirStart/dirEnd = entry/exit azimuth converted to Civil 3D direction
 convention (decimal degrees, 0=East counterclockwise) via _to_civil_dir,
 on every Curve and Spiral.
@@ -61,7 +61,7 @@ def _curve_center(n: float, e: float, azimuth_rad: float, k: float) -> tuple[flo
 
 
 def _rotation(k: float) -> str:
-    return 'right' if k > 0 else 'left'
+    return 'cw' if k > 0 else 'ccw'
 
 
 def _spiral_lx_type(transition: str) -> str:
@@ -87,7 +87,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
     """Convert BuildResult to LandXML 1.2 XML string (Civil 3D 2023 compatible).
 
     Units: metric/meter.  Coordinates: "N E" (northing first), 6 dp.
-    rot="right" for k>0 (right turn), rot="left" for k<0 (left turn).
+    rot="cw" for k>0 (right turn), rot="ccw" for k<0 (left turn).
     Curve: <Center> child tag; dirStart/dirEnd (entry/exit azimuth, Civil 3D
     direction convention, decimal degrees).
     Spiral: dirStart/dirEnd (entry/exit azimuth, Civil 3D direction convention).
