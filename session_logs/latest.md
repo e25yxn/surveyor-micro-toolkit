@@ -9,7 +9,7 @@
 - คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
 - ผล: PASS 444/444 — smoke test: ตรวจ SettingOutTest.xml พบ PI4 (COSINE) → spiType="sineHalfWave",
   PI5 (SINE) → spiType="sinusoid" ตรงกับ mapping ใหม่
-- commit: (ดูด้านล่างหลัง commit)
+- commit: 5e98645
 
 ---
 
