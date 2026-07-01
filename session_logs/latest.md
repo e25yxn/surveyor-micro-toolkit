@@ -16,7 +16,7 @@
     (ตรวจค่าตัวเลขจริงจาก fixture spiral symmetric R=400 Ls=60)
 - คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
 - ผล: PASS 442/442 — smoke test: ตรวจ SettingOutTest.xml พบ Spiral ทุกตัวมี totalX/totalY/tanLong/tanShort ครบ, Curve ยังคงเดิมไม่เปลี่ยนแปลง
-- commit: (ดูด้านล่างหลัง commit)
+- commit: acb56cd
 
 ---
 
