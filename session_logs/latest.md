@@ -11,7 +11,7 @@
   - แก้ `tests/test_landxml.py`: เปลี่ยนตัวเลือก spin/spout จาก `spiType=='toCurve'` เป็น `radiusStart=='INF'`; ลบ `test_spin_spi_type`/`test_spout_spi_type`/`test_spiral_type_clothoid` แทนที่ด้วย `test_no_type_attribute`, `test_spi_type_holds_shape`, `test_no_to_from_curve_values`
 - คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
 - ผล: PASS 438/438 — smoke test: ตรวจ SettingOutTest.xml พบ Spiral มี spiType="clothoid"/"bloss"/"sinusoid" ไม่มี type attribute ไม่มี toCurve/fromCurve เหลืออยู่เลย
-- commit: (ดูด้านล่างหลัง commit)
+- commit: 37b4bdf
 
 ---
 
