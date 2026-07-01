@@ -8,7 +8,7 @@
   - แก้ `tests/test_landxml.py`: `test_rotation_right` → `test_rotation_cw` (assert `'cw'`), `test_left_turn_rotation` assert `'ccw'` แทน `'left'`
 - คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml` → `smt export-landxml test_data/ramp01n01_SO.csv --name ramp_test --out test_data/mainline_test.xml`
 - ผล: PASS 438/438 — smoke test: ทั้งสองไฟล์ export สำเร็จ, ตรวจ mainline_test.xml พบ rot="cw"/"ccw" เท่านั้น ไม่มี "right"/"left" หลงเหลือ
-- commit: (ดูด้านล่างหลัง commit)
+- commit: d743e31
 
 ---
 
