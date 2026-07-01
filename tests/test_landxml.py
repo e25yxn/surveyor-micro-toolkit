@@ -271,6 +271,7 @@ class TestSpiralIn:
         assert math.isclose(float(spout.get('theta')), 4.297183, abs_tol=1e-3)
 
     def test_spin_geometry_attributes(self):
+        # canonical: synthetic Element at origin, k_in=0 -> k_out=1/400 over 60m
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
         spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
@@ -279,14 +280,23 @@ class TestSpiralIn:
         assert math.isclose(float(spin.get('tanLong')), 40.011792, abs_tol=1e-3)
         assert math.isclose(float(spin.get('tanShort')), 20.010720, abs_tol=1e-3)
 
-    def test_spout_geometry_attributes(self):
+    def test_spout_geometry_matches_spin(self):
+        # canonical geometry depends only on R/length/transition, not on the
+        # spiral's real position, direction, or SPIN/SPOUT role — with equal
+        # R and length here, SPIN and SPOUT must produce identical values
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
         spout = next(s for s in _find_all(root, 'Spiral') if s.get('radiusEnd') == 'INF')
-        assert math.isclose(float(spout.get('totalX')), 59.910032, abs_tol=1e-3)
-        assert math.isclose(float(spout.get('totalY')), 2.998072, abs_tol=1e-3)
-        assert math.isclose(float(spout.get('tanLong')), 20.010720, abs_tol=1e-3)
-        assert math.isclose(float(spout.get('tanShort')), 40.011792, abs_tol=1e-3)
+        for attr in ('totalX', 'totalY', 'tanLong', 'tanShort'):
+            assert math.isclose(float(spin.get(attr)), float(spout.get(attr)), abs_tol=1e-6)
+
+    def test_geometry_attributes_are_positive(self):
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        for spiral in _find_all(root, 'Spiral'):
+            assert float(spiral.get('totalX')) > 0
+            assert float(spiral.get('totalY')) > 0
 
 
 class TestAnglePoint:

@@ -1,5 +1,29 @@
 # Session Log
 
+## [2026-07-01] เปลี่ยนวิธีคำนวณ totalX/totalY/tanLong/tanShort เป็นแบบ canonical (ไม่ขึ้นกับทิศทางจริง)
+
+- ทำ: แก้ `src/smt/landxml.py`
+  - ลบวิธีคำนวณเดิมที่ใช้พิกัด start/end จริง (`_spiral_geometry` แบบเดิมที่หมุนพิกัดจริงเข้า local frame) ทิ้งทั้งหมด
+  - เขียน `_spiral_geometry(R, length, transition, theta_rad)` ใหม่: สร้าง synthetic `Element`
+    ที่ n=0, e=0, azimuth=0, sta_start=0, sta_end=length, k_in=0, k_out=1/R (R คือรัศมีจำกัดเสมอ
+    ไม่ว่า SPIN หรือ SPOUT), transition เดียวกับของจริง แล้วเรียก `calculate_point_on_element`
+    ที่ distance=length ได้ local_n, local_e → totalX=local_n, totalY=local_e (บวกทั้งคู่)
+    theta_rad ใช้ค่าเดียวกับที่คำนวณไว้แล้วสำหรับ attribute theta
+    tanLong = totalX - totalY/tan(theta_rad), tanShort = totalY/sin(theta_rad)
+  - import `calculate_point_on_element` เพิ่มจาก `.alignment`
+  - Curve element ไม่แตะเลย
+  - อัปเดต docstring
+  - แก้ `tests/test_landxml.py`: `test_spout_geometry_attributes` เดิม (เทียบค่าจาก SPOUT พิกัดจริง)
+    ใช้ไม่ได้แล้วเพราะตอนนี้ SPIN/SPOUT ที่ R และ length เท่ากันต้องได้ค่าเดียวกัน (canonical)
+    → แทนที่ด้วย `test_spout_geometry_matches_spin` (เทียบ SPIN==SPOUT) และเพิ่ม
+    `test_geometry_attributes_are_positive` (ตรวจ totalX, totalY > 0 ทุก Spiral)
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
+- ผล: PASS 443/443 — smoke test: ตรวจ SettingOutTest.xml พบ SPIN/SPOUT คู่เดียวกัน (R, length เท่ากัน)
+  ได้ totalX/totalY/tanLong/tanShort เท่ากันทุกคู่ ค่าทั้งหมดเป็นบวก, Curve ไม่เปลี่ยนแปลง
+- commit: (ดูด้านล่างหลัง commit)
+
+---
+
 ## [2026-07-01] เพิ่ม totalX/totalY/tanLong/tanShort ใน Spiral element ทุกตัว
 
 - ทำ: แก้ `src/smt/landxml.py`

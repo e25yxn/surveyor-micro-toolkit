@@ -10,7 +10,10 @@ dirStart/dirEnd = entry/exit azimuth converted to Civil 3D direction
 convention (decimal degrees, 0=East counterclockwise) via _to_civil_dir,
 on every Curve.  Spiral has no dirStart/dirEnd (Civil 3D doesn't use them
 there); instead it carries theta (absolute total turning angle, dd) plus
-totalX/totalY/tanLong/tanShort (meters, in the entry-tangent local frame).
+totalX/totalY/tanLong/tanShort (meters), computed canonically from a
+synthetic Element at the origin curving from k_in=0 to k_out=1/R — these
+values do not depend on the spiral's real position, direction, or role
+(SPIN/SPOUT) in the alignment.
 """
 from __future__ import annotations
 
@@ -19,7 +22,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 from . import fpmath
-from .alignment import Element, calculate_exit_state
+from .alignment import Element, calculate_exit_state, calculate_point_on_element
 from .builders.alignment_builder import BuildResult
 
 _NS = 'http://www.landxml.org/schema/LandXML-1.2'
@@ -62,17 +65,18 @@ def _theta_rad(entry_azimuth_rad: float, exit_azimuth_rad: float) -> float:
     return abs(fpmath.calculate_angle_diff(exit_azimuth_rad, entry_azimuth_rad))
 
 
-def _spiral_geometry(
-    start_n: float, start_e: float,
-    end_n: float, end_e: float,
-    entry_azimuth_rad: float, theta_rad: float,
-) -> tuple[float, float, float, float]:
-    """(totalX, totalY, tanLong, tanShort) for a spiral, in the entry-tangent
-    local frame (X along the entry tangent, Y to the left of it)."""
-    d_n = end_n - start_n
-    d_e = end_e - start_e
-    total_x = d_n * math.cos(entry_azimuth_rad) + d_e * math.sin(entry_azimuth_rad)
-    total_y = -d_n * math.sin(entry_azimuth_rad) + d_e * math.cos(entry_azimuth_rad)
+def _spiral_geometry(R: float, length: float, transition: str, theta_rad: float) -> tuple[float, float, float, float]:
+    """(totalX, totalY, tanLong, tanShort) for a spiral, computed canonically:
+    a synthetic Element at the origin (n=0, e=0, azimuth=0) curving from
+    k_in=0 to k_out=1/R over [0, length], independent of the spiral's real
+    position, direction, or SPIN/SPOUT role in the alignment."""
+    synthetic = Element(
+        type='SPIN', sta_start=0.0, sta_end=length,
+        n=0.0, e=0.0, azimuth=0.0,
+        k_in=0.0, k_out=1.0 / R, transition=transition,
+    )
+    state = calculate_point_on_element(synthetic, length)
+    total_x, total_y = state.n, state.e
     tan_long = total_x - total_y / math.tan(theta_rad)
     tan_short = total_y / math.sin(theta_rad)
     return total_x, total_y, tan_long, tan_short
@@ -114,9 +118,10 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
     Curve: <Center> child tag; dirStart/dirEnd (entry/exit azimuth, Civil 3D
     direction convention, decimal degrees).
     Spiral: no dirStart/dirEnd; theta (absolute total turning angle, decimal
-    degrees) plus totalX/totalY/tanLong/tanShort (meters) instead.
-    spiType holds the spiral shape (clothoid/bloss/sinusoid/sineHalfWave)
-    via _spiral_lx_type — no "type" attribute, no toCurve/fromCurve.
+    degrees) plus totalX/totalY/tanLong/tanShort (meters, canonical — see
+    _spiral_geometry) instead.  spiType holds the spiral shape (clothoid/
+    bloss/sinusoid/sineHalfWave) via _spiral_lx_type — no "type" attribute,
+    no toCurve/fromCurve.
     radiusStart/radiusEnd="INF" for the infinite-radius end of spiral elements.
     """
     elements = build_result.elements
@@ -179,7 +184,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             exit_az = _exit_azimuth(i, elements)
             theta_rad = _theta_rad(el.azimuth, exit_az)
             total_x, total_y, tan_long, tan_short = _spiral_geometry(
-                el.n, el.e, end_n, end_e, el.azimuth, theta_rad)
+                R_out, length, el.transition, theta_rad)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
                                 rot=_rotation(k_out),
                                 radiusStart='INF',
@@ -200,7 +205,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             exit_az = _exit_azimuth(i, elements)
             theta_rad = _theta_rad(el.azimuth, exit_az)
             total_x, total_y, tan_long, tan_short = _spiral_geometry(
-                el.n, el.e, end_n, end_e, el.azimuth, theta_rad)
+                R_in, length, el.transition, theta_rad)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
                                 rot=_rotation(k_in),
                                 radiusStart=f'{R_in:.6f}',
