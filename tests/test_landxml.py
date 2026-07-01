@@ -196,7 +196,7 @@ class TestSpiralIn:
         root = _parse(xml)
         spin = next(
             s for s in _find_all(root, 'Spiral')
-            if s.get('spiType') == 'toCurve'
+            if s.get('radiusStart') == 'INF'
         )
         assert spin.get('radiusStart') == 'INF'
 
@@ -205,36 +205,34 @@ class TestSpiralIn:
         root = _parse(xml)
         spin = next(
             s for s in _find_all(root, 'Spiral')
-            if s.get('spiType') == 'toCurve'
+            if s.get('radiusStart') == 'INF'
         )
         assert math.isclose(float(spin.get('radiusEnd')), 400.0, abs_tol=1e-6)
 
-    def test_spin_spi_type(self):
-        xml = export_alignment_landxml(_build(_verts_spiral()))
-        root = _parse(xml)
-        spirals = _find_all(root, 'Spiral')
-        spi_types = {s.get('spiType') for s in spirals}
-        assert 'toCurve' in spi_types
-
-    def test_spout_spi_type(self):
-        xml = export_alignment_landxml(_build(_verts_spiral()))
-        root = _parse(xml)
-        spirals = _find_all(root, 'Spiral')
-        spi_types = {s.get('spiType') for s in spirals}
-        assert 'fromCurve' in spi_types
-
-    def test_spiral_type_clothoid(self):
+    def test_no_type_attribute(self):
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
         for spiral in _find_all(root, 'Spiral'):
-            assert spiral.get('type') == 'clothoid'
+            assert spiral.get('type') is None
+
+    def test_spi_type_holds_shape(self):
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        for spiral in _find_all(root, 'Spiral'):
+            assert spiral.get('spiType') == 'clothoid'
+
+    def test_no_to_from_curve_values(self):
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        for spiral in _find_all(root, 'Spiral'):
+            assert spiral.get('spiType') not in ('toCurve', 'fromCurve')
 
     def test_spiral_length(self):
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
         spin = next(
             s for s in _find_all(root, 'Spiral')
-            if s.get('spiType') == 'toCurve'
+            if s.get('radiusStart') == 'INF'
         )
         assert math.isclose(float(spin.get('length')), 60.0, abs_tol=1e-3)
 
@@ -251,7 +249,7 @@ class TestSpiralIn:
         # → Civil dir = (450-90)%360 = 0°
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
-        spin = next(s for s in _find_all(root, 'Spiral') if s.get('spiType') == 'toCurve')
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
         assert math.isclose(float(spin.get('dirStart')), 0.0, abs_tol=1e-3)
 
     def test_spin_dir_end(self):
@@ -259,7 +257,7 @@ class TestSpiralIn:
         # curve (turning angle consumed over the spiral length)
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
-        spin = next(s for s in _find_all(root, 'Spiral') if s.get('spiType') == 'toCurve')
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
         assert spin.get('dirEnd') is not None
 
 

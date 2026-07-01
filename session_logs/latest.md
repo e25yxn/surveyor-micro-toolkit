@@ -1,5 +1,20 @@
 # Session Log
 
+## [2026-07-01] ลบ attribute "type" ออกจาก Spiral, ใช้ "spiType" ใส่รูปร่าง spiral แทน toCurve/fromCurve
+
+- ทำ: แก้ `src/smt/landxml.py` ส่วนสร้าง Spiral (SPIN และ SPOUT)
+  - ลบ attribute `type=_spiral_lx_type(...)` ออกทั้งหมด
+  - เปลี่ยน `spiType='toCurve'`/`spiType='fromCurve'` → `spiType=_spiral_lx_type(el.transition)` (ใส่ค่ารูปร่าง clothoid/bloss/sinusoid/sineHalfWave แทน)
+  - attribute อื่น (rot, radiusStart, radiusEnd, length, dirStart, dirEnd) คงเดิมทั้งหมด
+  - อ้างอิงจาก py-1.xml (Civil 3D 2023 export จริง) ที่ Spiral มีแค่ length, radiusEnd, radiusStart, rot, spiType — ไม่มี type, ไม่มี toCurve/fromCurve
+  - อัปเดต docstring ให้ตรงกับ format ใหม่
+  - แก้ `tests/test_landxml.py`: เปลี่ยนตัวเลือก spin/spout จาก `spiType=='toCurve'` เป็น `radiusStart=='INF'`; ลบ `test_spin_spi_type`/`test_spout_spi_type`/`test_spiral_type_clothoid` แทนที่ด้วย `test_no_type_attribute`, `test_spi_type_holds_shape`, `test_no_to_from_curve_values`
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
+- ผล: PASS 438/438 — smoke test: ตรวจ SettingOutTest.xml พบ Spiral มี spiType="clothoid"/"bloss"/"sinusoid" ไม่มี type attribute ไม่มี toCurve/fromCurve เหลืออยู่เลย
+- commit: (ดูด้านล่างหลัง commit)
+
+---
+
 ## [2026-07-01] แก้ _rotation ให้คืน "cw"/"ccw" แทน "right"/"left"
 
 - ทำ: แก้ `src/smt/landxml.py` ฟังก์ชัน `_rotation` — คืน `"cw"` เมื่อ k>0, `"ccw"` เมื่อ k<0

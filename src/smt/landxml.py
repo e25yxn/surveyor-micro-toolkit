@@ -90,7 +90,9 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
     rot="cw" for k>0 (right turn), rot="ccw" for k<0 (left turn).
     Curve: <Center> child tag; dirStart/dirEnd (entry/exit azimuth, Civil 3D
     direction convention, decimal degrees).
-    Spiral: dirStart/dirEnd (entry/exit azimuth, Civil 3D direction convention).
+    Spiral: dirStart/dirEnd (entry/exit azimuth, Civil 3D direction convention);
+    spiType holds the spiral shape (clothoid/bloss/sinusoid/sineHalfWave) via
+    _spiral_lx_type — no separate "type" attribute, no toCurve/fromCurve.
     radiusStart/radiusEnd="INF" for the infinite-radius end of spiral elements.
     """
     elements = build_result.elements
@@ -152,11 +154,10 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             R_out = abs(1.0 / k_out)
             exit_az = _exit_azimuth(i, elements)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
-                                type=_spiral_lx_type(el.transition),
                                 rot=_rotation(k_out),
                                 radiusStart='INF',
                                 radiusEnd=f'{R_out:.6f}',
-                                spiType='toCurve',
+                                spiType=_spiral_lx_type(el.transition),
                                 length=f'{length:.6f}',
                                 dirStart=f'{_to_civil_dir(el.azimuth):.6f}',
                                 dirEnd=f'{_to_civil_dir(exit_az):.6f}')
@@ -168,11 +169,10 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             R_in = abs(1.0 / k_in)
             exit_az = _exit_azimuth(i, elements)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
-                                type=_spiral_lx_type(el.transition),
                                 rot=_rotation(k_in),
                                 radiusStart=f'{R_in:.6f}',
                                 radiusEnd='INF',
-                                spiType='fromCurve',
+                                spiType=_spiral_lx_type(el.transition),
                                 length=f'{length:.6f}',
                                 dirStart=f'{_to_civil_dir(el.azimuth):.6f}',
                                 dirEnd=f'{_to_civil_dir(exit_az):.6f}')
