@@ -15,7 +15,7 @@
     (คาดค่า theta ≈ 4.297183° จาก 0.5 * k_out * L)
 - คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
 - ผล: PASS 440/440 — smoke test: ตรวจ SettingOutTest.xml พบ Spiral มี theta ทุกตัว ไม่มี dirStart/dirEnd หลงเหลือ, Curve ยังมี dirStart/dirEnd ครบ
-- commit: (ดูด้านล่างหลัง commit)
+- commit: 47e38b9
 
 ---
 
