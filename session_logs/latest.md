@@ -10,7 +10,7 @@
   - อัปเดต `tests/test_landxml.py`: `test_curve_dir_start` (คาด 0.0 แทน 90.0 ตาม civil convention), เพิ่ม `test_curve_dir_end` (คาด 270.0), `test_spin_dir_start` (คาด 0.0), เพิ่ม `test_spin_dir_end` (คาดว่า dirEnd ไม่ใช่ None)
 - คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml` → `smt export-landxml test_data/ramp01n01_SO.csv --name ramp_test --out test_data/mainline_test.xml`
 - ผล: PASS 438/438 — smoke test: ทั้งสองไฟล์ export สำเร็จ, ตรวจ XML พบ dirStart/dirEnd ต่อเนื่องกันระหว่าง element ถัดไป และ spiral type ตรงกับ BLOSS/COSINE/SINE ที่ใช้จริงใน ramp01n01_SO.csv
-- commit: (ดูด้านล่างหลัง commit)
+- commit: 4bc4f09
 
 ---
 
