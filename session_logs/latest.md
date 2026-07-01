@@ -1,5 +1,18 @@
 # Session Log
 
+## [2026-07-01] สลับ mapping SINE/COSINE ใน _spiral_lx_type
+
+- ทำ: แก้ `src/smt/landxml.py` — `_SPIRAL_TYPE`: SINE→sinusoid (เดิม sineHalfWave), COSINE→sineHalfWave
+  (เดิม sinusoid) CLOTHOID→clothoid และ BLOSS→bloss เหมือนเดิม
+  - เพิ่ม test ใหม่ `test_spiral_lx_type_mapping` ใน `tests/test_landxml.py` ตรวจ mapping ทั้ง 4 ตัวตรงๆ
+    (ของเดิมไม่มี test คุม SINE/COSINE โดยตรง)
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
+- ผล: PASS 444/444 — smoke test: ตรวจ SettingOutTest.xml พบ PI4 (COSINE) → spiType="sineHalfWave",
+  PI5 (SINE) → spiType="sinusoid" ตรงกับ mapping ใหม่
+- commit: (ดูด้านล่างหลัง commit)
+
+---
+
 ## [2026-07-01] เปลี่ยนวิธีคำนวณ totalX/totalY/tanLong/tanShort เป็นแบบ canonical (ไม่ขึ้นกับทิศทางจริง)
 
 - ทำ: แก้ `src/smt/landxml.py`

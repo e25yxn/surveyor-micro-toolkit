@@ -5,7 +5,7 @@ import math
 import xml.etree.ElementTree as ET
 
 from smt.builders.alignment_builder import build_alignment_from_pi
-from smt.landxml import export_alignment_landxml
+from smt.landxml import _spiral_lx_type, export_alignment_landxml
 
 NS = 'http://www.landxml.org/schema/LandXML-1.2'
 
@@ -220,6 +220,12 @@ class TestSpiralIn:
         root = _parse(xml)
         for spiral in _find_all(root, 'Spiral'):
             assert spiral.get('spiType') == 'clothoid'
+
+    def test_spiral_lx_type_mapping(self):
+        assert _spiral_lx_type('CLOTHOID') == 'clothoid'
+        assert _spiral_lx_type('BLOSS') == 'bloss'
+        assert _spiral_lx_type('SINE') == 'sinusoid'
+        assert _spiral_lx_type('COSINE') == 'sineHalfWave'
 
     def test_no_to_from_curve_values(self):
         xml = export_alignment_landxml(_build(_verts_spiral()))
