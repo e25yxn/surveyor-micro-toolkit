@@ -154,17 +154,18 @@ class TestSimpleCurve:
         assert curve.get('rot') == 'right'
 
     def test_curve_dir_start(self):
-        # BP→PI direction is East → entry WCB = 90°
+        # BP→PI direction is East (WCB 90°) → Civil dir = (450-90)%360 = 0°
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert math.isclose(float(curve.get('dirStart')), 90.0, abs_tol=1e-3)
+        assert math.isclose(float(curve.get('dirStart')), 0.0, abs_tol=1e-3)
 
-    def test_curve_no_dir_end(self):
+    def test_curve_dir_end(self):
+        # Exit is South (WCB 180°) → Civil dir = (450-180)%360 = 270°
         xml = export_alignment_landxml(_build(_verts_curve()))
         root = _parse(xml)
         curve = _find_all(root, 'Curve')[0]
-        assert curve.get('dirEnd') is None
+        assert math.isclose(float(curve.get('dirEnd')), 270.0, abs_tol=1e-3)
 
     def test_radius_attribute(self):
         xml = export_alignment_landxml(_build(_verts_curve()))
@@ -246,17 +247,20 @@ class TestSpiralIn:
             assert spiral.find(f'{{{NS}}}Center') is None
 
     def test_spin_dir_start(self):
-        # SPIN entry is same direction as the approach tangent → 90°
+        # SPIN entry is same direction as the approach tangent (WCB 90° East)
+        # → Civil dir = (450-90)%360 = 0°
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
         spin = next(s for s in _find_all(root, 'Spiral') if s.get('spiType') == 'toCurve')
-        assert math.isclose(float(spin.get('dirStart')), 90.0, abs_tol=1e-3)
+        assert math.isclose(float(spin.get('dirStart')), 0.0, abs_tol=1e-3)
 
-    def test_spin_no_dir_end(self):
+    def test_spin_dir_end(self):
+        # dirEnd present on SPIN, matching the entry azimuth of the following
+        # curve (turning angle consumed over the spiral length)
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
         spin = next(s for s in _find_all(root, 'Spiral') if s.get('spiType') == 'toCurve')
-        assert spin.get('dirEnd') is None
+        assert spin.get('dirEnd') is not None
 
 
 class TestAnglePoint:

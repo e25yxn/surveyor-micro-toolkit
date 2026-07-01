@@ -6,7 +6,9 @@ that Civil 3D 2023 can import directly.
 Coordinates: "N E" format (northing first), 6 decimal places.
 Azimuths: decimal degrees.  Units: metric, linearUnit=meter.
 Sign convention: k>0 → rot="right" (right turn); k<0 → rot="left" (left turn).
-dirStart = entry azimuth in decimal degrees on every Curve and Spiral.
+dirStart/dirEnd = entry/exit azimuth converted to Civil 3D direction
+convention (decimal degrees, 0=East counterclockwise) via _to_civil_dir,
+on every Curve and Spiral.
 """
 from __future__ import annotations
 
@@ -24,6 +26,9 @@ ET.register_namespace('', _NS)
 
 _SPIRAL_TYPE = {
     'CLOTHOID': 'clothoid',
+    'BLOSS': 'bloss',
+    'SINE': 'sineHalfWave',
+    'COSINE': 'sinusoid',
 }
 
 
@@ -36,6 +41,18 @@ def _end_ne(i: int, elements: list[Element]) -> tuple[float, float]:
         return elements[i + 1].n, elements[i + 1].e
     state = calculate_exit_state(elements[-1])
     return state.n, state.e
+
+
+def _exit_azimuth(i: int, elements: list[Element]) -> float:
+    if i < len(elements) - 1:
+        return elements[i + 1].azimuth
+    return calculate_exit_state(elements[-1]).azimuth
+
+
+def _to_civil_dir(az_rad: float) -> float:
+    """Convert SMT survey azimuth (rad, 0=North clockwise) to Civil 3D
+    direction convention (decimal degrees, 0=East counterclockwise)."""
+    return (450.0 - fpmath.rad_to_deg(az_rad)) % 360.0
 
 
 def _curve_center(n: float, e: float, azimuth_rad: float, k: float) -> tuple[float, float]:
@@ -71,8 +88,9 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
 
     Units: metric/meter.  Coordinates: "N E" (northing first), 6 dp.
     rot="right" for k>0 (right turn), rot="left" for k<0 (left turn).
-    Curve: <Center> child tag; dirStart (entry azimuth, decimal degrees).
-    Spiral: dirStart (entry azimuth, decimal degrees).
+    Curve: <Center> child tag; dirStart/dirEnd (entry/exit azimuth, Civil 3D
+    direction convention, decimal degrees).
+    Spiral: dirStart/dirEnd (entry/exit azimuth, Civil 3D direction convention).
     radiusStart/radiusEnd="INF" for the infinite-radius end of spiral elements.
     """
     elements = build_result.elements
@@ -118,11 +136,13 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             k = el.k_in
             R = abs(1.0 / k)
             cn, ce = _curve_center(el.n, el.e, el.azimuth, k)
+            exit_az = _exit_azimuth(i, elements)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Curve',
                                 rot=_rotation(k),
                                 radius=f'{R:.6f}',
                                 length=f'{length:.6f}',
-                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}')
+                                dirStart=f'{_to_civil_dir(el.azimuth):.6f}',
+                                dirEnd=f'{_to_civil_dir(exit_az):.6f}')
             _sub(tag, 'Start',  _coord(el.n, el.e))
             _sub(tag, 'Center', _coord(cn, ce))
             _sub(tag, 'End',    _coord(end_n, end_e))
@@ -130,6 +150,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
         elif el.type == 'SPIN':
             k_out = el.k_out
             R_out = abs(1.0 / k_out)
+            exit_az = _exit_azimuth(i, elements)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
                                 type=_spiral_lx_type(el.transition),
                                 rot=_rotation(k_out),
@@ -137,13 +158,15 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 radiusEnd=f'{R_out:.6f}',
                                 spiType='toCurve',
                                 length=f'{length:.6f}',
-                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}')
+                                dirStart=f'{_to_civil_dir(el.azimuth):.6f}',
+                                dirEnd=f'{_to_civil_dir(exit_az):.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 
         elif el.type == 'SPOUT':
             k_in = el.k_in
             R_in = abs(1.0 / k_in)
+            exit_az = _exit_azimuth(i, elements)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
                                 type=_spiral_lx_type(el.transition),
                                 rot=_rotation(k_in),
@@ -151,7 +174,8 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 radiusEnd='INF',
                                 spiType='fromCurve',
                                 length=f'{length:.6f}',
-                                dirStart=f'{fpmath.rad_to_deg(el.azimuth):.6f}')
+                                dirStart=f'{_to_civil_dir(el.azimuth):.6f}',
+                                dirEnd=f'{_to_civil_dir(exit_az):.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LandXML xmlns="http://www.landxml.org/schema/LandXML-1.2" version="1.2" date="2026-07-01" time="12:31:19">
+  <Units>
+    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter" angularUnit="decimal dd" directionUnit="decimal dd" />
+  </Units>
+  <Alignments>
+    <Alignment name="ramp_test" length="1762.876172" staStart="0.000000">
+      <CoordGeom>
+        <Line length="0.001131">
+          <Start>1537796.012000 685410.478000</Start>
+          <End>1537796.012214 685410.479111</End>
+        </Line>
+        <Curve rot="left" radius="150.000000" length="53.875700" dirStart="190.886958" dirEnd="211.465959">
+          <Start>1537796.012214 685410.479111</Start>
+          <Center>1537648.711954 685438.809898</Center>
+          <End>1537776.654521 685360.511114</End>
+        </Curve>
+        <Line length="0.000279">
+          <Start>1537776.654521 685360.511114</Start>
+          <End>1537776.654666 685360.511351</End>
+        </Line>
+        <Curve rot="right" radius="150.000000" length="55.788115" dirStart="211.465959" dirEnd="190.156469">
+          <Start>1537776.654666 685360.511351</Start>
+          <Center>1537904.597233 685282.212567</Center>
+          <End>1537756.947753 685308.663108</End>
+        </Curve>
+        <Line length="81.775786">
+          <Start>1537756.947753 685308.663108</Start>
+          <End>1537742.527662 685228.168759</End>
+        </Line>
+        <Curve rot="right" radius="100.000000" length="53.867165" dirStart="190.156469" dirEnd="159.292857">
+          <Start>1537742.527662 685228.168759</Start>
+          <Center>1537840.960648 685210.535065</Center>
+          <End>1537747.420653 685175.175918</End>
+        </Curve>
+        <Line length="0.002006">
+          <Start>1537747.420653 685175.175918</Start>
+          <End>1537747.419943 685175.177795</End>
+        </Line>
+        <Curve rot="left" radius="100.000000" length="50.644022" dirStart="159.292857" dirEnd="188.309744">
+          <Start>1537747.419943 685175.177795</Start>
+          <Center>1537653.879948 685139.818648</Center>
+          <End>1537752.830071 685125.366201</End>
+        </Curve>
+        <Line length="472.475970">
+          <Start>1537752.830071 685125.366201</Start>
+          <End>1537684.545729 684657.850649</End>
+        </Line>
+        <Curve rot="left" radius="500.000000" length="75.314783" dirStart="188.309744" dirEnd="196.940182">
+          <Start>1537684.545729 684657.850649</Start>
+          <Center>1537189.795116 684730.112887</Center>
+          <End>1537668.099854 684584.426316</End>
+        </Curve>
+        <Line length="754.039483">
+          <Start>1537668.099854 684584.426316</Start>
+          <End>1537448.393000 683863.105000</End>
+        </Line>
+        <Line length="165.091732">
+          <Start>1537448.393000 683863.105000</Start>
+          <End>1537405.577000 683703.662000</End>
+        </Line>
+      </CoordGeom>
+    </Alignment>
+  </Alignments>
+</LandXML>

@@ -1,5 +1,51 @@
 # Session Log
 
+## [2026-07-01] แก้ spiral type mapping + dirStart/dirEnd Civil 3D convention + คืน dirEnd
+
+- ทำ: แก้ `src/smt/landxml.py` 3 จุดตามแผนที่อนุมัติ
+  1. `_spiral_lx_type`: CLOTHOID→clothoid, BLOSS→bloss, SINE→sineHalfWave, COSINE→sinusoid (ตรงกับ Civil 3D จริง แทนที่จะ map ทุกอย่างเป็น clothoid)
+  2. เพิ่ม `_to_civil_dir(az_rad)` แปลง SMT survey azimuth (radian, 0=North clockwise) → Civil 3D dir (decimal degrees, 0=East counterclockwise) ด้วย `(450 - deg) mod 360`; ใช้แทน `rad_to_deg` ตรงๆ ทุกจุดที่เขียน dirStart
+  3. เพิ่ม `dirEnd` กลับเข้า Curve/Spiral ทุกตัว โดยใช้ `_to_civil_dir` กับ exit azimuth (เพิ่ม helper `_exit_azimuth`)
+  - `_rotation` ตรวจแล้วคืน "right"/"left" (ไม่ใช่ "cw"/"ccw") — ของเดิมถูกอยู่แล้วตาม test ที่ผ่าน จึงไม่แก้
+  - อัปเดต `tests/test_landxml.py`: `test_curve_dir_start` (คาด 0.0 แทน 90.0 ตาม civil convention), เพิ่ม `test_curve_dir_end` (คาด 270.0), `test_spin_dir_start` (คาด 0.0), เพิ่ม `test_spin_dir_end` (คาดว่า dirEnd ไม่ใช่ None)
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml` → `smt export-landxml test_data/ramp01n01_SO.csv --name ramp_test --out test_data/mainline_test.xml`
+- ผล: PASS 438/438 — smoke test: ทั้งสองไฟล์ export สำเร็จ, ตรวจ XML พบ dirStart/dirEnd ต่อเนื่องกันระหว่าง element ถัดไป และ spiral type ตรงกับ BLOSS/COSINE/SINE ที่ใช้จริงใน ramp01n01_SO.csv
+- commit: (ดูด้านล่างหลัง commit)
+
+---
+
+## [2026-07-01] ลบ dirEnd ออกจาก Curve และ Spiral ใน LandXML export
+
+- ทำ: ลบ `dirEnd` attribute ออกจาก Curve, SPIN, SPOUT ทุกตัวใน `src/smt/landxml.py`
+  - ลบ `_exit_azimuth_deg` helper (กลายเป็น dead code)
+  - อัปเดต module docstring และ function docstring
+  - แก้ `tests/test_landxml.py`: เปลี่ยน `test_curve_dir_end` → `test_curve_no_dir_end` (assert `dirEnd is None`) และ `test_spin_dir_end_is_float` → `test_spin_no_dir_end`
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
+- ผล: PASS 438/438 — smoke test: XML regenerated ปกติ
+- commit: 1280fb0
+
+---
+
+## [2026-07-01] Map BLOSS/COSINE/SINE spiral types to clothoid in LandXML export
+
+- ทำ: แก้ `_SPIRAL_TYPE` dict ใน `src/smt/landxml.py` — ลบ BLOSS/COSINE/SINE ออก (ทั้ง 3 ตัว fall through เป็น 'clothoid' via default ใน `.get(..., 'clothoid')` อยู่แล้ว)
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
+- ผล: PASS 438/438 (ไม่มี regression) — smoke test: XML regenerated ปกติ
+- commit: abc2e7c
+
+---
+
+## [2026-06-30] LandXML 1.2 export — landxml.py + CLI + 27 tests
+
+- ทำ: สร้าง LandXML 1.2 export feature ครบ 3 ไฟล์
+  - `src/smt/landxml.py`: pure function `export_alignment_landxml(build_result, name)` — T→`<Line>`, C→`<Curve>` + Center, SPIN→`<Spiral radiusStart="INF">`, SPOUT→`<Spiral radiusEnd="INF">`, rot="right"/"left" (Civil 3D 2023), transition types mapped ครบ (clothoid/bloss/cosineCurve/sineCurve)
+  - `src/smt/cli.py`: เพิ่ม subcommand `smt export-landxml <pi.csv> [--name] [--out]`
+  - `tests/test_landxml.py`: 27 tests — TestTangentOnly (7), TestSimpleCurve (7), TestSpiralIn (8), TestAnglePoint (5)
+- คำสั่ง: `pytest tests/test_landxml.py -v`, `pytest -q`, `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest`
+- ผล: PASS 27/27 (landxml), PASS 434/434 (full suite, ไม่มี regression)
+- smoke test: XML ถูกต้องครบทุก element type รวม BLOSS/COSINE/SINE spirals และ angle points
+- commit: f1f07d1
+
 ## [2026-06-30] เปลี่ยนชื่อ function ใน SMT_Geometry.bas + อัปเดต README
 
 - ทำ: เปลี่ยนชื่อ 2 functions ใน `reference/vba/SMT_Geometry.bas` (ทุกที่: declaration, comment, expected values)
