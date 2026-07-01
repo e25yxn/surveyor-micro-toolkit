@@ -20,7 +20,7 @@
 - คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
 - ผล: PASS 443/443 — smoke test: ตรวจ SettingOutTest.xml พบ SPIN/SPOUT คู่เดียวกัน (R, length เท่ากัน)
   ได้ totalX/totalY/tanLong/tanShort เท่ากันทุกคู่ ค่าทั้งหมดเป็นบวก, Curve ไม่เปลี่ยนแปลง
-- commit: (ดูด้านล่างหลัง commit)
+- commit: 3715369
 
 ---
 
