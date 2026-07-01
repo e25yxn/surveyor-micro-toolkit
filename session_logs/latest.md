@@ -1,5 +1,24 @@
 # Session Log
 
+## [2026-07-01] ลบ dirStart/dirEnd ออกจาก Spiral, เพิ่ม theta แทน (Curve ไม่แตะ)
+
+- ทำ: แก้ `src/smt/landxml.py` ส่วนสร้าง Spiral (SPIN และ SPOUT)
+  - ลบ `dirStart`/`dirEnd` ออกทั้งหมดจาก Spiral (Civil 3D ไม่ใช้ attribute นี้กับ Spiral)
+  - เพิ่ม attribute `theta` = มุมเลี้ยวรวมของ spiral (องศา, ค่าสัมบูรณ์) คำนวณจาก
+    `theta_deg = abs(rad_to_deg(calculate_angle_diff(exit_azimuth, entry_azimuth)))`
+    โดยเพิ่ม helper `_theta_deg` ใหม่
+  - Curve ยังคงมี `dirStart`/`dirEnd` เหมือนเดิม ไม่แตะ
+  - attribute อื่นของ Spiral (rot, radiusStart, radiusEnd, spiType, length) คงเดิม
+  - อัปเดต docstring
+  - แก้ `tests/test_landxml.py`: เอา `test_spin_dir_start`/`test_spin_dir_end` ออก แทนที่ด้วย
+    `test_spiral_no_dir_start`, `test_spiral_no_dir_end`, `test_spin_theta`, `test_spout_theta`
+    (คาดค่า theta ≈ 4.297183° จาก 0.5 * k_out * L)
+- คำสั่ง: `pytest -q` → `smt export-landxml test_data/SettingOutTest.csv --name SettingOutTest --out test_data/SettingOutTest.xml`
+- ผล: PASS 440/440 — smoke test: ตรวจ SettingOutTest.xml พบ Spiral มี theta ทุกตัว ไม่มี dirStart/dirEnd หลงเหลือ, Curve ยังมี dirStart/dirEnd ครบ
+- commit: (ดูด้านล่างหลัง commit)
+
+---
+
 ## [2026-07-01] ลบ attribute "type" ออกจาก Spiral, ใช้ "spiType" ใส่รูปร่าง spiral แทน toCurve/fromCurve
 
 - ทำ: แก้ `src/smt/landxml.py` ส่วนสร้าง Spiral (SPIN และ SPOUT)

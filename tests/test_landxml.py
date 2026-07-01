@@ -244,21 +244,31 @@ class TestSpiralIn:
             assert spiral.find(f'{{{NS}}}End') is not None
             assert spiral.find(f'{{{NS}}}Center') is None
 
-    def test_spin_dir_start(self):
-        # SPIN entry is same direction as the approach tangent (WCB 90° East)
-        # → Civil dir = (450-90)%360 = 0°
+    def test_spiral_no_dir_start(self):
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
-        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
-        assert math.isclose(float(spin.get('dirStart')), 0.0, abs_tol=1e-3)
+        for spiral in _find_all(root, 'Spiral'):
+            assert spiral.get('dirStart') is None
 
-    def test_spin_dir_end(self):
-        # dirEnd present on SPIN, matching the entry azimuth of the following
-        # curve (turning angle consumed over the spiral length)
+    def test_spiral_no_dir_end(self):
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        for spiral in _find_all(root, 'Spiral'):
+            assert spiral.get('dirEnd') is None
+
+    def test_spin_theta(self):
+        # theta = 0.5 * k_out * L = 0.5 * (1/400) * 60 rad = 4.297183 deg
         xml = export_alignment_landxml(_build(_verts_spiral()))
         root = _parse(xml)
         spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
-        assert spin.get('dirEnd') is not None
+        assert math.isclose(float(spin.get('theta')), 4.297183, abs_tol=1e-3)
+
+    def test_spout_theta(self):
+        # symmetric spiral out of the same curve → same total turning angle
+        xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        spout = next(s for s in _find_all(root, 'Spiral') if s.get('radiusEnd') == 'INF')
+        assert math.isclose(float(spout.get('theta')), 4.297183, abs_tol=1e-3)
 
 
 class TestAnglePoint:

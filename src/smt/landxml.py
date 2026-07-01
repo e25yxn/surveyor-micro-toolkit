@@ -8,7 +8,8 @@ Azimuths: decimal degrees.  Units: metric, linearUnit=meter.
 Sign convention: k>0 → rot="cw" (right turn); k<0 → rot="ccw" (left turn).
 dirStart/dirEnd = entry/exit azimuth converted to Civil 3D direction
 convention (decimal degrees, 0=East counterclockwise) via _to_civil_dir,
-on every Curve and Spiral.
+on every Curve.  Spiral has no dirStart/dirEnd (Civil 3D doesn't use them
+there); instead it carries theta, the absolute total turning angle (dd).
 """
 from __future__ import annotations
 
@@ -55,6 +56,11 @@ def _to_civil_dir(az_rad: float) -> float:
     return (450.0 - fpmath.rad_to_deg(az_rad)) % 360.0
 
 
+def _theta_deg(entry_azimuth_rad: float, exit_azimuth_rad: float) -> float:
+    """Absolute total turning angle of a spiral (decimal degrees)."""
+    return abs(fpmath.rad_to_deg(fpmath.calculate_angle_diff(exit_azimuth_rad, entry_azimuth_rad)))
+
+
 def _curve_center(n: float, e: float, azimuth_rad: float, k: float) -> tuple[float, float]:
     R = 1.0 / k   # signed: k>0 → right, k<0 → left
     return n - R * math.sin(azimuth_rad), e + R * math.cos(azimuth_rad)
@@ -90,9 +96,10 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
     rot="cw" for k>0 (right turn), rot="ccw" for k<0 (left turn).
     Curve: <Center> child tag; dirStart/dirEnd (entry/exit azimuth, Civil 3D
     direction convention, decimal degrees).
-    Spiral: dirStart/dirEnd (entry/exit azimuth, Civil 3D direction convention);
-    spiType holds the spiral shape (clothoid/bloss/sinusoid/sineHalfWave) via
-    _spiral_lx_type — no separate "type" attribute, no toCurve/fromCurve.
+    Spiral: no dirStart/dirEnd; theta (absolute total turning angle, decimal
+    degrees) instead.  spiType holds the spiral shape (clothoid/bloss/
+    sinusoid/sineHalfWave) via _spiral_lx_type — no "type" attribute,
+    no toCurve/fromCurve.
     radiusStart/radiusEnd="INF" for the infinite-radius end of spiral elements.
     """
     elements = build_result.elements
@@ -159,8 +166,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 radiusEnd=f'{R_out:.6f}',
                                 spiType=_spiral_lx_type(el.transition),
                                 length=f'{length:.6f}',
-                                dirStart=f'{_to_civil_dir(el.azimuth):.6f}',
-                                dirEnd=f'{_to_civil_dir(exit_az):.6f}')
+                                theta=f'{_theta_deg(el.azimuth, exit_az):.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 
@@ -174,8 +180,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 radiusEnd='INF',
                                 spiType=_spiral_lx_type(el.transition),
                                 length=f'{length:.6f}',
-                                dirStart=f'{_to_civil_dir(el.azimuth):.6f}',
-                                dirEnd=f'{_to_civil_dir(exit_az):.6f}')
+                                theta=f'{_theta_deg(el.azimuth, exit_az):.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
 
