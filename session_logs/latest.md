@@ -19,7 +19,7 @@
   → ทดสอบ `webhelpers.parse_element_rows` กับไฟล์จริง `test_data/build_out/elements_output.csv`
 - ผล: PASS — helper tests 8/8, full suite 452/452, smoke test HTTP 200 ไม่มี error ใน log,
   ไฟล์จริง parse ได้ 31 elements ถูกต้อง
-- commit: (จะเติมหลัง commit)
+- commit: df7d8fd
 - หมายเหตุ: ยังไม่ push — รอคำสั่งผู้ใช้
 
 ## [2026-07-01] สลับ mapping SINE/COSINE ใน _spiral_lx_type
