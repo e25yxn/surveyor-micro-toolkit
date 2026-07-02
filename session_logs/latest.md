@@ -1,5 +1,27 @@
 # Session Log
 
+## [2026-07-02] Streamlit web UI (app.py) — 5 tabs, revision 2 ของแผน
+
+- ทำ: implement ตามแผนที่อนุมัติแล้ว (`session_logs/plan_streamlit_ui_20260701_1400.md`, revision 2):
+  - สร้าง `src/smt/webhelpers.py` — 4 pure helper functions (`read_csv_rows`,
+    `parse_field_points`, `parse_drawing_points`, `parse_element_rows`) ไม่ import
+    streamlit เลย, mirror `cli.py`'s private helpers ตรงๆ (รวมถึง `disc` default = `''`
+    ไม่ใช่ `0.0` ตามจุดที่แก้ในแผน)
+  - สร้าง `app.py` (root) — Streamlit UI 5 tabs (Build, Cross-Check, Compare Drawing,
+    Fit Radius, Export LandXML) import helper จาก `smt.webhelpers`
+  - Fit Radius verification table + Compare Drawing table มี column `status` แยก
+    (`OK`/`OUTSIDE_ALIGNMENT`/`HIP`) ไม่ปนกับตัวเลขใน `calc_N/calc_E/gap_m` แล้ว
+  - เพิ่ม `tests/test_app_helpers.py` (8 tests) import ตรงจาก `smt.webhelpers`
+  - แก้ `pyproject.toml` — เพิ่ม `[project.optional-dependencies] ui = ["streamlit>=1.30", "pandas>=1.5"]`
+    (เพิ่ม pandas เพราะ `app.py` ใช้ `DataFrame.to_csv()` ตามที่แผนระบุไว้ — streamlit เองก็ต้องพึ่ง pandas อยู่แล้ว)
+- คำสั่ง: `pytest tests/test_app_helpers.py -q` → `pytest -q` → smoke test จริงด้วย
+  `streamlit run app.py --server.headless=true --server.port=8765` + `curl localhost:8765`
+  → ทดสอบ `webhelpers.parse_element_rows` กับไฟล์จริง `test_data/build_out/elements_output.csv`
+- ผล: PASS — helper tests 8/8, full suite 452/452, smoke test HTTP 200 ไม่มี error ใน log,
+  ไฟล์จริง parse ได้ 31 elements ถูกต้อง
+- commit: (จะเติมหลัง commit)
+- หมายเหตุ: ยังไม่ push — รอคำสั่งผู้ใช้
+
 ## [2026-07-01] สลับ mapping SINE/COSINE ใน _spiral_lx_type
 
 - ทำ: แก้ `src/smt/landxml.py` — `_SPIRAL_TYPE`: SINE→sinusoid (เดิม sineHalfWave), COSINE→sineHalfWave
