@@ -1,5 +1,86 @@
 # Session Log
 
+## [2026-07-03] ขยาย .gitignore pattern build_out/ → build_out*/
+
+- ทำ: แก้ `.gitignore` บรรทัด `test_data/build_out/` → `test_data/build_out*/`
+  เพื่อ ignore ทุกโฟลเดอร์ output ที่ขึ้นต้นด้วย build_out ไม่ใช่แค่ชื่อเดียว
+- คำสั่ง: Edit tool → `git status` (ยืนยัน `test_data/build_out_compound/` หายจาก
+  Untracked files แล้ว) → Write `.git\smt_commit_msg.txt` → `git add .gitignore` →
+  `git commit -F .git\smt_commit_msg.txt`
+- ผล: PASS — `git status` ยืนยัน pattern ใหม่ทำงานถูกต้อง ไม่มี test เกี่ยวข้อง (ไฟล์ config)
+- commit: f2e57bb
+
+## [2026-07-03] แก้เอกสาร CLAUDE.md — บันทึกบั๊ก R-drop, ground truth files, roadmap
+
+- ทำ: แก้ `CLAUDE.md` 6 จุดตามที่อาจารย์สั่ง (งานแก้เอกสารเท่านั้น ไม่แตะโค้ด)
+  1. เพิ่มรายการใน Known limits: `_flush_pending` ทิ้งค่า R แถว PI เงียบๆ เมื่อมี compound
+     sub-row ตามมา (ยังไม่แก้), PI7 ใน SettingOutTest.csv ได้รับผลกระทบห้ามใช้อ้างอิง,
+     transition COSINE ผิดจาก Civil 3D ~3cm ที่ R=900 L=100 (CLOTHOID/BLOSS/SINE ยืนยันตรงแล้ว)
+  2. เพิ่ม section "Civil 3D Interop ground truth references" — smt-test1.xml, AL_compound.xml
+     + compound_curve.csv + so_compound_curve.csv (ยืนยันต่ำกว่า 1mm), py-1.xml
+  3. เพิ่ม section "Spiral formula verification methodology" — ต้องมี ground truth ≥2 ชุด
+     ต่อ 1 shape ก่อนสรุปว่าสูตรถูกต้อง
+  4. เพิ่มกฎใน 4.3 VBA เฉพาะ — แก้ `_shape_integral` ต้องอัปเดต SMT_Core.bas/SMT_Alignment.bas
+     พร้อมกันเสมอ
+  5. เพิ่ม section "Roadmap" — multicurve.py solver, R-sign auto-derive (backward compatible),
+     แยก curvature.py ออกจาก alignment.py
+  6. เพิ่มกฎใน Extension policy — Civil 3D interop นับเป็น oracle อีกชั้น ต้องอ้างอิงไฟล์จริงเสมอ
+- คำสั่ง: Edit tool ×4 → แสดงเนื้อหาไฟล์เต็มให้ตรวจ → Write `.git\smt_commit_msg.txt` → `git add CLAUDE.md` → `git commit -F .git\smt_commit_msg.txt`
+- ผล: PASS (ไม่มี test เกี่ยวข้อง — งานเอกสารล้วน)
+- commit: 8f9c9f4
+- หมายเหตุ: commit เฉพาะ CLAUDE.md ไฟล์เดียว ไม่แตะไฟล์อื่นที่ค้างอยู่ (session_logs/latest.md เดิม,
+  test_data/SettingOutTest.csv, ไฟล์ใหม่ที่ยัง untracked)
+
+## [2026-07-03 16:17] ทดสอบ compound curve engine ด้วยไฟล์ใหม่ pi_compound_curve.csv
+
+- ทำ: สร้าง `test_data/pi_compound_curve.csv` (PI แถวเดียว, RADIUS ว่าง, compound
+  2 arc R=30/R=45 ในแถวว่างที่ตามมา — pattern ที่ผ่าน `test_compound()` จริง) แล้วรัน
+  `smt build` เทียบผลกับ ground truth จาก Civil 3D (PC/PCC/EP)
+- คำสั่ง: `smt build test_data/pi_compound_curve.csv --out-dir test_data/build_out_compound`
+- ผล: PASS
+  - รอบแรก (Delta arc R=30 ว่างเปล่าตามที่ระบุ) → **crash ทันที** `KeyError: 'delta'`
+    ที่ `alignment_builder.py:77` เพราะ arc ที่ไม่ใช่ตัวสุดท้ายต้องมี Delta เสมอ (พิสูจน์แล้วว่า
+    เป็นปัญหา input CSV ไม่ใช่บั๊กคำนวณ — โค้ดยังรันไม่ถึงขั้นคำนวณจริง)
+  - คำนวณ Delta arc แรกจาก ground truth เอง (อิสระจากโค้ด SMT) ได้ 102.507634° (สอดคล้องกับ
+    ระยะ arc length เทียบ station diff ต่างกัน < 1mm) → เติมลง CSV แล้วรันใหม่ → build สำเร็จ
+    ไม่มี `warning:` ปรากฏบน stderr เลย (issues list ว่าง)
+  - Element ที่ได้ 4 แถว: T (BP→PC) → C R=30 (PC→PCC) → C R=45 (PCC→PT) → T เล็กมาก
+    (PT→EP ยาว 0.000831m, เป็น rounding closure ไม่ใช่เส้นตรงจริงคั่นระหว่างโค้ง) — สองโค้งต่อกัน
+    ตรงตามคาด ไม่มีเส้นตรงคั่น
+  - เทียบ ground truth: PC Δsta=0.7mm ΔN=0.2mm ΔE=0.24mm | PCC (จุดต่อ R=30→R=45)
+    Δsta=0.572mm ΔN=0.522mm ΔE=0.288mm | EP Δsta=0.58mm ΔN=ΔE=0mm — ทุกจุดต่างกัน
+    ต่ำกว่า 1mm ทั้งหมด → **compound curve engine คำนวณถูกต้อง**
+- commit: (ไม่มี — ยังไม่ commit ไฟล์ CSV ใหม่ รอผู้ใช้สั่ง)
+- หมายเหตุ: ปัญหาเดิมที่เจอใน SettingOutTest.csv/PI7 (ข้อมูล arc แรกหายเงียบ) คือปัญหา input
+  format ไม่ใช่บั๊ก engine — ยืนยันด้วยผลทดสอบนี้
+
+## [2026-07-02] Audit: git diff test_data/build_out/*.csv + เตรียม smoke test 5 tabs
+
+- ทำ: (งานอ่าน/ตรวจสอบเท่านั้น ไม่แก้ core code)
+  - รัน `git diff` บน `test_data/build_out/controls_so_output.csv` และ `elements_output.csv`
+    ที่ค้าง modified มาตั้งแต่ก่อน session นี้ → พบว่าค่าตัวเลขไม่เปลี่ยน เปลี่ยนแค่ precision
+    (3dp→6dp) กับ Transition column (T/C แถวเคยมี CLOTHOID ติดผิดๆ ตอนนี้ว่างถูกต้อง)
+  - สืบ git log เจอสาเหตุ: commit `dad90fb` (smt build: 6-decimal output, fix Transition
+    column) แก้ format ใน cli.py แต่ไฟล์ output ใน test_data/build_out/ ถูก commit ครั้งล่าสุดที่
+    `3b0afff` ซึ่งเกิดก่อนหน้านั้น — ไฟล์เลย stale ไม่ใช่บั๊ก สรุปว่าปลอดภัย restore ทิ้งได้
+    (ยังไม่ restore/commit ให้ รอผู้ใช้ตัดสินใจ)
+  - พบเพิ่ม: `.gitignore` มี `test_data/build_out/` อยู่แล้วแต่สองไฟล์นี้ยัง track ค้างจากก่อนกฎ ignore
+  - ตรวจ header ไฟล์ทดสอบใน test_data/ ที่จะใช้ smoke test — พบว่าไฟล์ที่ผู้ใช้ระบุไว้สำหรับ
+    Cross-Check tab (`r01n01_so_crosscheck.csv`) เป็น drawing-point format (Name,STA,N,E)
+    ไม่ใช่ field-survey format (NAME,N,E,Z,DISC) ที่ tab ต้องการ → แก้เป็น `Bulk_cross-check.csv`
+    แทน; ไฟล์ drawing point ที่ตรง alignment เดียวกับ SettingOutTest.csv คือ
+    `test_data/build_out/controls_so_output.csv` (ไม่ใช่ r01n01_so_crosscheck.csv ซึ่งเป็นคนละ
+    alignment/ramp01n01)
+  - สร้าง `~/.streamlit/credentials.toml` (email="") เพื่อข้าม onboarding prompt ที่ทำให้
+    `streamlit run app.py` แบบไม่ headless ค้างรอ stdin ตอนรันครั้งแรกบนเครื่องนี้
+  - เปิด `streamlit run app.py --server.port=8501` (ไม่ headless ตามที่ขอ) ทิ้งไว้ให้เปิดเบราว์เซอร์ทดสอบเอง
+- คำสั่ง: `git diff`, `git log --oneline -p -- src/smt/cli.py`, `git log -S"transition_val"`,
+  `git ls-files test_data/build_out/`, `streamlit run app.py --server.port=8501` (background)
+- ผล: PASS — server ตอบ HTTP 200, ไม่มี error ใน log
+- commit: ไม่มี (งานอ่าน/ตรวจสอบ + เปิด dev server เท่านั้น)
+- หมายเหตุ: ระหว่างทำงานพลาดเผลอ Write ทับ `session_logs/latest.md` ด้วย placeholder ชั่วขณะหนึ่ง
+  — กู้คืนด้วย `git restore` ทันที ไม่มีข้อมูลสูญหาย
+
 ## [2026-07-02] Streamlit web UI (app.py) — 5 tabs, revision 2 ของแผน
 
 - ทำ: implement ตามแผนที่อนุมัติแล้ว (`session_logs/plan_streamlit_ui_20260701_1400.md`, revision 2):

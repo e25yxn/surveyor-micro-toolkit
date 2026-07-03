@@ -12,6 +12,6 @@ build/
 .DS_Store
 output.png
 output/
-test_data/build_out/
+test_data/build_out*/
 *.xlsm
 *.xlam
