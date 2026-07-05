@@ -1,5 +1,43 @@
 # Session Log
 
+## [2026-07-05] สรุปรวม: แก้ COSINE closed-form + regenerate golden fixture (ปิดงานสองแผน)
+
+- ทำ: ครบทั้ง 2 แผนที่เกี่ยวข้องกัน
+  แผนที่หนึ่ง (session_logs/plan_cosine_sinehalfwave_fix.md):
+  1. แก้ `src/smt/alignment.py` — COSINE ใช้สูตรปิด Civil 3D Sine Half-Wave แทน Simpson
+     เดิม ทั้ง SPIN (สูตรตรง) และ SPOUT (mirror ผ่าน s↔L−s) พร้อมอัปเดต docstring
+  2. เพิ่ม 3 test ใหม่ (ground truth R=900/L=100, R=250/L=50, symmetry SPIN/SPOUT) — PASS
+  3. Mark xfail(strict=True) 9 ตัวที่ยังผูกกับ golden fixture เดิม (Simpson-based)
+  4. Smoke test `smt export-landxml` จริง — ยืนยัน landxml.py ไม่ต้องแก้ พบ known
+     limitation ใหม่ (`_build_curve_sub_elements` สมมติ theta เชิงเส้นผิดสำหรับ COSINE)
+     บันทึกแยกไว้ใน session_logs/investigate_cosine_builder_mismatch_20260705.md
+
+  แผนที่สอง (session_logs/report_xfail_mismatch_20260705.md + งาน regenerate):
+  5. ตรวจผลจริงของ xfail 9 ตัว พบว่า 3 ตัวคาดผิด (pass จริง) และมี 1 ตัวใหม่ที่พังจริง
+     โดยไม่คาดคิด (station คลาดเคลื่อน 8.4 ซม. ผ่าน `_calculate_end_displacement`) —
+     สรุปจริง 9 ตัว (ไม่ใช่ 10 ตามที่ประเมินตอนแรก)
+  6. เขียนสคริปต์ regenerate (`regenerate_cosine_golden_fixture.py`, scratchpad, ไม่ commit)
+     dry-run แสดง diff เต็มให้ตรวจก่อน แล้วจึง apply จริงกับ `tests/golden/tables.json`
+     และ `reference/tables.json` (20 element rows + 20 control rows เปลี่ยน, เหมือนกัน
+     ทุกตัวอักษรทั้งสองไฟล์)
+  7. ลบ xfail ออก 7 ตัวที่ fixture ใหม่แก้ตรงแล้ว แต่พบว่าเหลือ 2 ตัว
+     (`test_chain_has_no_gaps`, `test_exit_state_matches_next_entry`) ยังพังจริงจาก
+     สาเหตุใหม่: mismatch ของ `_build_curve_sub_elements` ที่เคยพบตอน smoke test ติดเข้าไป
+     ในตัวเลขคงที่ของ fixture เองด้วย (ช่องว่าง 34.26 arcsec ที่รอยต่อ SPOUT-COSINE
+     ยืนยันด้วย 2 วิธีอิสระตรงกันถึงหลักที่ 6) — mark xfail ใหม่ 2 ตัวนี้พร้อมเหตุผลที่ถูกต้อง
+     แทนเหตุผลเดิม อัปเดต investigate_cosine_builder_mismatch_20260705.md และ CLAUDE.md
+- คำสั่ง: แก้โค้ด/เทส → `pytest -q` → `smt export-landxml` → เขียน/รัน regenerate script
+  (dry-run แล้ว apply) → `pytest -q` → Write `.git\smt_commit_msg.txt` → `git add` → `git commit -F`
+  (4 ครั้งแยกกันตามลำดับงาน)
+- ผล: PASS — สถานะสุดท้าย `455 passed, 2 xfailed, 0 failed` (ลดจาก 9 xfail เหลือ 2 ตัว
+  ที่มีเหตุผลยืนยันแน่นอนแล้ว ไม่ใช่ของค้างที่ยังไม่ตรวจ)
+- commit: 301245c (แก้ COSINE core + tests + xfail 9 + report), db39b85 (บันทึก known
+  limitation builder mismatch), 162ef98 (session log), aa8038c (regenerate fixture +
+  ลบ xfail 7 + เพิ่ม xfail ใหม่ 2 พร้อมเหตุผลที่ยืนยันแล้ว)
+- หมายเหตุ: งานค้างที่ยังไม่วางแผน — แก้ `_build_curve_sub_elements` ให้รองรับทุก
+  transition shape (ไม่ใช่แค่ COSINE) เพื่อลบ xfail 2 ตัวสุดท้ายได้ในที่สุด ยังไม่มีแผนแยก
+  สำหรับงานนี้
+
 ## [2026-07-05] แก้ COSINE transition ให้ใช้สูตรปิด Civil 3D Sine Half-Wave (แผนหลัก)
 
 - ทำ: ทำตาม session_logs/plan_cosine_sinehalfwave_fix.md ที่อนุมัติแล้วเต็มขั้นตอน
