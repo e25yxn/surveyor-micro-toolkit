@@ -67,6 +67,80 @@ All code paths and tests added for this extension are marked with the comment:
 ### Regression guarantee
 All 250 pre-existing oracle tests continue to pass (verified in commit `cdf896d`).
 Angle-point paths are additive; no existing public signature was changed.
+
+---
+
+## EXT-003 — COSINE Transition: Civil 3D Sine Half-Wave Closed Form
+
+**Date:** 2026-07-05
+**Commits:** `301245c`, `db39b85`, `162ef98`, `aa8038c`, `ce75e4a`, `214db4e` (see
+`session_logs/latest.md` for the full commit-by-commit breakdown), plus the
+`_build_curve_sub_elements` fix and second fixture regeneration committed alongside
+this doc entry.
+**Modules:** `src/smt/alignment.py`, `src/smt/builders/alignment_builder.py`
+**Tests:** `tests/test_alignment.py` (`test_cosine_closed_form_endpoint_r900_l100`,
+`test_cosine_closed_form_endpoint_r250_l50`, `test_cosine_spin_spout_symmetry_matches_civil3d`)
+plus the full suite
+
+### Oracle limitation
+`reference/Alignment.gs` and `reference/AlignmentBuilder.gs` model the COSINE transition
+shape as a curvature-vs-arc-length integral (`f(τ)=(1-cos πτ)/2`), the same mechanism as
+CLOTHOID/BLOSS/SINE. This does not match real Autodesk Civil 3D COSINE spirals ("Sine
+Half-Wavelength Diminishing Tangent Curve"), which are defined by a closed-form y(x) in
+tangent-projected distance, not arc length — verified independently against 2 Civil 3D
+ground-truth points. Comparing the old formula's tanLong/tanShort against the verified
+closed-form values: **~2.90cm off at R=900/L=100**, **~4.71cm off at R=250/L=50**.
+Because `AlignmentBuilder.gs` also sizes a PI-group's circular arc assuming every
+spiral's total turning angle equals `Ls/(2R)` (exact for the Simpson-based shapes, since
+`∫₀¹f=1/2` always), fixing only the point-position formula left a second, smaller
+(~34 arcsecond) inconsistency at the circular-arc-sizing level.
+
+### What we added
+1. `alignment.py::calculate_point_on_element` — new closed-form COSINE branch (SPIN
+   direct, SPOUT mirrored via s↔L−s), replacing Simpson integration for this shape only.
+   See `session_logs/plan_cosine_sinehalfwave_fix.md`,
+   `session_logs/investigate_sinehalfwave_formula.md`.
+2. `alignment_builder.py::_build_curve_sub_elements` — real spiral turning angle via a
+   synthetic SPIN element + `calculate_exit_state`, replacing the `Ls/(2R)` assumption.
+   See `session_logs/investigate_cosine_builder_mismatch_20260705.md`,
+   `session_logs/investigate_build_curve_sub_elements_fix.md`.
+3. `tests/golden/tables.json` + `reference/tables.json` regenerated twice (once per
+   change above) so the shared golden fixture reflects both fixes.
+
+### Mathematical basis
+- COSINE closed form: `X = L - 0.0226689447*L³/R²`,
+  `y(x) = X²/R·(a²/4 - (1-cos πa)/(2π²))`, `theta(x) = atan(X/R·(a/2 - sin(πa)/(2π)))`,
+  `a=x/X`. Source: Autodesk Civil 3D 2026 Help, "About Transition Definitions".
+- SPOUT mirror: `theta_SPOUT(d) = Θ − theta_SPIN(L−d)`, position via reflect+rotate —
+  confirmed against real Civil 3D data that SPIN/SPOUT of equal R,L share identical
+  theta/totalX/totalY/tanLong/tanShort.
+- Builder fix: the real turning angle Θ replaces `Ls/(2R)`; proven identical to the old
+  formula for CLOTHOID/BLOSS/SINE (diffs ~1e-16, float noise, checked across 6
+  R/Ls/trans combinations) since those three satisfy `F(1)=1/2` exactly — only COSINE's
+  Θ genuinely differs (`atan(X/(2R)) ≠ L/(2R)`).
+
+### Code markers
+```python
+# EXTENSION: beyond oracle — reference/AlignmentBuilder.gs (lines 53-54) still
+# assumes theta=Ls/(2R); real turning angle needed for the COSINE closed form.
+```
+
+### Known limitations (unresolved, documented in full in alignment.py's docstring)
+- `x≈s` (tangent-projected distance approximated by arc length) costs ~1.5-4.5mm at the
+  element's own exit; no interior point is independently verified at all.
+- The SPOUT mid-curve trace is derived from the boundary mirror only — no independent
+  Civil 3D ground truth confirms any SPOUT interior point.
+- LandXML's `totalX` field reports `L`, not the true closed-form `X`.
+
+### Regression guarantee
+CLOTHOID/BLOSS/SINE are numerically unaffected by either change — proven, not assumed
+(see Q3 in `session_logs/investigate_build_curve_sub_elements_fix.md` for the builder
+fix, and the unchanged golden-fixture rows outside the COSINE PI-group for the
+closed-form fix). Confirmed: `pytest -q` → `457 passed, 0 xfailed, 0 failed` — fully
+green, both xfail marks removed, no regression anywhere in the suite.
+
+---
+
 ## EXT-002 — Radius Optimisation (fit_radius)
 
 **วันที่:** 2026-06-29

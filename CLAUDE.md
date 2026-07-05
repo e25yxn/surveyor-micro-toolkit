@@ -98,21 +98,21 @@ All phases complete — 407/407 tests passing.
   ยังไม่ได้แก้ พบเมื่อ 2026-07-03
 - `test_data/SettingOutTest.csv` PI7 ได้รับผลกระทบจากบั๊กข้างต้น ห้ามใช้ PI7 อ้างอิงจนกว่าจะแก้ไฟล์
 - transition COSINE แก้แล้วเมื่อ 2026-07-05 ให้ใช้สูตรปิด Civil 3D Sine Half-Wave แทน Simpson เดิม
-  (เดิมต่าง ~3 ซม. ที่ R=900 L=100) ดู session_logs/plan_cosine_sinehalfwave_fix.md และ
-  session_logs/investigate_sinehalfwave_formula.md — ยังมี known limitation ย่อยที่ยังไม่แก้:
-  x≈s เป็นค่าประมาณ (คลาดเคลื่อนหลักมิลลิเมตรที่ d เท่ากับ L), SPOUT mid-curve ยืนยันด้วย
-  boundary invariant เท่านั้น, LandXML totalX รายงานค่า L ไม่ใช่ X จริง (รายละเอียดใน
-  alignment.py docstring "Known limitations")
-- alignment_builder.py::_build_curve_sub_elements สมมติมุมเลี้ยว spiral ด้วยสูตรเชิงเส้น
-  theta เท่ากับ Ls หารสองเท่าของ R ซึ่งไม่ตรงกับ COSINE closed-form ใหม่อีกต่อไป (ตรงเป๊ะเฉพาะ
-  CLOTHOID/BLOSS/SINE) ทำให้กลุ่มโค้ง COSINE ที่สร้างผ่าน build_alignment_from_pi มีมุมเลี้ยว
-  จริงคลาดเคลื่อนเล็กน้อย (~0.005 องศาที่ R=900 L=100 ยืนยันแล้ว) ยังไม่แก้ อยู่นอกขอบเขตแผน
-  แก้ COSINE รอบนี้ — mismatch นี้ติดเข้าไปใน tests/golden/tables.json +
-  reference/tables.json เองด้วยหลัง regenerate เมื่อ 2026-07-05 (รอยต่อ SPOUT-COSINE
-  element 13->14 คลาดเคลื่อน 34.26 arcsec ยืนยันด้วย 2 วิธีอิสระตรงกันถึงหลักที่ 6) ทำให้
-  test_chain_has_no_gaps และ test_exit_state_matches_next_entry (tests/test_alignment.py)
-  ต้อง xfail(strict=True) ไว้จนกว่าจะแก้ _build_curve_sub_elements ดู
-  session_logs/investigate_cosine_builder_mismatch_20260705.md
+  (เดิมคลาดเคลื่อน tanLong/tanShort เทียบ Civil 3D จริง ~2.90 ซม. ที่ R=900 L=100 และ
+  ~4.71 ซม. ที่ R=250 L=50 ยืนยันแล้ว) ดู session_logs/plan_cosine_sinehalfwave_fix.md,
+  session_logs/investigate_sinehalfwave_formula.md, docs/extensions.md EXT-003 — ยังมี
+  known limitation ย่อยที่ยังไม่แก้: x≈s เป็นค่าประมาณ (คลาดเคลื่อนหลักมิลลิเมตรที่ d
+  เท่ากับ L), SPOUT mid-curve ยืนยันด้วย boundary invariant เท่านั้น, LandXML totalX
+  รายงานค่า L ไม่ใช่ X จริง (รายละเอียดใน alignment.py docstring "Known limitations")
+- alignment_builder.py::_build_curve_sub_elements แก้แล้วเมื่อ 2026-07-05 — เปลี่ยนจาก
+  สมมติฐาน theta เชิงเส้น (Ls หารสองเท่าของ R) มาเรียกมุมหมุนจริงผ่าน synthetic SPIN
+  element + calculate_exit_state แทน (เทคนิคเดียวกับ landxml.py::_spiral_geometry และ
+  _calculate_end_displacement ที่ใช้อยู่แล้ว) พิสูจน์แล้วว่า CLOTHOID/BLOSS/SINE ไม่เปลี่ยน
+  แม้แต่ค่าเดียว (diff ระดับ 1e-16 float noise ล้วนๆ) รอยต่อ SPOUT-COSINE element 13->14
+  ที่เคยคลาดเคลื่อน 34.26 arcsec ปิดสนิทเป็น 0 arcsec แล้ว tests/golden/tables.json +
+  reference/tables.json regenerate รอบสองให้ตรงกับ builder ที่แก้ ดู
+  session_logs/investigate_cosine_builder_mismatch_20260705.md,
+  session_logs/investigate_build_curve_sub_elements_fix.md, docs/extensions.md EXT-003
 - spiral บวก compound ยังไม่รองรับ รอออกแบบ multicurve solver ก่อนตัดสินใจ
 
 ## Civil 3D Interop ground truth references

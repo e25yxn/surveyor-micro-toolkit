@@ -93,14 +93,16 @@ def _build_curve_sub_elements(
     ls_out = float(vert['LsOut'] if vert.get('LsOut') is not None else (vert.get('Ls') or 0.0))
 
     if ls_in > 0 or ls_out > 0:
-        theta_in  = ls_in  / (2.0 * R) if ls_in  > 0 else 0.0
-        theta_out = ls_out / (2.0 * R) if ls_out > 0 else 0.0
-        delta_circular = abs_delta - theta_in - theta_out
-        if delta_circular < 0:
-            issue = 'spiral ยาวเกินมุมเลี้ยว (Δ < θsIn+θsOut)'
         trans     = vert.get('trans')
         trans_in  = vert.get('transIn') or trans
         trans_out = vert.get('transOut') or trans
+        # EXTENSION: beyond oracle — reference/AlignmentBuilder.gs (lines 53-54) still
+        # assumes theta=Ls/(2R); real turning angle needed for the COSINE closed form.
+        theta_in  = _spiral_turning_angle(R, ls_in, trans_in)   if ls_in  > 0 else 0.0
+        theta_out = _spiral_turning_angle(R, ls_out, trans_out) if ls_out > 0 else 0.0
+        delta_circular = abs_delta - theta_in - theta_out
+        if delta_circular < 0:
+            issue = 'spiral ยาวเกินมุมเลี้ยว (Δ < θsIn+θsOut)'
         if ls_in > 0:
             subs.append({'kind': 'SPIN',  'R': R, 'len': ls_in,  'trans': trans_in})
         subs.append({'kind': 'C', 'R': R, 'len': R * delta_circular})
@@ -132,6 +134,20 @@ def _get_control_names(subs: list[dict[str, Any]]) -> dict[str, Any]:
         elif a == 'C'     and b == 'C':     jct.append('PCC')
         else:                                jct.append('JCT')
     return {'start': start, 'end': end, 'jct': jct}
+
+
+def _spiral_turning_angle(R: float, length: float, trans: str | None) -> float:
+    """Real accumulated turning angle (radians) of one spiral, R/length/shape only.
+
+    Built via a synthetic SPIN element at the origin (k_in=0, k_out=1/R, entry azimuth
+    0) — same canonical-SPIN technique as landxml.py::_spiral_geometry and
+    _calculate_end_displacement below. Replaces the linear approximation length/(2R),
+    which is exact for CLOTHOID/BLOSS/SINE (F(1)=1/2 in alignment._shape_integral) but
+    not for COSINE's closed-form turning angle (see session_logs/
+    investigate_build_curve_sub_elements_fix.md).
+    """
+    el = make_element('SPIN', 0.0, length, 0.0, 0.0, 0.0, R, None, trans)
+    return calculate_exit_state(el).azimuth - el.azimuth
 
 
 def _calculate_end_displacement(

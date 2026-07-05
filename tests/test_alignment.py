@@ -46,21 +46,6 @@ def _mid(el: al.Element) -> float:
 # Test 1: chain integrity
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        'alignment_builder.py::_build_curve_sub_elements sizes the circular arc '
-        'assuming a linear spiral turning angle (Ls/(2R)), which was exact for the '
-        'old Simpson-based COSINE but no longer matches the new closed form '
-        '(session_logs/plan_cosine_sinehalfwave_fix.md). For this alignment\'s '
-        'COSINE PI-group (R=500, L=70), that mismatch leaves a real ~34 arcsecond '
-        'azimuth gap at the SPOUT-COSINE junction (element 13->14) baked into the '
-        'regenerated golden fixture itself -- not a rounding artifact, confirmed by '
-        'direct recomputation. Root-caused in session_logs/'
-        'investigate_cosine_builder_mismatch_20260705.md; fixing requires changing '
-        '_build_curve_sub_elements for every transition shape, out of scope here.'
-    ),
-)
 def test_chain_has_no_gaps(elements):
     """Exit state of element[n] must equal entry state of element[n+1]."""
     issues = al.check_chain(elements, tolerance=0.005)
@@ -230,18 +215,6 @@ def test_point_on_tangent_due_east():
     assert math.isclose(st.e, 10519.6152, abs_tol=1e-9)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        'Same root cause as test_chain_has_no_gaps: alignment_builder.py::'
-        '_build_curve_sub_elements\'s linear spiral-turning-angle assumption no '
-        'longer matches the new COSINE closed form, leaving a real ~34 arcsecond '
-        'azimuth gap at element 13->14 (SPOUT-COSINE exit) baked into the '
-        'regenerated golden fixture. See session_logs/'
-        'investigate_cosine_builder_mismatch_20260705.md; fixing requires changing '
-        '_build_curve_sub_elements for every transition shape, out of scope here.'
-    ),
-)
 def test_exit_state_matches_next_entry(elements):
     """Exit state of each element must match the n,e,az of the next element."""
     tol_pos = 1e-3   # 1 mm
