@@ -144,6 +144,26 @@ def _sine_halfwave_point(x: float, big_x: float, r: float) -> tuple[float, float
     return x, y, theta
 
 
+def calculate_sine_halfwave_tangent_length(length: float, r: float) -> float:
+    """Closed-form tangent-projected length X for the COSINE (Civil 3D "Sine
+    Half-Wavelength Diminishing Tangent Curve") transition shape, at the
+    element's own true end (arc length = `length`).
+
+    length : element arc length L (m); always positive.
+    r      : signed radius at the curved end (m); sign does not affect the
+             result since only r**2 appears in the formula.
+    Returns X = L - 0.0226689447*L**3/R**2 (m) — the tangent-projected
+    distance from the zero-curvature end, NOT equal to L except in the
+    R -> infinity limit. Single source of truth for the closed-form constant
+    used both by `_sine_halfwave_point` (point-on-element geometry) and by
+    `landxml.py::_spiral_geometry` (LandXML totalX export).
+    Reference: Autodesk Civil 3D 2026 Help, "About Transition Definitions";
+    see session_logs/investigate_sinehalfwave_formula.md and
+    session_logs/investigate_totalx_landxml_fix.md.
+    """
+    return length - _SINE_HALFWAVE_C * length ** 3 / r ** 2
+
+
 def _calculate_turning_angle_at(el: Element, s: float) -> float:
     """Accumulated turning angle at arc distance s from element start (radians).
 
@@ -265,11 +285,11 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
         length = el.sta_end - el.sta_start
         if el.k_in == 0:   # SPIN: curvature 0 -> 1/R, canonical form used directly
             r = radius_from_curvature(el.k_out)
-            big_x = length - _SINE_HALFWAVE_C * length ** 3 / r ** 2
+            big_x = calculate_sine_halfwave_tangent_length(length, r)
             x_local, y_local, theta_local = _sine_halfwave_point(d, big_x, r)
         else:   # SPOUT: curvature 1/R -> 0, mirror canonical form via s <-> L-d
             r = radius_from_curvature(el.k_in)
-            big_x = length - _SINE_HALFWAVE_C * length ** 3 / r ** 2
+            big_x = calculate_sine_halfwave_tangent_length(length, r)
             x_end, y_end, theta_total = _sine_halfwave_point(length, big_x, r)
             x_g, y_g, theta_g = _sine_halfwave_point(length - d, big_x, r)
             dx, dy = x_end - x_g, y_end - y_g

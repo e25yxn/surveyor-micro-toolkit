@@ -62,6 +62,15 @@ def _verts_spiral():
     ]
 
 
+def _verts_spiral_cosine():
+    """Right-hand curve with symmetric Sine Half-Wavelength spirals Ls=60, R=400."""
+    return [
+        {'n':    0.0, 'e':   0.0},
+        {'n':    0.0, 'e': 500.0, 'R': 400.0, 'Ls': 60.0, 'trans': 'COSINE'},
+        {'n': -500.0, 'e': 500.0},
+    ]
+
+
 def _verts_angle_point():
     """Angle point (R=0 / no R key): BP(0,0) → IP(0,500) → EP(500,1000)."""
     return [
@@ -291,6 +300,36 @@ class TestSpiralIn:
         # spiral's real position, direction, or SPIN/SPOUT role — with equal
         # R and length here, SPIN and SPOUT must produce identical values
         xml = export_alignment_landxml(_build(_verts_spiral()))
+        root = _parse(xml)
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
+        spout = next(s for s in _find_all(root, 'Spiral') if s.get('radiusEnd') == 'INF')
+        for attr in ('totalX', 'totalY', 'tanLong', 'tanShort'):
+            assert math.isclose(float(spin.get(attr)), float(spout.get(attr)), abs_tol=1e-6)
+
+    def test_cosine_total_x_uses_closed_form_not_arc_length(self):
+        """COSINE totalX must be the closed-form tangent-projected X, not L.
+
+        Regression for the bug in session_logs/investigate_totalx_landxml_fix.md:
+        totalX used to equal the raw element length (60.0) exactly; the correct
+        closed-form value for R=400, Ls=60 is X = L - 0.0226689447*L**3/R**2
+        = 59.969397.
+        """
+        xml = export_alignment_landxml(_build(_verts_spiral_cosine()))
+        root = _parse(xml)
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
+        total_x = float(spin.get('totalX'))
+        assert not math.isclose(total_x, 60.0, abs_tol=1e-6)
+        assert math.isclose(total_x, 59.969397, abs_tol=1e-5)
+
+    def test_cosine_spin_spout_total_x_match(self):
+        """SPIN and SPOUT COSINE spirals of equal R,L must report the same totalX.
+
+        Mirrors test_spout_geometry_matches_spin above for COSINE
+        specifically -- not previously covered, since no existing test in
+        this file used transition='COSINE'
+        (session_logs/investigate_totalx_landxml_fix.md, section 4).
+        """
+        xml = export_alignment_landxml(_build(_verts_spiral_cosine()))
         root = _parse(xml)
         spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
         spout = next(s for s in _find_all(root, 'Spiral') if s.get('radiusEnd') == 'INF')

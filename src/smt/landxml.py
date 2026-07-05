@@ -22,7 +22,12 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 from . import fpmath
-from .alignment import Element, calculate_exit_state, calculate_point_on_element
+from .alignment import (
+    Element,
+    calculate_exit_state,
+    calculate_point_on_element,
+    calculate_sine_halfwave_tangent_length,
+)
 from .builders.alignment_builder import BuildResult
 
 _NS = 'http://www.landxml.org/schema/LandXML-1.2'
@@ -69,7 +74,18 @@ def _spiral_geometry(R: float, length: float, transition: str, theta_rad: float)
     """(totalX, totalY, tanLong, tanShort) for a spiral, computed canonically:
     a synthetic Element at the origin (n=0, e=0, azimuth=0) curving from
     k_in=0 to k_out=1/R over [0, length], independent of the spiral's real
-    position, direction, or SPIN/SPOUT role in the alignment."""
+    position, direction, or SPIN/SPOUT role in the alignment.
+
+    COSINE transition: totalX is overridden with the closed-form tangent-
+    projected length (calculate_sine_halfwave_tangent_length) instead of the
+    raw value calculate_point_on_element returns at d=length, which equals
+    `length` itself (known limitation; see
+    session_logs/investigate_totalx_landxml_fix.md). tanLong changes as a
+    direct consequence (tanLong = totalX - totalY/tan(theta)); totalY/
+    tanShort still use the d=length approximation — a separate, smaller,
+    already-documented known limitation (see alignment.py module docstring
+    "Known limitations").
+    """
     synthetic = Element(
         type='SPIN', sta_start=0.0, sta_end=length,
         n=0.0, e=0.0, azimuth=0.0,
@@ -77,6 +93,8 @@ def _spiral_geometry(R: float, length: float, transition: str, theta_rad: float)
     )
     state = calculate_point_on_element(synthetic, length)
     total_x, total_y = state.n, state.e
+    if transition == 'COSINE':
+        total_x = calculate_sine_halfwave_tangent_length(length, R)
     tan_long = total_x - total_y / math.tan(theta_rad)
     tan_short = total_y / math.sin(theta_rad)
     return total_x, total_y, tan_long, tan_short
