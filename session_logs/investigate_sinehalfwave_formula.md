@@ -38,3 +38,8 @@ y เท่ากับ X ยกกำลังสอง หารด้วย R
 Autodesk Civil 3D 2026 Help About Transition Definitions
 https://help.autodesk.com/cloudhelp/2026/ENG/Civil3D-UserGuide/files/GUID-DD7C0EA1-8465-45BA-9A39-FC05106FD822.htm
 smt-test1.xml และ SMT_TEST_ALINGMENT2.xml เป็นไฟล์ Civil 3D ground truth export จริง
+
+ยืนยันเพิ่มเติม SPIN กับ SPOUT ที่ R,L เท่ากัน ให้ theta totalX totalY tanLong tanShort เท่ากันทุกตัว Civil 3D R เท่ากับ 250 L เท่ากับ 50 จาก SMT_TEST_ALINGMENT2.xml ก่อนไฟล์หายจากเครื่อง
+SPIN radiusStart เท่ากับ INF radiusEnd เท่ากับ 250 theta เท่ากับ 5.705449190899 องศา totalY เท่ากับ 1.484093072531 totalX เท่ากับ 49.954662110533 tanLong เท่ากับ 35.100262042251 tanShort เท่ากับ 14.928353346451
+SPOUT radiusStart เท่ากับ 250 radiusEnd เท่ากับ INF theta totalY totalX tanLong tanShort เท่ากับ SPIN ทุกตัวเลขเป๊ะ
+สรุป ยืนยัน mirror-symmetry ระหว่าง SPIN SPOUT ด้วยข้อมูล Civil 3D จริง ไม่ใช่ข้อสันนิษฐาน ใช้แนวทางเดียวกับ CLOTHOID BLOSS SINE คือ swap บทบาท k_in k_out ผ่านการสลับ s เป็น L ลบ s บนฟังก์ชันเดียวกัน ไม่ต้องมีสูตรแยกสำหรับ SPOUT
