@@ -245,6 +245,8 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
 
     vertices: list[dict[str, Any]] = []
     pending_pi: dict[str, Any] | None = None
+    pending_pi_label: str = ''
+    pending_pi_line: int = 0
     compound_arcs: list[dict[str, Any]] = []
 
     def _flush_pending() -> None:
@@ -252,6 +254,15 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
         if pending_pi is None:
             return
         if compound_arcs:
+            if 'R' in pending_pi:
+                raise ValueError(
+                    f'PI "{pending_pi_label}" (แถวที่ {pending_pi_line}) มีทั้งค่า RADIUS '
+                    f'({pending_pi["R"]}) และมี compound sub-row ตามมา '
+                    'กำกวมว่าจะใช้ค่ารัศมีไหน '
+                    'ให้ปล่อย RADIUS ของแถว PI นี้ว่างไว้ '
+                    'แล้วย้ายค่า RADIUS (และ Delta ถ้ามี) '
+                    'ไปเป็นแถว compound sub-row แยกต่างหากแทน'
+                )
             v: dict[str, Any] = {'n': pending_pi['n'], 'e': pending_pi['e']}
             v['compound'] = compound_arcs.copy()
             compound_arcs.clear()
@@ -260,7 +271,7 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
         vertices.append(v)
         pending_pi = None
 
-    for row in rows[1:]:            # skip header row
+    for line_no, row in enumerate(rows[1:], start=2):   # start=2: row 1 is the header
         point = _g(row, 'point')
 
         if not point:
@@ -310,6 +321,8 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
         # else: R absent or 0 → angle point (no 'R' key); may gain 'compound' later
 
         pending_pi = pi_dict
+        pending_pi_label = point
+        pending_pi_line = line_no
 
     _flush_pending()
     return vertices

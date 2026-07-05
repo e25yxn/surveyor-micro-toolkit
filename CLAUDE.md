@@ -94,9 +94,13 @@ All phases complete — 407/407 tests passing.
 - no-curve PI (angle point, R=None/R=0/collinear) → NOW SUPPORTED via EXT-001
 - fit_radius requires scipy: `pip install -e ".[optimize]"`
 - VBA Named Range ต้องไม่รวม index column และ header row
-- `_flush_pending` (builders/alignment_builder.py) ทิ้งค่า R ของแถว PI แบบเงียบเมื่อมี compound sub-row ตามมา
-  ยังไม่ได้แก้ พบเมื่อ 2026-07-03
-- `test_data/SettingOutTest.csv` PI7 ได้รับผลกระทบจากบั๊กข้างต้น ห้ามใช้ PI7 อ้างอิงจนกว่าจะแก้ไฟล์
+- `_flush_pending` (builders/alignment_builder.py) แก้แล้วเมื่อ 2026-07-05 (พบเมื่อ 2026-07-03) —
+  เดิมทิ้งค่า R ของแถว PI แบบเงียบเมื่อมี compound sub-row ตามมา ตอนนี้ raise ValueError แทน
+  ระบุชื่อ PI และเลขบรรทัดในข้อความ ดู session_logs/plan_flush_pending_fix.md
+- `test_data/SettingOutTest.csv` PI7 แก้แล้วเมื่อ 2026-07-05 — ย้ายค่า RADIUS/Delta ที่เคยอยู่บน
+  แถว PI7 เอง (ซึ่งเคยถูกทิ้งเงียบๆ) ไปเป็น compound sub-row แยกต่างหาก ตอนนี้สร้าง compound curve
+  จริง R=300 ต่อด้วย R=150 (ยืนยันด้วย `smt build` จริงแล้ว) ไม่ใช่วงกลมเดี่ยว R=150 ครอบมุมทั้งหมด
+  เหมือนก่อนหน้า
 - transition COSINE แก้แล้วเมื่อ 2026-07-05 ให้ใช้สูตรปิด Civil 3D Sine Half-Wave แทน Simpson เดิม
   (เดิมคลาดเคลื่อน tanLong/tanShort เทียบ Civil 3D จริง ~2.90 ซม. ที่ R=900 L=100 และ
   ~4.71 ซม. ที่ R=250 L=50 ยืนยันแล้ว) ดู session_logs/plan_cosine_sinehalfwave_fix.md,

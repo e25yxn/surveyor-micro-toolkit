@@ -840,6 +840,35 @@ class TestParsePiTable:
         last_arc = pi['compound'][-1]
         assert 'delta' not in last_arc
 
+    def test_pi_radius_with_compound_raises_value_error(self):
+        # PI row itself has a non-blank, non-zero RADIUS *and* is followed by a
+        # compound sub-row -- ambiguous which radius applies. Regression test for the
+        # _flush_pending bug (CLAUDE.md Known limits; test_data/SettingOutTest.csv PI7).
+        rows = _rows(
+            ['BP', '1000', '2000', '0',  '', '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '300', '', '', '', '', '20'],
+            ['',   '',     '',     '',  '150', '', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '', '', '', '', '', ''],
+        )
+        with pytest.raises(ValueError):
+            ab.parse_pi_table(rows)
+
+    def test_pi_radius_zero_with_compound_still_works(self):
+        # R=0 (explicit angle point) on the PI row, followed by a compound sub-row,
+        # is the *correct* way to write this and must not raise -- same pattern
+        # already proven by test_compound(), checked here explicitly against R=0
+        # (not just blank).
+        rows = _rows(
+            ['BP', '1000', '2000', '0',  '', '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '0', '', '', '', '', ''],
+            ['',   '',     '',     '',  '300', '', '', '', '', '20'],
+            ['',   '',     '',     '',  '150', '', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '', '', '', '', '', ''],
+        )
+        pi = ab.parse_pi_table(rows)[1]
+        assert 'R' not in pi
+        assert pi['compound'] == [{'R': 300.0, 'delta': 20.0}, {'R': 150.0}]
+
     def test_roundtrip_build(self):
         # Simple two-PI alignment: circle then angle point — must build without issues
         rows = _rows(
