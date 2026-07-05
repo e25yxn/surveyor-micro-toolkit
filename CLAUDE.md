@@ -97,9 +97,17 @@ All phases complete — 407/407 tests passing.
 - `_flush_pending` (builders/alignment_builder.py) ทิ้งค่า R ของแถว PI แบบเงียบเมื่อมี compound sub-row ตามมา
   ยังไม่ได้แก้ พบเมื่อ 2026-07-03
 - `test_data/SettingOutTest.csv` PI7 ได้รับผลกระทบจากบั๊กข้างต้น ห้ามใช้ PI7 อ้างอิงจนกว่าจะแก้ไฟล์
-- transition COSINE (`_shape_integral` ใน alignment.py) สูตรไม่ตรงกับ Civil 3D sineHalfWave จริง
-  ต่างประมาณ 3 เซนติเมตรที่ R=900 L=100 ยืนยันด้วยการคำนวณอิสระ ส่วน CLOTHOID BLOSS SINE (คู่กับ sinusoid)
-  ยืนยันแล้วว่าตรง Civil 3D
+- transition COSINE แก้แล้วเมื่อ 2026-07-05 ให้ใช้สูตรปิด Civil 3D Sine Half-Wave แทน Simpson เดิม
+  (เดิมต่าง ~3 ซม. ที่ R=900 L=100) ดู session_logs/plan_cosine_sinehalfwave_fix.md และ
+  session_logs/investigate_sinehalfwave_formula.md — ยังมี known limitation ย่อยที่ยังไม่แก้:
+  x≈s เป็นค่าประมาณ (คลาดเคลื่อนหลักมิลลิเมตรที่ d เท่ากับ L), SPOUT mid-curve ยืนยันด้วย
+  boundary invariant เท่านั้น, LandXML totalX รายงานค่า L ไม่ใช่ X จริง (รายละเอียดใน
+  alignment.py docstring "Known limitations")
+- alignment_builder.py::_build_curve_sub_elements สมมติมุมเลี้ยว spiral ด้วยสูตรเชิงเส้น
+  theta เท่ากับ Ls หารสองเท่าของ R ซึ่งไม่ตรงกับ COSINE closed-form ใหม่อีกต่อไป (ตรงเป๊ะเฉพาะ
+  CLOTHOID/BLOSS/SINE) ทำให้กลุ่มโค้ง COSINE ที่สร้างผ่าน build_alignment_from_pi มีมุมเลี้ยว
+  จริงคลาดเคลื่อนเล็กน้อย (~0.005 องศาที่ R=900 L=100 ยืนยันแล้ว) ยังไม่แก้ อยู่นอกขอบเขตแผน
+  แก้ COSINE รอบนี้ ดู session_logs/investigate_cosine_builder_mismatch_20260705.md
 - spiral บวก compound ยังไม่รองรับ รอออกแบบ multicurve solver ก่อนตัดสินใจ
 
 ## Civil 3D Interop ground truth references

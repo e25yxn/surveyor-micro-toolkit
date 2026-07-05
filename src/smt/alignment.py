@@ -38,7 +38,12 @@ Transition shapes (spiral elements only):
                        point (d<L) is independently verified at all;
                        (2) the SPOUT mid-curve trace is derived from the boundary
                        mirror only — no independent Civil 3D data confirms a SPOUT
-                       interior point, only the shared endpoint invariant.
+                       interior point, only the shared endpoint invariant;
+                       (3) the LandXML export's totalX field (src/smt/landxml.py
+                       _spiral_geometry) reports L directly, not the true closed-form
+                       X — a natural consequence of the same x≈s approximation above,
+                       not a separate bug (see session_logs/
+                       investigate_sinehalfwave_formula.md).
 
 Depends on: fpmath, wcb.
 """
