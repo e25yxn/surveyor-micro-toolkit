@@ -107,7 +107,12 @@ All phases complete — 407/407 tests passing.
   theta เท่ากับ Ls หารสองเท่าของ R ซึ่งไม่ตรงกับ COSINE closed-form ใหม่อีกต่อไป (ตรงเป๊ะเฉพาะ
   CLOTHOID/BLOSS/SINE) ทำให้กลุ่มโค้ง COSINE ที่สร้างผ่าน build_alignment_from_pi มีมุมเลี้ยว
   จริงคลาดเคลื่อนเล็กน้อย (~0.005 องศาที่ R=900 L=100 ยืนยันแล้ว) ยังไม่แก้ อยู่นอกขอบเขตแผน
-  แก้ COSINE รอบนี้ ดู session_logs/investigate_cosine_builder_mismatch_20260705.md
+  แก้ COSINE รอบนี้ — mismatch นี้ติดเข้าไปใน tests/golden/tables.json +
+  reference/tables.json เองด้วยหลัง regenerate เมื่อ 2026-07-05 (รอยต่อ SPOUT-COSINE
+  element 13->14 คลาดเคลื่อน 34.26 arcsec ยืนยันด้วย 2 วิธีอิสระตรงกันถึงหลักที่ 6) ทำให้
+  test_chain_has_no_gaps และ test_exit_state_matches_next_entry (tests/test_alignment.py)
+  ต้อง xfail(strict=True) ไว้จนกว่าจะแก้ _build_curve_sub_elements ดู
+  session_logs/investigate_cosine_builder_mismatch_20260705.md
 - spiral บวก compound ยังไม่รองรับ รอออกแบบ multicurve solver ก่อนตัดสินใจ
 
 ## Civil 3D Interop ground truth references

@@ -10,7 +10,6 @@ Two test categories:
 import json
 import math
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -50,12 +49,16 @@ def _mid(el: al.Element) -> float:
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
-        'session_logs/investigate_sinehalfwave_formula.md) intentionally shifts the '
-        'SPIN-COSINE exit (SC@2249.324) and SPOUT-COSINE exit (ST@2554.756) by '
-        '~3cm vs the old Simpson-based golden fixture. Fixture regeneration is the '
-        'immediate next plan; remove this mark once tests/golden/tables.json and '
-        'reference/tables.json are regenerated.'
+        'alignment_builder.py::_build_curve_sub_elements sizes the circular arc '
+        'assuming a linear spiral turning angle (Ls/(2R)), which was exact for the '
+        'old Simpson-based COSINE but no longer matches the new closed form '
+        '(session_logs/plan_cosine_sinehalfwave_fix.md). For this alignment\'s '
+        'COSINE PI-group (R=500, L=70), that mismatch leaves a real ~34 arcsecond '
+        'azimuth gap at the SPOUT-COSINE junction (element 13->14) baked into the '
+        'regenerated golden fixture itself -- not a rounding artifact, confirmed by '
+        'direct recomputation. Root-caused in session_logs/'
+        'investigate_cosine_builder_mismatch_20260705.md; fixing requires changing '
+        '_build_curve_sub_elements for every transition shape, out of scope here.'
     ),
 )
 def test_chain_has_no_gaps(elements):
@@ -75,16 +78,6 @@ def _control_params(golden_data):
     ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
-        'session_logs/investigate_sinehalfwave_formula.md) intentionally shifts '
-        'SC@2249.324 and ST@2554.756 by ~3cm vs the old Simpson-based golden fixture. '
-        'Fixture regeneration is the immediate next plan; remove this mark once '
-        'tests/golden/tables.json and reference/tables.json are regenerated.'
-    ),
-)
 def test_control_points(elements, golden):
     """All 31 control points must resolve to N,E within 1e-3 m.
 
@@ -108,42 +101,11 @@ def test_control_points(elements, golden):
     assert not failures, 'Control point failures:\n' + '\n'.join(failures)
 
 
-# Parametrized variant — one test per control point for granular CI output.
-# Only ST@2554.756 is marked xfail: COSINE closed-form fix (session_logs/
-# plan_cosine_sinehalfwave_fix.md, session_logs/investigate_sinehalfwave_formula.md)
-# intentionally shifts it ~3cm vs the old Simpson-based golden fixture. Fixture
-# regeneration is the immediate next plan; remove this mark once tests/golden/
-# tables.json and reference/tables.json are regenerated. SC@2249.324 looks like it
-# should be affected too but genuinely passes: the golden fixture rounds its station
-# to 3 decimals (2249.324 vs the true boundary 2249.3237), which lands just outside
-# get_element_index's +-1e-4 tolerance for the SPIN-COSINE element, so the lookup
-# resolves in the next (circular, unaffected) element instead — see
-# session_logs/report_xfail_mismatch_20260705.md section 2.3. The other 29 control
-# points are unaffected and keep full coverage.
-_COSINE_XFAIL_REASON = (
-    'COSINE closed-form fix shifts this control point ~3cm vs the old '
-    'Simpson-based golden fixture (session_logs/plan_cosine_sinehalfwave_fix.md, '
-    'session_logs/investigate_sinehalfwave_formula.md); fixture regeneration is '
-    'the immediate next plan.'
-)
-
-
-# Station-based, not name-based: SC/ST repeat once per curve group (5 groups in the
-# golden alignment). Only ST@2554.756 is genuinely affected (see comment above).
-_COSINE_AFFECTED_STATIONS = (2554.756,)
-
-
-def _control_point_param(cp: dict) -> Any:
-    values = (cp['sta'], cp['n'], cp['e'], cp['name'])
-    if cp['sta'] in _COSINE_AFFECTED_STATIONS:
-        return pytest.param(*values, marks=pytest.mark.xfail(strict=True, reason=_COSINE_XFAIL_REASON))
-    return values
-
-
+# Parametrized variant — one test per control point for granular CI output
 @pytest.mark.parametrize(
     'sta,exp_n,exp_e,name',
     [
-        _control_point_param(cp)
+        (cp['sta'], cp['n'], cp['e'], cp['name'])
         for cp in json.loads(_GOLDEN.read_text(encoding='utf-8'))['controls']
     ],
     ids=[
@@ -271,12 +233,13 @@ def test_point_on_tangent_due_east():
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
-        'session_logs/investigate_sinehalfwave_formula.md) intentionally shifts the '
-        'SPIN-COSINE exit (element 11->12, SC@2249.324) and SPOUT-COSINE exit '
-        '(element 13->14, ST@2554.756) by ~3cm vs the old Simpson-based golden '
-        'fixture. Fixture regeneration is the immediate next plan; remove this mark '
-        'once tests/golden/tables.json and reference/tables.json are regenerated.'
+        'Same root cause as test_chain_has_no_gaps: alignment_builder.py::'
+        '_build_curve_sub_elements\'s linear spiral-turning-angle assumption no '
+        'longer matches the new COSINE closed form, leaving a real ~34 arcsecond '
+        'azimuth gap at element 13->14 (SPOUT-COSINE exit) baked into the '
+        'regenerated golden fixture. See session_logs/'
+        'investigate_cosine_builder_mismatch_20260705.md; fixing requires changing '
+        '_build_curve_sub_elements for every transition shape, out of scope here.'
     ),
 )
 def test_exit_state_matches_next_entry(elements):
