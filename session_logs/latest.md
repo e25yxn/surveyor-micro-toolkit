@@ -1,5 +1,62 @@
 # Session Log
 
+## [2026-07-05] แก้ COSINE transition ให้ใช้สูตรปิด Civil 3D Sine Half-Wave (แผนหลัก)
+
+- ทำ: ทำตาม session_logs/plan_cosine_sinehalfwave_fix.md ที่อนุมัติแล้วเต็มขั้นตอน
+  1. แก้ `src/smt/alignment.py` — เพิ่ม `_SINE_HALFWAVE_C`, helper `_sine_halfwave_point`,
+     branch ใหม่ใน `calculate_point_on_element` สำหรับ COSINE ทั้ง SPIN (ใช้สูตรตรง) และ
+     SPOUT (mirror ผ่าน s↔L−s แบบเดียวกับ CLOTHOID/BLOSS/SINE) แทน Simpson integration เดิม
+     พร้อมอัปเดต module docstring ส่วน Transition shapes + Known limitations ให้ครบ
+  2. เพิ่ม 3 test ใหม่ใน `tests/test_alignment.py`: ground truth R=900/L=100, R=250/L=50
+     (เทียบที่ d เท่ากับ X จุดที่สูตรตรง Civil 3D ระดับ machine precision) และ test สมมาตร
+     SPIN/SPOUT (parametrize 3 คู่ R,L) — ทั้งหมด PASS
+  3. ค้นและ mark xfail(strict=True) ให้ test ที่ผูกกับ golden fixture เดิม (Simpson-based)
+     ที่ SC/ST ขยับ ~3 ซม. ตอนแรกคาด 10 ตัว รันจริงแล้วพบว่า 3 ตัว pass จริง (มีเหตุผล
+     เฉพาะเจาะจงต่อตัว ไม่ใช่ fluke) และมี 1 ตัวใหม่ที่พังโดยไม่คาดคิด (station คลาดเคลื่อน
+     8.4 ซม. ผ่าน _calculate_end_displacement ใน alignment_builder.py คูณด้วย 1/sin(δ))
+     สรุปสุดท้าย mark จริง 9 ตัว บันทึกละเอียดใน session_logs/report_xfail_mismatch_20260705.md
+  4. Smoke test `smt export-landxml` จริงกับไฟล์ทดสอบ R=900/L=100 และ R=250/L=50 —
+     ยืนยัน landxml.py ไม่ต้องแก้โค้ด (delegate ผ่าน alignment.py อยู่แล้ว) แต่พบ known
+     limitation ใหม่ระหว่างทาง: `alignment_builder.py::_build_curve_sub_elements` สมมติ
+     มุมเลี้ยว spiral แบบเชิงเส้น (Ls/(2R)) ซึ่งไม่ตรงกับ COSINE closed-form ใหม่ ทำให้กลุ่มโค้ง
+     COSINE ที่สร้างผ่าน build_alignment_from_pi คลาดเคลื่อน ~0.005 องศา บันทึกไว้ใน
+     session_logs/investigate_cosine_builder_mismatch_20260705.md + CLAUDE.md Known limits
+     ยังไม่แก้ อยู่นอกขอบเขตแผนนี้ รอวางแผนแยกภายหลัง
+- คำสั่ง: แก้โค้ด/เทส → `pytest -q` → `smt export-landxml` (2 ไฟล์ทดสอบ) → เขียนรายงาน →
+  Write `.git\smt_commit_msg.txt` → `git add` (เฉพาะไฟล์ที่เกี่ยวข้อง) → `git commit -F` (2 ครั้งแยกกัน)
+- ผล: PASS — `448 passed, 9 xfailed` (ยืนยันด้วย `pytest -rx` ว่าตรงกับ 9 mark ที่ตั้งใจไว้ทุกตัว)
+- commit: 301245c (แก้ COSINE core + xfail + report), db39b85 (บันทึก known limitation ใหม่จาก builder)
+- หมายเหตุ: งานต่อเนื่องที่ผูกพันไว้แล้วคือ regenerate tests/golden/tables.json +
+  reference/tables.json ให้ตรงสูตรใหม่ (ต้องแสดงแถวดิบเต็มให้ตรวจก่อนแก้ไฟล์ ตามที่ตกลงไว้ใน
+  plan) และแก้ `_build_curve_sub_elements` ให้รองรับ COSINE closed-form (ยังไม่ได้วางแผน)
+
+## [2026-07-05] บันทึกหลักฐาน SPIN/SPOUT mirror-symmetry เพิ่มในรายงาน COSINE — รายงานเท่านั้น
+
+- ทำ: เปิด plan mode ชั่วคราวสำหรับงานบันทึกเดียว (ตามกฎ CLAUDE.md งานอ่าน/รายงานไม่ต้องผ่าน
+  Plan-Review-Approve) ต่อท้าย `session_logs/investigate_sinehalfwave_formula.md` ด้วยหลักฐาน
+  Civil 3D จริงที่อาจารย์ยกมา (R=250 L=50 จาก SMT_TEST_ALINGMENT2.xml ก่อนไฟล์หาย): SPIN กับ
+  SPOUT ที่ R,L เท่ากัน ให้ theta/totalX/totalY/tanLong/tanShort เท่ากันทุกตัวเป๊ะ ยืนยัน
+  mirror-symmetry ด้วยข้อมูลจริง ไม่ใช่ข้อสันนิษฐาน — ใช้แนวทาง swap k_in/k_out ผ่าน s↔L−s บน
+  ฟังก์ชันเดียวกัน (แบบเดียวกับ CLOTHOID/BLOSS/SINE) ไม่ต้องมีสูตรแยกสำหรับ SPOUT
+  ยังไม่แก้โค้ดใดๆ ในรอบนี้ — กลับเข้า plan mode ต่อทันทีหลัง commit
+- คำสั่ง: Write .git\smt_commit_msg.txt → git add session_logs/investigate_sinehalfwave_formula.md
+  → git commit -F .git\smt_commit_msg.txt
+- ผล: PASS — ไม่มี test เกี่ยวข้อง (ไม่แตะโค้ด)
+- commit: db1a024
+
+## [2026-07-04] ตรวจสอบสูตร Sine Half-Wavelength (COSINE) spiral — รายงานเท่านั้น
+
+- ทำ: เขียนไฟล์ `session_logs/investigate_sinehalfwave_formula.md` สรุปผลตรวจสอบสูตร
+  transition COSINE เทียบเอกสาร Autodesk Civil 3D 2026 Help และคำนวณมือเทียบ ground truth
+  2 จุด (R=900/L=100 จาก smt-test1.xml, R=250/L=50 จาก SMT_TEST_ALINGMENT2.xml)
+  สรุป: BLOSS/SINE ตรง Autodesk 100% อยู่แล้ว ส่วน COSINE ใช้คนละกลไก (tangent-projected
+  distance ไม่ใช่ arc length) มีสูตรปิดที่ยืนยันแล้ว แต่จุดกลางโค้งยังไม่มีข้อมูลยืนยัน
+  ยังไม่ได้แก้โค้ดใดๆ ในรอบนี้ — เป็นงานตรวจสอบ/รายงานล้วน
+- คำสั่ง: Write session_logs/investigate_sinehalfwave_formula.md → Write .git\smt_commit_msg.txt
+  → git add session_logs/investigate_sinehalfwave_formula.md → git commit -F .git\smt_commit_msg.txt
+- ผล: PASS — ไม่มี test เกี่ยวข้อง (ไม่แตะโค้ด)
+- commit: 6644305
+
 ## [2026-07-03] ขยาย .gitignore pattern build_out/ → build_out*/
 
 - ทำ: แก้ `.gitignore` บรรทัด `test_data/build_out/` → `test_data/build_out*/`
