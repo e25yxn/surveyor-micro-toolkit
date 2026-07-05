@@ -329,6 +329,17 @@ class TestGoldenStructure:
 
 class TestGoldenElementGeometry:
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
+            'session_logs/investigate_sinehalfwave_formula.md) shifts the '
+            'SPIN-COSINE/SPOUT-COSINE exit ~3cm vs the old Simpson-based golden '
+            'fixture; build_alignment_from_pi chains every element after it via '
+            'calculate_exit_state, so the shift cascades through the back half of '
+            'the alignment. Fixture regeneration is the immediate next plan.'
+        ),
+    )
     def test_element_ne_within_tolerance(self, result, golden_elements):
         for i, (b, g) in enumerate(zip(result.elements, golden_elements)):
             assert math.isclose(b.n, g.n, abs_tol=2e-3), (
@@ -339,6 +350,12 @@ class TestGoldenElementGeometry:
             )
 
     def test_element_azimuth_within_tolerance(self, result, golden_elements):
+        # NOTE: passes even after the COSINE closed-form fix (session_logs/
+        # plan_cosine_sinehalfwave_fix.md), but only by a close margin — the real
+        # azimuth error at the SC junction (R=500/L=70) is ~8.3e-5 rad, just 17%
+        # under this 1e-4 rad tolerance. See session_logs/
+        # report_xfail_mismatch_20260705.md section 2.1. Do not assume this is
+        # comfortably safe for other R/L combinations.
         for i, (b, g) in enumerate(zip(result.elements, golden_elements)):
             az_diff = abs(b.azimuth - g.azimuth)
             # handle wrap-around (should not occur here but guard it)
@@ -352,6 +369,21 @@ class TestGoldenElementGeometry:
             assert math.isclose(b.k_in,  g.k_in,  abs_tol=1e-9), f'k_in  mismatch el[{i}]'
             assert math.isclose(b.k_out, g.k_out, abs_tol=1e-9), f'k_out mismatch el[{i}]'
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md) '
+            'shifts station values here too, not just N/E: build_alignment_from_pi '
+            'solves the COSINE curve group\'s tangent length d1 from its total '
+            'end-displacement (_calculate_end_displacement, which chains through '
+            'calculate_exit_state), then divides by sin(delta) — a continuing '
+            'knock-on effect through that existing formula, not a new bug. Measured '
+            '8.4cm at element[10].sta_end (delta=35 deg, sin(delta)=0.574 amplifies '
+            'the ~7cm combined SPIN+SPOUT end-displacement shift). Root-caused in '
+            'session_logs/report_xfail_mismatch_20260705.md section 3. Fixture '
+            'regeneration is the immediate next plan.'
+        ),
+    )
     def test_element_stations_within_tolerance(self, result, golden_elements):
         # Station values accumulate tangent-length errors across 9 PI groups.
         # Tolerance is 5 mm to accommodate this accumulation.
@@ -370,6 +402,15 @@ class TestGoldenElementGeometry:
 
 class TestGoldenControlPoints:
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
+            'session_logs/investigate_sinehalfwave_formula.md) shifts control points '
+            'from SC@2249.324 onward via the calculate_exit_state chain in '
+            'build_alignment_from_pi. Fixture regeneration is the immediate next plan.'
+        ),
+    )
     def test_control_ne_within_1mm(self, result, golden_controls):
         for i, (c, g) in enumerate(zip(result.control, golden_controls)):
             assert math.isclose(c.n, g['n'], abs_tol=1e-3), (
@@ -400,6 +441,15 @@ class TestGoldenControlPoints:
 
 class TestCheckAgainstDrawing:
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
+            'session_logs/investigate_sinehalfwave_formula.md) shifts control points '
+            'from SC@2249.324 onward via the calculate_exit_state chain in '
+            'build_alignment_from_pi. Fixture regeneration is the immediate next plan.'
+        ),
+    )
     def test_all_controls_pass_1mm_tolerance(self, result, golden_controls):
         drawing = golden_controls   # list of {'name', 'sta', 'n', 'e'}
         report = ab.check_against_drawing(result.control, drawing, tolerance=1e-3)

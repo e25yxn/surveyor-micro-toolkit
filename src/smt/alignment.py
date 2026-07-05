@@ -12,8 +12,33 @@ Angles:    radians internally; degrees only at the make_element boundary.
 Transition shapes (spiral elements only):
   CLOTHOID (default) : linear curvature change        f(τ) = τ
   BLOSS              : f(τ) = 3τ²-2τ³                 (zero jerk at both ends)
-  COSINE             : f(τ) = (1-cos πτ)/2            (zero jerk at both ends)
   SINE               : f(τ) = τ-sin(2πτ)/(2π)         (zero jerk at both ends)
+  COSINE             : Civil 3D "Sine Half-Wavelength Diminishing Tangent Curve" —
+                       NOT a curvature-vs-arc-length shape like the three above.
+                       Closed form in tangent-projected distance x (approximated here
+                       by arc distance s, since x is not independently invertible from
+                       s in closed form): with X = L - 0.0226689447*L**3/R**2 and
+                       a = x/X,
+                         y(x)     = X**2/R * (a**2/4 - (1-cos(pi*a))/(2*pi**2))
+                         theta(x) = atan(X/R * (a/2 - sin(pi*a)/(2*pi)))
+                       SPIN (k_in=0) uses this directly with x=d. SPOUT (k_out=0)
+                       mirrors it via s<->L-s (see `_sine_halfwave_point` and the
+                       SPOUT branch in `calculate_point_on_element`), matching the
+                       Civil 3D-confirmed invariant that SPIN and SPOUT of equal R,L
+                       share the same total turning angle. Verified against 2
+                       independent Civil 3D ground-truth points (R=900/L=100,
+                       R=250/L=50) — see session_logs/investigate_sinehalfwave_formula.md.
+                       Known limitations (documented there, not fixed here):
+                       (1) x≈s is an approximation; at the element's own true end
+                       (d=L, the point calculate_exit_state actually uses) this costs
+                       1.5548mm at R=900/L=100 and 4.5338mm at R=250/L=50 (measured:
+                       the gap between evaluating at d=X, where a=1 exactly and the
+                       formula matches Civil 3D to machine precision, vs d=L, where
+                       L-X is 0.027986m and 0.045338m respectively) — no interior
+                       point (d<L) is independently verified at all;
+                       (2) the SPOUT mid-curve trace is derived from the boundary
+                       mirror only — no independent Civil 3D data confirms a SPOUT
+                       interior point, only the shared endpoint invariant.
 
 Depends on: fpmath, wcb.
 """
@@ -26,6 +51,7 @@ from typing import Any, NamedTuple
 from . import fpmath, wcb
 
 SPIRAL_STEPS: int = 48   # Simpson intervals for spiral numerical integration (must be even)
+_SINE_HALFWAVE_C: float = 0.0226689447   # Civil 3D closed-form tangent-length correction constant
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +118,25 @@ def _shape_integral(transition: str, tau: float) -> float:
         return tau ** 2 / 2 - (1 - math.cos(2 * pi * tau)) / (4 * pi ** 2)
     # CLOTHOID (default): f(τ) = τ  →  F(τ) = τ²/2
     return tau ** 2 / 2
+
+
+def _sine_halfwave_point(x: float, big_x: float, r: float) -> tuple[float, float, float]:
+    """Civil 3D Sine Half-Wavelength Diminishing Tangent Curve, canonical (SPIN) form.
+
+    x     : tangent-projected distance from the zero-curvature end (approximated by
+            arc distance here — see module docstring "Known limitations").
+    big_x : X, the closed-form tangent-projected length at the curve's own full L
+            (X = L - 0.0226689447*L**3/R**2), constant for one element.
+    r     : signed radius at the curved end (+ right, - left).
+    Returns (x, y, theta): local offset y (+ left of entry tangent) and tangent
+    angle theta (radians) at x, both measured from the zero-curvature end.
+    Reference: Autodesk Civil 3D 2026 Help, "About Transition Definitions" — see
+    session_logs/investigate_sinehalfwave_formula.md for the verified derivation.
+    """
+    a = x / big_x
+    y = big_x ** 2 / r * (a ** 2 / 4 - (1 - math.cos(math.pi * a)) / (2 * math.pi ** 2))
+    theta = math.atan(big_x / r * (a / 2 - math.sin(math.pi * a) / (2 * math.pi)))
+    return x, y, theta
 
 
 def _calculate_turning_angle_at(el: Element, s: float) -> float:
@@ -207,6 +252,31 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
         chord_azimuth = el.azimuth + theta / 2               # chord bisects arc angle
         pt = wcb.calculate_forward(el.n, el.e, chord_azimuth, chord)
         return ElementState(n=pt.n, e=pt.e, azimuth=fpmath.normalize_angle(el.azimuth + theta))
+
+    # COSINE spiral (pure SPIN or SPOUT only — exactly one of k_in/k_out is zero):
+    # Civil 3D Sine Half-Wavelength closed form, not the Simpson integration below.
+    # See module docstring "Transition shapes" and _sine_halfwave_point.
+    if el.transition == 'COSINE' and (el.k_in == 0) != (el.k_out == 0):
+        length = el.sta_end - el.sta_start
+        if el.k_in == 0:   # SPIN: curvature 0 -> 1/R, canonical form used directly
+            r = radius_from_curvature(el.k_out)
+            big_x = length - _SINE_HALFWAVE_C * length ** 3 / r ** 2
+            x_local, y_local, theta_local = _sine_halfwave_point(d, big_x, r)
+        else:   # SPOUT: curvature 1/R -> 0, mirror canonical form via s <-> L-d
+            r = radius_from_curvature(el.k_in)
+            big_x = length - _SINE_HALFWAVE_C * length ** 3 / r ** 2
+            x_end, y_end, theta_total = _sine_halfwave_point(length, big_x, r)
+            x_g, y_g, theta_g = _sine_halfwave_point(length - d, big_x, r)
+            dx, dy = x_end - x_g, y_end - y_g
+            x_local = dx * math.cos(theta_total) + dy * math.sin(theta_total)
+            y_local = dx * math.sin(theta_total) - dy * math.cos(theta_total)
+            theta_local = theta_total - theta_g
+        ca, sa = math.cos(el.azimuth), math.sin(el.azimuth)
+        return ElementState(
+            n=el.n + x_local * ca - y_local * sa,
+            e=el.e + x_local * sa + y_local * ca,
+            azimuth=fpmath.normalize_angle(el.azimuth + theta_local),
+        )
 
     # Spiral: variable curvature → Simpson integration of (cos θ, sin θ)
     #   Local frame: x along entry tangent, y perpendicular (left).

@@ -68,6 +68,16 @@ def test_check_horizontal_gap_equals_hypot(golden: dict, elements: list) -> None
         assert abs(r.gap_metres - math.hypot(r.delta_n, r.delta_e)) < 1e-12
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
+        'session_logs/investigate_sinehalfwave_formula.md) intentionally shifts '
+        'SC@2249.324 and ST@2554.756 by ~3cm vs the old Simpson-based golden fixture. '
+        'Fixture regeneration is the immediate next plan; remove this mark once '
+        'tests/golden/tables.json and reference/tables.json are regenerated.'
+    ),
+)
 def test_check_horizontal_all_pass(golden: dict, elements: list) -> None:
     """All 31 control points must fall within 2 mm of the alignment engine."""
     results = ck.check_horizontal(elements, golden['controls'], tol=2e-3)

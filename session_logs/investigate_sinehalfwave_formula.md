@@ -43,3 +43,9 @@ smt-test1.xml และ SMT_TEST_ALINGMENT2.xml เป็นไฟล์ Civil 3
 SPIN radiusStart เท่ากับ INF radiusEnd เท่ากับ 250 theta เท่ากับ 5.705449190899 องศา totalY เท่ากับ 1.484093072531 totalX เท่ากับ 49.954662110533 tanLong เท่ากับ 35.100262042251 tanShort เท่ากับ 14.928353346451
 SPOUT radiusStart เท่ากับ 250 radiusEnd เท่ากับ INF theta totalY totalX tanLong tanShort เท่ากับ SPIN ทุกตัวเลขเป๊ะ
 สรุป ยืนยัน mirror-symmetry ระหว่าง SPIN SPOUT ด้วยข้อมูล Civil 3D จริง ไม่ใช่ข้อสันนิษฐาน ใช้แนวทางเดียวกับ CLOTHOID BLOSS SINE คือ swap บทบาท k_in k_out ผ่านการสลับ s เป็น L ลบ s บนฟังก์ชันเดียวกัน ไม่ต้องมีสูตรแยกสำหรับ SPOUT
+
+วัดขนาด error จริงของการประมาณ x เท่ากับ s ที่จุด d เท่ากับ L (จุดที่ calculate_exit_state ใช้งานจริง) หลัง implement แล้วใน alignment.py
+วิธีวัด เทียบผลลัพธ์ระหว่างเรียก calculate_point_on_element ที่ d เท่ากับ X (จุดที่ a เท่ากับ 1 พอดี สูตรตรง Civil 3D ระดับ machine precision) กับที่ d เท่ากับ L (จุดจริงที่ใช้งาน)
+R เท่ากับ 900 L เท่ากับ 100 X เท่ากับ 99.972014 (L ลบ X เท่ากับ 0.027986 เมตร) error ที่ d เท่ากับ L คือ theta คลาดเคลื่อน 0.00178 องศา totalY คลาดเคลื่อน 1.5548 มิลลิเมตร
+R เท่ากับ 250 L เท่ากับ 50 X เท่ากับ 49.954662 (L ลบ X เท่ากับ 0.045338 เมตร) error ที่ d เท่ากับ L คือ theta คลาดเคลื่อน 0.01029 องศา totalY คลาดเคลื่อน 4.5338 มิลลิเมตร
+สรุป error นี้เป็นคนละก้อนกับ error 3 ซม. ของสูตร Simpson เดิมที่แก้อยู่ในรอบนี้ เป็น error เพิ่มเติมจากการประมาณ x เท่ากับ s เท่านั้น ขนาดเล็กกว่ามาก (หลักมิลลิเมตร ไม่ใช่เซนติเมตร) แต่ยังเป็น known limitation ที่ยังไม่แก้ ตามที่บันทึกไว้ใน src/smt/alignment.py docstring ส่วน Known limitations

@@ -10,6 +10,7 @@ Two test categories:
 import json
 import math
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -46,6 +47,17 @@ def _mid(el: al.Element) -> float:
 # Test 1: chain integrity
 # ---------------------------------------------------------------------------
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
+        'session_logs/investigate_sinehalfwave_formula.md) intentionally shifts the '
+        'SPIN-COSINE exit (SC@2249.324) and SPOUT-COSINE exit (ST@2554.756) by '
+        '~3cm vs the old Simpson-based golden fixture. Fixture regeneration is the '
+        'immediate next plan; remove this mark once tests/golden/tables.json and '
+        'reference/tables.json are regenerated.'
+    ),
+)
 def test_chain_has_no_gaps(elements):
     """Exit state of element[n] must equal entry state of element[n+1]."""
     issues = al.check_chain(elements, tolerance=0.005)
@@ -63,6 +75,16 @@ def _control_params(golden_data):
     ]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
+        'session_logs/investigate_sinehalfwave_formula.md) intentionally shifts '
+        'SC@2249.324 and ST@2554.756 by ~3cm vs the old Simpson-based golden fixture. '
+        'Fixture regeneration is the immediate next plan; remove this mark once '
+        'tests/golden/tables.json and reference/tables.json are regenerated.'
+    ),
+)
 def test_control_points(elements, golden):
     """All 31 control points must resolve to N,E within 1e-3 m.
 
@@ -86,11 +108,42 @@ def test_control_points(elements, golden):
     assert not failures, 'Control point failures:\n' + '\n'.join(failures)
 
 
-# Parametrized variant — one test per control point for granular CI output
+# Parametrized variant — one test per control point for granular CI output.
+# Only ST@2554.756 is marked xfail: COSINE closed-form fix (session_logs/
+# plan_cosine_sinehalfwave_fix.md, session_logs/investigate_sinehalfwave_formula.md)
+# intentionally shifts it ~3cm vs the old Simpson-based golden fixture. Fixture
+# regeneration is the immediate next plan; remove this mark once tests/golden/
+# tables.json and reference/tables.json are regenerated. SC@2249.324 looks like it
+# should be affected too but genuinely passes: the golden fixture rounds its station
+# to 3 decimals (2249.324 vs the true boundary 2249.3237), which lands just outside
+# get_element_index's +-1e-4 tolerance for the SPIN-COSINE element, so the lookup
+# resolves in the next (circular, unaffected) element instead — see
+# session_logs/report_xfail_mismatch_20260705.md section 2.3. The other 29 control
+# points are unaffected and keep full coverage.
+_COSINE_XFAIL_REASON = (
+    'COSINE closed-form fix shifts this control point ~3cm vs the old '
+    'Simpson-based golden fixture (session_logs/plan_cosine_sinehalfwave_fix.md, '
+    'session_logs/investigate_sinehalfwave_formula.md); fixture regeneration is '
+    'the immediate next plan.'
+)
+
+
+# Station-based, not name-based: SC/ST repeat once per curve group (5 groups in the
+# golden alignment). Only ST@2554.756 is genuinely affected (see comment above).
+_COSINE_AFFECTED_STATIONS = (2554.756,)
+
+
+def _control_point_param(cp: dict) -> Any:
+    values = (cp['sta'], cp['n'], cp['e'], cp['name'])
+    if cp['sta'] in _COSINE_AFFECTED_STATIONS:
+        return pytest.param(*values, marks=pytest.mark.xfail(strict=True, reason=_COSINE_XFAIL_REASON))
+    return values
+
+
 @pytest.mark.parametrize(
     'sta,exp_n,exp_e,name',
     [
-        (cp['sta'], cp['n'], cp['e'], cp['name'])
+        _control_point_param(cp)
         for cp in json.loads(_GOLDEN.read_text(encoding='utf-8'))['controls']
     ],
     ids=[
@@ -215,6 +268,17 @@ def test_point_on_tangent_due_east():
     assert math.isclose(st.e, 10519.6152, abs_tol=1e-9)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        'COSINE closed-form fix (session_logs/plan_cosine_sinehalfwave_fix.md, '
+        'session_logs/investigate_sinehalfwave_formula.md) intentionally shifts the '
+        'SPIN-COSINE exit (element 11->12, SC@2249.324) and SPOUT-COSINE exit '
+        '(element 13->14, ST@2554.756) by ~3cm vs the old Simpson-based golden '
+        'fixture. Fixture regeneration is the immediate next plan; remove this mark '
+        'once tests/golden/tables.json and reference/tables.json are regenerated.'
+    ),
+)
 def test_exit_state_matches_next_entry(elements):
     """Exit state of each element must match the n,e,az of the next element."""
     tol_pos = 1e-3   # 1 mm
@@ -400,3 +464,60 @@ def test_c2s_far_point_raises():
     el = al.make_element('T', 0, 100, 0.0, 0.0, 90.0, 0)
     with pytest.raises(ValueError):
         al.calculate_coordinate_to_station([el], 0.0, -500.0)
+
+
+# ---------------------------------------------------------------------------
+# Test 15: COSINE closed form (Civil 3D Sine Half-Wavelength Diminishing Tangent
+# Curve) — ground truth from session_logs/investigate_sinehalfwave_formula.md,
+# itself sourced from Autodesk Civil 3D 2026 Help, "About Transition Definitions"
+# (https://help.autodesk.com/cloudhelp/2026/ENG/Civil3D-UserGuide/files/GUID-DD7C0EA1-8465-45BA-9A39-FC05106FD822.htm).
+# Evaluated at d=X (the closed-form tangent-projected length), not d=L, because
+# calculate_point_on_element approximates the tangent-projected coordinate by arc
+# distance (see alignment.py module docstring "Known limitations") — d=X is the one
+# point where that approximation is exact (a=1), matching how the formula itself was
+# hand-verified. The d=L approximation error (1.5548mm / 4.5338mm) is measured and
+# documented there and in alignment.py, not re-asserted here.
+# ---------------------------------------------------------------------------
+
+def _cosine_local_turn_and_offset(el: al.Element, d: float) -> tuple[float, float]:
+    """(turning angle deg, perpendicular local offset m) at arc distance d."""
+    st = al.calculate_point_on_element(el, d)
+    turn_deg = math.degrees(st.azimuth - el.azimuth)
+    dn, de = st.n - el.n, st.e - el.e
+    local_y = -dn * math.sin(el.azimuth) + de * math.cos(el.azimuth)
+    return turn_deg, local_y
+
+
+def test_cosine_closed_form_endpoint_r900_l100():
+    R, L = 900.0, 100.0
+    big_x = L - al._SINE_HALFWAVE_C * L ** 3 / R ** 2
+    el = al.make_element('SPIN', 0, L, 0.0, 0.0, 90.0, R, None, 'COSINE')
+    turn_deg, local_y = _cosine_local_turn_and_offset(el, big_x)
+    assert math.isclose(turn_deg, 3.178942026888, abs_tol=1e-6)
+    assert math.isclose(local_y, 1.651062316115, abs_tol=1e-6)
+
+
+def test_cosine_closed_form_endpoint_r250_l50():
+    R, L = 250.0, 50.0
+    big_x = L - al._SINE_HALFWAVE_C * L ** 3 / R ** 2
+    assert math.isclose(big_x, 49.954662110533, abs_tol=1e-6)
+    el = al.make_element('SPIN', 0, L, 0.0, 0.0, 90.0, R, None, 'COSINE')
+    turn_deg, local_y = _cosine_local_turn_and_offset(el, big_x)
+    assert math.isclose(turn_deg, 5.705449190899, abs_tol=1e-6)
+    assert math.isclose(local_y, 1.484093072531, abs_tol=1e-6)
+
+
+@pytest.mark.parametrize('r,length', [(900.0, 100.0), (250.0, 50.0), (500.0, 70.0)])
+def test_cosine_spin_spout_symmetry_matches_civil3d(r, length):
+    """SPIN and SPOUT of equal R,L must share the same total turning angle.
+
+    Confirmed against real Civil 3D data (R=250/L=50, from the now-lost
+    SMT_TEST_ALINGMENT2.xml) in session_logs/investigate_sinehalfwave_formula.md:
+    SPIN and SPOUT gave identical theta/totalX/totalY/tanLong/tanShort. This test
+    operationalizes that invariant for the s<->L-s SPOUT mirror implemented here.
+    """
+    spin = al.make_element('SPIN', 0, length, 0.0, 0.0, 90.0, r, None, 'COSINE')
+    spout = al.make_element('SPOUT', 0, length, 0.0, 0.0, 90.0, r, None, 'COSINE')
+    spin_turn = al.calculate_exit_state(spin).azimuth - spin.azimuth
+    spout_turn = al.calculate_exit_state(spout).azimuth - spout.azimuth
+    assert math.isclose(spin_turn, spout_turn, abs_tol=1e-9)
