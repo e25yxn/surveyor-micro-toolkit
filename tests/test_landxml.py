@@ -367,3 +367,127 @@ class TestAnglePoint:
     def test_valid_xml(self):
         xml = export_alignment_landxml(_build(_verts_angle_point()))
         _parse(xml)   # raises if not well-formed
+
+
+# ---------------------------------------------------------------------------
+# Curve/Spiral chord/delta/tangent/external/midOrd/crvType + <PI> sub-tag
+# ---------------------------------------------------------------------------
+
+def _verts_pi_table_ground_truth():
+    """PI table verified against a real Civil 3D LandXML export within 0.5 mm
+    for Curve tangent/chord/external/midOrd/PI and Spiral(SPIN) PI --
+    see session_logs/investigate_landxml_curve_pi_attrs.md."""
+    return [
+        {'n': 1543078.851, 'e': 682175.2221},
+        {'n': 1543275.044, 'e': 682214.0623, 'R': 100.0,  'Ls': 35.0, 'trans': 'CLOTHOID'},
+        {'n': 1543368.699, 'e': 682416.2292, 'R': -105.0, 'Ls': 40.0, 'trans': 'CLOTHOID'},
+        {'n': 1543573.554, 'e': 682458.492},
+    ]
+
+
+def _verts_curve_left():
+    """Left-hand circular curve R=300 (mirrors _verts_curve but ccw)."""
+    return [
+        {'n':    0.0, 'e':   0.0},
+        {'n':    0.0, 'e': 500.0, 'R': 300.0},
+        {'n':  500.0, 'e': 500.0},
+    ]
+
+
+class TestCurvePISubTagCivil3D:
+    """Ground truth Civil 3D LandXML numbers from
+    session_logs/investigate_landxml_curve_pi_attrs.md.  Tolerance is 0.5 mm
+    (5e-4 m), NOT the 1e-6 used by the synthetic-input tests elsewhere in this
+    file: the report found 0.008-0.30 mm differences from Civil 3D's own
+    reported values (likely because Civil 3D re-derives alignment geometry
+    on import instead of preserving what we export) -- these new attributes
+    are a close approximation, not an exact reproduction.
+    """
+    _TOL = 5e-4   # 0.5 mm -- see session_logs/investigate_landxml_curve_pi_attrs.md
+
+    def test_curve_tangent_chord_external_midord(self):
+        xml = export_alignment_landxml(_build(_verts_pi_table_ground_truth()))
+        root = _parse(xml)
+        curve = _find_all(root, 'Curve')[0]
+        assert math.isclose(float(curve.get('tangent')),  30.470311074669, abs_tol=self._TOL)
+        assert math.isclose(float(curve.get('chord')),     58.294529362525, abs_tol=self._TOL)
+        assert math.isclose(float(curve.get('external')),   4.539178574294, abs_tol=self._TOL)
+        assert math.isclose(float(curve.get('midOrd')),     4.342083643854, abs_tol=self._TOL)
+
+    def test_curve_crv_type_is_arc(self):
+        xml = export_alignment_landxml(_build(_verts_pi_table_ground_truth()))
+        root = _parse(xml)
+        curve = _find_all(root, 'Curve')[0]
+        assert curve.get('crvType') == 'arc'
+
+    def test_curve_pi_point(self):
+        xml = export_alignment_landxml(_build(_verts_pi_table_ground_truth()))
+        root = _parse(xml)
+        curve = _find_all(root, 'Curve')[0]
+        pi_n, pi_e = _ne(curve, 'PI')
+        assert math.isclose(pi_n, 1543269.952250064351, abs_tol=self._TOL)
+        assert math.isclose(pi_e,  682220.539152466343, abs_tol=self._TOL)
+
+    def test_spin_pi_point_matches_civil3d(self):
+        """SPIN only -- this is the one spiral element the investigation report
+        has an independent Civil 3D ground-truth number for.  There is no
+        equivalent ground truth for SPOUT in this project (see class
+        TestSpoutPISelfConsistency below for why, and how SPOUT is verified
+        instead)."""
+        xml = export_alignment_landxml(_build(_verts_pi_table_ground_truth()))
+        root = _parse(xml)
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
+        pi_n, pi_e = _ne(spin, 'PI')
+        assert math.isclose(pi_n, 1543230.641722853528, abs_tol=self._TOL)
+        assert math.isclose(pi_e,  682205.272023039055, abs_tol=self._TOL)
+
+
+class TestSpoutPISelfConsistency:
+    """SPOUT PI point has NO independent Civil 3D ground truth in this project
+    (checked: grepped the whole repo for the report's ground-truth numbers,
+    only the report itself contains them; the only two XML/CSV files that
+    looked like candidates -- test_data/SettingOutTest555.xml and
+    test_data/SMT_TEST_CLOTHIOD.csv -- are a different PI table and an SMT-own
+    export respectively, not a Civil 3D export of *this* PI table's SPOUT).
+
+    So SPOUT is verified two other ways instead, NEITHER of which is
+    equivalent to an independent Civil-3D comparison:
+    1. mirror-symmetry: test_spout_geometry_matches_spin (existing test,
+       TestSpiralIn class) already proves SPIN and SPOUT compute the same
+       tanLong/tanShort/totalX/totalY when R and length match.
+    2. self-consistency (this test): SPOUT's own PI point must sit at
+       distance `tanLong` from SPOUT's own Start, along SPOUT's own entry
+       azimuth -- proves the PI formula was applied correctly to the SPOUT
+       branch's variables, not that the result matches Civil 3D.
+    """
+
+    def test_spout_pi_distance_equals_tan_long(self):
+        xml = export_alignment_landxml(_build(_verts_pi_table_ground_truth()))
+        root = _parse(xml)
+        spout = next(s for s in _find_all(root, 'Spiral') if s.get('radiusEnd') == 'INF')
+        tan_long = float(spout.get('tanLong'))
+        pi_n, pi_e = _ne(spout, 'PI')
+        sn, se = _ne(spout, 'Start')
+        assert math.isclose(math.hypot(pi_n - sn, pi_e - se), tan_long, abs_tol=1e-6)
+
+
+class TestCurvePIGeometricInvariant:
+    """Formula-independent regression check (tight 1e-6 tolerance, no Civil 3D
+    ground truth needed): for a simple circular curve, PI is equidistant from
+    curve Start and curve End, and both distances equal `tangent` -- true for
+    both right (_verts_curve) and left (_verts_curve_left) turns.  Guards
+    against the R-sign bug class called out in
+    session_logs/investigate_landxml_curve_pi_attrs.md section 5 (formula
+    must use R=abs(1/k), not el.k_in directly)."""
+
+    def test_pi_equidistant_from_start_and_end(self):
+        for verts in (_verts_curve(), _verts_curve_left()):
+            xml = export_alignment_landxml(_build(verts))
+            root = _parse(xml)
+            curve = _find_all(root, 'Curve')[0]
+            tangent = float(curve.get('tangent'))
+            pi_n, pi_e = _ne(curve, 'PI')
+            sn, se = _ne(curve, 'Start')
+            en, ee = _ne(curve, 'End')
+            assert math.isclose(math.hypot(pi_n - sn, pi_e - se), tangent, abs_tol=1e-6)
+            assert math.isclose(math.hypot(pi_n - en, pi_e - ee), tangent, abs_tol=1e-6)

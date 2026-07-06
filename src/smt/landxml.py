@@ -14,6 +14,20 @@ totalX/totalY/tanLong/tanShort (meters), computed canonically from a
 synthetic Element at the origin curving from k_in=0 to k_out=1/R — these
 values do not depend on the spiral's real position, direction, or role
 (SPIN/SPOUT) in the alignment.
+
+Curve also carries delta (dd, unsigned total turning angle of that Curve
+element only — not the full PI's deflection when spirals flank it),
+chord/tangent/external/midOrd (meters, standard circular-curve formulas from
+R and delta), and crvType="arc" (constant).  Both Curve and Spiral carry a
+<PI> sub-tag (Start + tangent, resp. tanLong, projected along the element's
+entry azimuth via wcb.calculate_forward) — for Spiral this is the PI local
+to that spiral's own tangent line, not the alignment vertex PI.
+These six new values are a close approximation of Civil 3D's own reported
+values (observed diff 0.008-0.30 mm across two ground-truth curves/spirals),
+not an exact reproduction — see
+session_logs/investigate_landxml_curve_pi_attrs.md for the verification and
+the likely reason (Civil 3D re-derives geometry on import rather than
+preserving raw exported values).
 """
 from __future__ import annotations
 
@@ -22,6 +36,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 
 from . import fpmath
+from . import wcb
 from .alignment import (
     Element,
     calculate_exit_state,
@@ -135,6 +150,10 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
     rot="cw" for k>0 (right turn), rot="ccw" for k<0 (left turn).
     Curve: <Center> child tag; dirStart/dirEnd (entry/exit azimuth, Civil 3D
     direction convention, decimal degrees).
+    Curve also carries delta/chord/tangent/external/midOrd (meters/dd,
+    standard circular-curve formulas — see module docstring) and
+    crvType="arc"; both Curve and Spiral carry a <PI> sub-tag.  These values
+    approximate Civil 3D within ~0.5 mm, not exact (see module docstring).
     Spiral: no dirStart/dirEnd; theta (absolute total turning angle, decimal
     degrees) plus totalX/totalY/tanLong/tanShort (meters, canonical — see
     _spiral_geometry) instead.  spiType holds the spiral shape (clothoid/
@@ -186,15 +205,29 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             R = abs(1.0 / k)
             cn, ce = _curve_center(el.n, el.e, el.azimuth, k)
             exit_az = _exit_azimuth(i, elements)
+            delta_rad = _theta_rad(el.azimuth, exit_az)
+            half_delta = delta_rad / 2.0
+            tangent = R * math.tan(half_delta)
+            chord = 2.0 * R * math.sin(half_delta)
+            external = R * (1.0 / math.cos(half_delta) - 1.0)
+            mid_ord = R * (1.0 - math.cos(half_delta))
+            pi_point = wcb.calculate_forward(el.n, el.e, el.azimuth, tangent)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Curve',
                                 rot=_rotation(k),
                                 radius=f'{R:.6f}',
                                 length=f'{length:.6f}',
                                 dirStart=f'{_to_civil_dir(el.azimuth):.6f}',
-                                dirEnd=f'{_to_civil_dir(exit_az):.6f}')
+                                dirEnd=f'{_to_civil_dir(exit_az):.6f}',
+                                delta=f'{fpmath.rad_to_deg(delta_rad):.6f}',
+                                chord=f'{chord:.6f}',
+                                tangent=f'{tangent:.6f}',
+                                external=f'{external:.6f}',
+                                midOrd=f'{mid_ord:.6f}',
+                                crvType='arc')
             _sub(tag, 'Start',  _coord(el.n, el.e))
             _sub(tag, 'Center', _coord(cn, ce))
             _sub(tag, 'End',    _coord(end_n, end_e))
+            _sub(tag, 'PI',     _coord(pi_point.n, pi_point.e))
 
         elif el.type == 'SPIN':
             k_out = el.k_out
@@ -203,6 +236,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             theta_rad = _theta_rad(el.azimuth, exit_az)
             total_x, total_y, tan_long, tan_short = _spiral_geometry(
                 R_out, length, el.transition, theta_rad)
+            pi_point = wcb.calculate_forward(el.n, el.e, el.azimuth, tan_long)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
                                 rot=_rotation(k_out),
                                 radiusStart='INF',
@@ -216,6 +250,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 tanShort=f'{tan_short:.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
+            _sub(tag, 'PI',    _coord(pi_point.n, pi_point.e))
 
         elif el.type == 'SPOUT':
             k_in = el.k_in
@@ -224,6 +259,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
             theta_rad = _theta_rad(el.azimuth, exit_az)
             total_x, total_y, tan_long, tan_short = _spiral_geometry(
                 R_in, length, el.transition, theta_rad)
+            pi_point = wcb.calculate_forward(el.n, el.e, el.azimuth, tan_long)
             tag = ET.SubElement(coord_geom, f'{{{_NS}}}Spiral',
                                 rot=_rotation(k_in),
                                 radiusStart=f'{R_in:.6f}',
@@ -237,6 +273,7 @@ def export_alignment_landxml(build_result: BuildResult, name: str = 'alignment')
                                 tanShort=f'{tan_short:.6f}')
             _sub(tag, 'Start', _coord(el.n, el.e))
             _sub(tag, 'End',   _coord(end_n, end_e))
+            _sub(tag, 'PI',    _coord(pi_point.n, pi_point.e))
 
     ET.indent(root, space='  ')
     xml_body = ET.tostring(root, encoding='unicode')
