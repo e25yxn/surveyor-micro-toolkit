@@ -1,5 +1,25 @@
 # Session Log
 
+## [2026-07-07] สืบสวน COSINE totalY/theta/tanShort ใน LandXML export — สรุปว่าตกกรณียาก
+
+- ทำ: สืบสวน (plan mode, ยังไม่แก้โค้ด) ว่าทำไม theta/totalY/tanShort ของ COSINE ใน LandXML
+  export ยังใช้ค่าประมาณ ไม่ตรง Civil 3D จริง แม้ totalX แก้ไปแล้วก่อนหน้านี้
+  - ยืนยันด้วย Explore agent 2 ตัว + คำนวณ python จริง: ตัวเลขส่วนต่างตรงกับที่บันทึกไว้เดิม
+    ทุกตัว (0.0017762° ที่ R=900/L=100, 0.0102878° ที่ R=250/L=50)
+  - พบว่า theta คือ `calculate_exit_state(...).azimuth` ตัวเดียวกับที่ใช้วาง element ถัดไปจริง
+    ในไฟล์ (ต่างจาก totalX ซึ่งเป็นตัวเลขบรรยายเดี่ยวไม่มีใครพึ่งพา)
+  - สรุป: **ตกกรณียาก** — ถ้าจะแก้ให้ตรงจริงต้องแก้ core engine
+    (`calculate_point_on_element`/`calculate_exit_state` ใน alignment.py) ไม่ใช่แค่ patch
+    landxml.py แบบเดียวกับ totalX เพราะจะทำให้ theta ไม่ตรงกับพิกัด End/azimuth ที่ element
+    ถัดไปใช้จริงในไฟล์เดียวกัน (ไฟล์ขัดแย้งในตัวเอง) การแก้จริงจะกระทบ golden fixture ทั้งชุด
+    และต้องอัปเดต VBA คู่กันตามกฎ
+  - **ยังไม่มีการแก้โค้ดใดๆ ในรอบนี้** — เป็นรายงานสืบสวนล้วน
+- คำสั่ง: Explore agent ×2 (parallel) → python3 -c คำนวณยืนยันตัวเลข → เขียนร่างลง scratchpad
+  → cat แสดงให้ตรวจ → ผู้ใช้อนุมัติ → Write session_logs/investigate_cosine_totaly_theta_export.md
+  → diff เทียบ scratchpad กับไฟล์จริง (ไม่ต่างกันเลย)
+- ผล: PASS (ไม่มี test เกี่ยวข้อง — งานสืบสวน/เอกสารล้วน ไม่แตะโค้ด)
+- commit: (รอ — จะ commit เฉพาะ investigate_cosine_totaly_theta_export.md + latest.md ต่อจากนี้)
+
 ## [2026-07-07] Annotate oracle ใน reference/Alignment.gs
 
 - ทำ: เพิ่ม comment เตือน 5 บรรทัดเหนือ case COSINE ในฟังก์ชัน shapeIntegral_ อธิบายว่าเป็น
