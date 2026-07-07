@@ -45,6 +45,13 @@ Transition shapes (spiral elements only):
                        not a separate bug (see session_logs/
                        investigate_sinehalfwave_formula.md).
 
+Naming note: 'COSINE' is this project's internal name for the shape Civil 3D
+calls the Sine Half-Wavelength Diminishing Tangent Curve (spiType="sineHalfWave"
+in LandXML) -- the same shape, not a different one. The name 'COSINE' stays in
+code and in the CSV Transition column for backward compatibility with existing
+files; see session_logs/investigate_sinehalfwave_formula.md and
+docs/extensions.md EXT-003 for the formula derivation.
+
 Depends on: fpmath, wcb.
 """
 from __future__ import annotations
@@ -126,7 +133,8 @@ def _shape_integral(transition: str, tau: float) -> float:
 
 
 def _sine_halfwave_point(x: float, big_x: float, r: float) -> tuple[float, float, float]:
-    """Civil 3D Sine Half-Wavelength Diminishing Tangent Curve, canonical (SPIN) form.
+    """COSINE transition shape (Civil 3D Sine Half-Wave -- see module docstring
+    "Transition shapes"), canonical (SPIN) form.
 
     x     : tangent-projected distance from the zero-curvature end (approximated by
             arc distance here — see module docstring "Known limitations").
@@ -145,9 +153,9 @@ def _sine_halfwave_point(x: float, big_x: float, r: float) -> tuple[float, float
 
 
 def calculate_sine_halfwave_tangent_length(length: float, r: float) -> float:
-    """Closed-form tangent-projected length X for the COSINE (Civil 3D "Sine
-    Half-Wavelength Diminishing Tangent Curve") transition shape, at the
-    element's own true end (arc length = `length`).
+    """Closed-form tangent-projected length X for the COSINE transition shape
+    (Civil 3D Sine Half-Wave -- see module docstring "Transition shapes"), at
+    the element's own true end (arc length = `length`).
 
     length : element arc length L (m); always positive.
     r      : signed radius at the curved end (m); sign does not affect the
