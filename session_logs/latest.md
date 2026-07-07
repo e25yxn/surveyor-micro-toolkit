@@ -1,5 +1,72 @@
 # Session Log
 
+## [2026-07-07] Annotate oracle ใน reference/Alignment.gs
+
+- ทำ: เพิ่ม comment เตือน 5 บรรทัดเหนือ case COSINE ในฟังก์ชัน shapeIntegral_ อธิบายว่าเป็น
+  จุดอ้างอิงประวัติศาสตร์ที่แช่แข็งไว้ ไม่ตรงกับ Civil 3D จริง ชี้ไปที่ docs/extensions.md
+  EXT-003 และ alignment.py แทน
+  ไม่แก้สูตรหรือค่าใดๆ ในไฟล์ ตามหลัก frozen oracle
+- คำสั่ง: diff เทียบก่อน/หลังคัดลอกทับ → git diff -- reference/Alignment.gs (ยืนยัน 5 บรรทัด
+  comment เท่านั้น) → Write .git\smt_commit_msg.txt → git add reference/Alignment.gs →
+  git commit -F .git\smt_commit_msg.txt → git push
+- ผล: PASS (ไม่มี test เกี่ยวข้อง — เอกสาร/comment ล้วน ไม่แตะโค้ด)
+- commit: 1818a38 (push แล้ว c3b535c..1818a38)
+
+## [2026-07-06] เพิ่ม chord/delta/tangent/external/midOrd/crvType และ PI sub-tag ให้ Curve/Spiral ใน LandXML export
+
+- ทำ: สืบสวนสูตรเทียบ Civil 3D ground truth จริง (จากไฟล์ C3D_Export_SMT_TEST_CLOTHOID.xml
+  ที่ผู้ใช้ทดสอบ) พบว่าตรงกันในระดับ 0.008-0.30 มม. ไม่ใช่ตรงเป๊ะ (คาดว่า Civil 3D คำนวณ
+  geometry ใหม่เองหลัง import)
+  - เพิ่ม 6 attribute ให้ Curve และ PI sub-tag ให้ทั้ง Curve และ Spiral (SPIN/SPOUT) โดยใช้
+    wcb.calculate_forward ที่มีอยู่แล้ว
+  - พบและปิดช่องโหว่ระหว่างวางแผน คือ PI point ของ SPOUT ไม่มี ground truth อิสระให้เทียบ
+    (มีแค่ SPIN) จึงเพิ่ม test แยกสำหรับ SPOUT ด้วย self-consistency + mirror-symmetry แทน
+    ระบุข้อจำกัดนี้ไว้ชัดเจนในเอกสารและ docstring
+  - เพิ่ม 6 test ใหม่ (รวม geometric invariant test ที่ไม่พึ่ง ground truth) ยืนยันด้วย
+    smoke test จริงผ่าน SettingOutTest.csv (10 Curve + 10 Spiral ไม่มีปัญหา)
+  - ระหว่างทางยังพิสูจน์ยืนยันว่า SMT export-landxml ทำงานได้จริงกับ Civil 3D 2023 จริง
+    (import ผ่านเมนู Insert เขียน LandXML มาตรฐาน) ซึ่งเป็นการยืนยันครั้งแรกในโปรเจกต์ว่าไฟล์
+    export ใช้งานได้จริง ไม่ใช่แค่ตัวเลขตรงกับ ground truth
+- คำสั่ง: สืบสวน → วางแผน → แก้โค้ด/เทส → pytest -q → smt export-landxml smoke test →
+  Write .git\smt_commit_msg.txt → git add → git commit -F (แยกกันตามลำดับงาน)
+- ผล: PASS 467/467
+- commit: cd9d138 (สืบสวน), c3b535c (แผน+โค้ด+test)
+
+## [2026-07-05] แก้ LandXML COSINE totalX รายงานค่า L แทนค่า X ปิดที่ถูกต้อง
+
+- ทำ: สืบสวนพบว่า _sine_halfwave_point คืนค่า x ที่รับเข้ามาตรงๆ ไม่แปลงเป็นค่า X ปิด ทำให้
+  totalX ที่ export ออกไปเท่ากับ L เป๊ะ
+  - แก้โดยเพิ่มฟังก์ชันสาธารณะ calculate_sine_halfwave_tangent_length ใน alignment.py
+    (จุดความจริงเดียว ใช้ทั้งใน alignment.py เองและ landxml.py) แก้เฉพาะ totalX ของ COSINE
+    เท่านั้น ไม่แตะ totalY หรือ theta
+  - เพิ่ม 2 test ใหม่ใน test_landxml.py ยืนยันด้วย smoke test จริงผ่าน SettingOutTest.csv
+- คำสั่ง: สืบสวน → วางแผน → แก้โค้ด/เทส → pytest -q → smt export-landxml smoke test →
+  Write .git\smt_commit_msg.txt → git add → git commit -F
+- ผล: PASS 461/461
+- commit: 5f70111 (สืบสวน+แผน), af5f849 (โค้ด+test)
+
+## [2026-07-05] สำรวจ+จัดกลุ่ม CSV ใน test_data แล้วรัน smt build เฉพาะ PI table — audit เท่านั้น
+
+- ทำ: ทำตามแผน `csv-test-data-dynamic-wigderson.md` (plan mode) — งานสำรวจล้วน ไม่แก้ไฟล์ใดๆ
+  1. ลิสต์ CSV ทั้งหมดใน `test_data/` (ไม่รวม `build_out*`) ด้วย Glob — พบ 8 ไฟล์
+  2. อ่าน header แต่ละไฟล์ จัดกลุ่มตามกฎที่กำหนด: `pi_compound_curve.csv`,
+     `ramp01n01_SO.csv`, `ramp01n01_SO2.csv`, `SettingOutTest.csv` = PI table;
+     `elements_output.csv`, `r01n01_elements_output.csv` = element table;
+     `r01n01_so_crosscheck.csv` = drawing control point; `Bulk_cross-check.csv` = other
+     (header เป็น POINT,N,E,Z,DISC — ไม่เข้าเกณฑ์ field survey เพราะคอลัมน์แรกไม่ใช่ NAME ตรงตัว
+     ตามกฎ literal ที่กำหนด)
+  3. รัน `smt build` กับ 4 ไฟล์ PI table เขียน output ไปที่ scratch folder นอก test_data
+     (scratchpad ของ session นี้ — ไม่ใช่ `/tmp`)
+- คำสั่ง: `smt build test_data/<file>.csv --out-dir <scratch>/<file>` × 4 → ตรวจ exit
+  code + ไฟล์ output → ลบ scratch folder ทั้งหมด → `git status -sb` ยืนยัน test_data ไม่เปลี่ยน
+- ผล: PASS ทั้ง 4 ไฟล์ — exit code 0 ทุกไฟล์ ไม่มี ValueError จาก `_flush_pending` defensive
+  check เลย (ไม่มีข้อความ "มีทั้งค่า RADIUS...และมี compound sub-row ตามมา" ปรากฏ) ไม่มี
+  warning อื่นบน stderr ด้วย — ยังไม่พบไฟล์ไหนที่เข้าข่ายบั๊กแบบเดียวกับ PI7 เดิม
+- commit: ไม่มี (งาน audit ล้วน ไม่มีไฟล์ให้ commit — scratch folder ลบทิ้งหมดแล้ว)
+- หมายเหตุ: `Bulk_cross-check.csv` จัดเป็น "other" ตามกฎ literal header ที่ผู้ใช้กำหนด แม้
+  โครงสร้างจะคล้าย field survey (N,E,Z,DISC) เพราะคอลัมน์แรกชื่อ POINT ไม่ใช่ NAME — ยังไม่ตัดสินใจ
+  แทนผู้ใช้ว่าควรจัดกลุ่มใหม่หรือไม่ รอคำสั่ง
+
 ## [2026-07-05] สรุปรวม: แก้ COSINE closed-form + regenerate golden fixture (ปิดงานสองแผน)
 
 - ทำ: ครบทั้ง 2 แผนที่เกี่ยวข้องกัน
