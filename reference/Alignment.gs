@@ -35,6 +35,11 @@ var Alignment = (function () {
     var PI = Math.PI;
     switch (trans) {
       case 'BLOSS':  return tau*tau*tau - tau*tau*tau*tau/2;            // f=3τ²-2τ³
+      // หมายเหตุ สูตร COSINE ในไฟล์นี้เป็นจุดอ้างอิงประวัติศาสตร์ที่แช่แข็งไว้ตามที่ตกลงกันไว้
+      // ไม่ใช่ค่าที่ตรงกับ Civil 3D จริง (Civil 3D ใช้สูตรปิด Sine Half-Wavelength ที่ผูกกับ
+      // ระยะโปรเจกชันบนเส้นสัมผัส ไม่ใช่ arc length integral แบบนี้) ดูรายละเอียดการแก้ที่
+      // docs/extensions.md หัวข้อ EXT-003 และ session_logs/investigate_sinehalfwave_formula.md
+      // ห้ามใช้ไฟล์นี้เป็นจุดอ้างอิงสำหรับ COSINE ให้ใช้ src/smt/alignment.py แทน
       case 'COSINE': return tau/2 - Math.sin(PI*tau)/(2*PI);           // f=(1-cos πτ)/2
       case 'SINE':   return tau*tau/2 - (1 - Math.cos(2*PI*tau))/(4*PI*PI); // f=τ-sin(2πτ)/2π
       default:       return tau*tau/2;                                  // CLOTHOID: f=τ (เชิงเส้น)
