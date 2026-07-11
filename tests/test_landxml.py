@@ -4,6 +4,8 @@ from __future__ import annotations
 import math
 import xml.etree.ElementTree as ET
 
+import pytest
+
 from smt.builders.alignment_builder import build_alignment_from_pi
 from smt.landxml import _spiral_lx_type, export_alignment_landxml
 
@@ -68,6 +70,20 @@ def _verts_spiral_cosine():
         {'n':    0.0, 'e':   0.0},
         {'n':    0.0, 'e': 500.0, 'R': 400.0, 'Ls': 60.0, 'trans': 'COSINE'},
         {'n': -500.0, 'e': 500.0},
+    ]
+
+
+def _verts_spiral_cosine_rl(r: float, length: float):
+    """Same 90-degree bend shape as _verts_spiral_cosine(), but R/Ls parametrized.
+
+    Leg length scales with R/length so the spiral+circular-arc geometry always
+    fits before the PI, regardless of which ground-truth R/L pair is used.
+    """
+    leg = max(r, length) * 3.0
+    return [
+        {'n': 0.0,  'e': 0.0},
+        {'n': 0.0,  'e': leg, 'R': r, 'Ls': length, 'trans': 'COSINE'},
+        {'n': -leg, 'e': leg},
     ]
 
 
@@ -335,6 +351,30 @@ class TestSpiralIn:
         spout = next(s for s in _find_all(root, 'Spiral') if s.get('radiusEnd') == 'INF')
         for attr in ('totalX', 'totalY', 'tanLong', 'tanShort'):
             assert math.isclose(float(spin.get(attr)), float(spout.get(attr)), abs_tol=1e-6)
+
+    @pytest.mark.parametrize('r,length,y_exact,tan_short_exact', [
+        (900.0, 100.0, 1.651062316115, None),
+        (250.0,  50.0, 1.484093072531, 14.928353346451),
+        (500.0,  70.0, 1.4557579182062208, 20.856652643241134),
+    ])
+    def test_cosine_total_y_tan_short_match_ground_truth(self, r, length, y_exact, tan_short_exact):
+        """totalY/tanShort for COSINE now flow correctly from the Phase 1 arc-length-
+        inversion fix in alignment.py (calculate_point_on_element at d=length) --
+        see session_logs/investigate_landxml_phase2_totaly_export.md sections 2-3.
+
+        Ground truth: real Civil 3D exports (R=250/L=50 totalY+tanShort from
+        SMT_TEST_ALINGMENT2.xml; R=900/L=100 totalY from smt-test1.xml -- no
+        independent tanShort capture at that point) plus the a=1 exact closed
+        form for R=500/L=70 (no separate Civil 3D file at that R/L, but the
+        closed form itself was validated against the two real points above --
+        see session_logs/investigate_sinehalfwave_formula.md).
+        """
+        xml = export_alignment_landxml(_build(_verts_spiral_cosine_rl(r, length)))
+        root = _parse(xml)
+        spin = next(s for s in _find_all(root, 'Spiral') if s.get('radiusStart') == 'INF')
+        assert math.isclose(float(spin.get('totalY')), y_exact, abs_tol=1e-6)
+        if tan_short_exact is not None:
+            assert math.isclose(float(spin.get('tanShort')), tan_short_exact, abs_tol=1e-6)
 
     def test_geometry_attributes_are_positive(self):
         xml = export_alignment_landxml(_build(_verts_spiral()))

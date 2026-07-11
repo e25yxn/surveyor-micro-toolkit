@@ -104,10 +104,19 @@ All phases complete — 407/407 tests passing.
 - transition COSINE แก้แล้วเมื่อ 2026-07-05 ให้ใช้สูตรปิด Civil 3D Sine Half-Wave แทน Simpson เดิม
   (เดิมคลาดเคลื่อน tanLong/tanShort เทียบ Civil 3D จริง ~2.90 ซม. ที่ R=900 L=100 และ
   ~4.71 ซม. ที่ R=250 L=50 ยืนยันแล้ว) ดู session_logs/plan_cosine_sinehalfwave_fix.md,
-  session_logs/investigate_sinehalfwave_formula.md, docs/extensions.md EXT-003 — ยังมี
-  known limitation ย่อยที่ยังไม่แก้: x≈s เป็นค่าประมาณ (คลาดเคลื่อนหลักมิลลิเมตรที่ d
-  เท่ากับ L), SPOUT mid-curve ยืนยันด้วย boundary invariant เท่านั้น, LandXML totalX
-  รายงานค่า L ไม่ใช่ X จริง (รายละเอียดใน alignment.py docstring "Known limitations")
+  session_logs/investigate_sinehalfwave_formula.md, docs/extensions.md EXT-003
+  แก้เพิ่มอีกรอบเมื่อ 2026-07-11 (Phase 1-3): x≈s ที่เคยเป็นค่าประมาณ ตอนนี้แก้เป็น
+  arc-length inversion จริง (Simpson quadrature + bisection) ดู
+  session_logs/plan_cosine_arclength_core_fix.md,
+  session_logs/investigate_cosine_arclength_inversion.md; tests/golden/tables.json +
+  reference/tables.json regenerate รอบสามให้ตรงกับ core engine ที่แก้ ดู
+  session_logs/investigate_phase3_golden_regen_scope.md; LandXML totalY/tanShort
+  ยืนยันแล้วว่าถูกต้องอัตโนมัติจากการแก้นี้ ไม่ต้องแก้ landxml.py เพิ่ม (totalX เคยแก้แยก
+  ไปแล้วก่อนหน้า ยังคงถูกต้อง) ดู session_logs/investigate_landxml_phase2_totaly_export.md —
+  known limitation ที่ยังเหลือจริง (ไม่ใช่ล้าสมัย): (1) s(1) ไม่เท่ากับ length เป๊ะ residual
+  คงที่ 0.036-0.187mm ไม่ลดลงแม้เพิ่ม Simpson interval (2) SPOUT mid-curve ยืนยันด้วย
+  boundary invariant เท่านั้น ไม่มีข้อมูล Civil 3D จุดกลางโค้งอิสระยืนยัน (รายละเอียดใน
+  alignment.py docstring "Known limitations")
 - alignment_builder.py::_build_curve_sub_elements แก้แล้วเมื่อ 2026-07-05 — เปลี่ยนจาก
   สมมติฐาน theta เชิงเส้น (Ls หารสองเท่าของ R) มาเรียกมุมหมุนจริงผ่าน synthetic SPIN
   element + calculate_exit_state แทน (เทคนิคเดียวกับ landxml.py::_spiral_geometry และ

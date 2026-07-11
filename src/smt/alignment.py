@@ -44,12 +44,14 @@ Transition shapes (spiral elements only):
                        (2) the SPOUT mid-curve trace is derived from the boundary
                        mirror only — no independent Civil 3D data confirms a SPOUT
                        interior point, only the shared endpoint invariant;
-                       (3) `landxml.py`'s `_spiral_geometry` still computes
-                       totalY/tanShort from the same d=length evaluation this module
-                       now gets right, but has not itself been updated to stop
-                       separately overriding totalX only — totalY/tanShort there
-                       remain a smaller, still-open item (see that module's
-                       docstring) until a follow-up phase updates the export layer.
+                       (3) RESOLVED, not an open item: `landxml.py`'s
+                       `_spiral_geometry` was originally expected to need a matching
+                       follow-up fix for totalY/tanShort — verified in Phase 2
+                       (session_logs/investigate_landxml_phase2_totaly_export.md)
+                       that this was unnecessary. totalY/tanShort there have no
+                       override or formula of their own; they already flow
+                       correctly from this module's fix with zero code changes,
+                       confirmed against real Civil 3D ground truth.
 
 Naming note: 'COSINE' is this project's internal name for the shape Civil 3D
 calls the Sine Half-Wavelength Diminishing Tangent Curve (spiType="sineHalfWave"

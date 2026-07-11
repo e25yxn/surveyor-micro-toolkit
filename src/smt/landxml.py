@@ -92,14 +92,22 @@ def _spiral_geometry(R: float, length: float, transition: str, theta_rad: float)
     position, direction, or SPIN/SPOUT role in the alignment.
 
     COSINE transition: totalX is overridden with the closed-form tangent-
-    projected length (calculate_sine_halfwave_tangent_length) instead of the
-    raw value calculate_point_on_element returns at d=length, which equals
-    `length` itself (known limitation; see
-    session_logs/investigate_totalx_landxml_fix.md). tanLong changes as a
-    direct consequence (tanLong = totalX - totalY/tan(theta)); totalY/
-    tanShort still use the d=length approximation — a separate, smaller,
-    already-documented known limitation (see alignment.py module docstring
-    "Known limitations").
+    projected length (calculate_sine_halfwave_tangent_length). This override
+    was originally needed because the raw value calculate_point_on_element
+    returned at d=length used to equal `length` itself, not the true
+    tangent-projected X (see session_logs/investigate_totalx_landxml_fix.md).
+    Since the Phase 1 arc-length-inversion fix in alignment.py
+    (calculate_point_on_element's d=length shortcut), the raw value already
+    equals this same X exactly, bit-for-bit — the override is no longer
+    strictly necessary but is kept as-is for now (harmless; removing it is a
+    separate cleanup decision, not made here). tanLong changes as a direct
+    consequence of totalX (tanLong = totalX - totalY/tan(theta)); totalY/
+    tanShort have no override or separate formula of their own here — they
+    come straight from calculate_point_on_element/theta_rad, so they were
+    already fixed by that same Phase 1 change with no code change needed in
+    this function. Confirmed against real Civil 3D ground truth (not just
+    self-consistency) — see
+    session_logs/investigate_landxml_phase2_totaly_export.md sections 2-3.
     """
     synthetic = Element(
         type='SPIN', sta_start=0.0, sta_end=length,
