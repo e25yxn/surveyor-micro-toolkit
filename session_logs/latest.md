@@ -1,5 +1,29 @@
 # Session Log
 
+## [2026-07-12] สืบสวน Phase 4 — ขอบเขตอัปเดต VBA COSINE (plan mode, ยังไม่แก้โค้ด)
+
+- ทำ: สืบสวนสโคป Phase 4 (อัปเดต reference/vba/SMT_Alignment.bas ให้ตรงกับ core engine
+  ปัจจุบันหลัง commit d8ebedd) เทียบโค้ด VBA SMT_ShapeIntegral/SMT_TurningAngle/
+  SMT_PointOnElement กับ src/smt/alignment.py ทีละจุด พบว่า VBA ยังตรงกับ Python เวอร์ชัน
+  ก่อน COSINE closed-form fix รอบแรก (2026-07-05) คือตกทั้ง 2 รอบที่เกี่ยวข้อง (closed-form +
+  arc-length inversion) ไม่ใช่แค่ตกรอบ arc-length inversion เดียว
+  - ระบุ error จริง: ~2.90-4.71 ซม. จากไม่มีสูตรปิด (ก้อนหลัก), 1.55-4.53 มม. เพิ่มเติมจากไม่มี
+    arc-length inversion (ก้อนรอง)
+  - พบว่า Simpson quadrature และ bisection ซึ่งเป็นแกนของ arc-length inversion มีต้นแบบอยู่แล้ว
+    ในไฟล์ SMT_Alignment.bas เอง (ความเสี่ยง port ต่ำ) จุดเสี่ยงจริงคือไม่มี cache เทียบเท่า
+    lru_cache ใน VBA เลย ต้องออกแบบ Scripting.Dictionary ใหม่
+  - ยืนยัน blast radius จำกัดแค่ SMT_Alignment.bas ไฟล์เดียว (grep ไม่พบ COSINE/shape-integral
+    ใน SMT_Vertical.bas, SMT_Crossfall.bas, SMT_Geometry.bas, SMT_Core.bas เลย)
+  - ยืนยันไม่มี automated test harness สำหรับ VBA เลย มีแค่ comment block "Expected values" —
+    ต้องยืนยันด้วยมือใน Excel จริงเมื่อแก้จริง
+  - ผู้ใช้ตรวจตัวเลขสำคัญ (494x, 2.27e-06 ถึง 4.23e-05 องศา) แล้วตรงกับที่พิสูจน์ไว้ก่อนหน้า อนุมัติ
+    ให้ save
+- คำสั่ง: อ่านไฟล์ตรงๆ (Read/Grep) เทียบ reference/vba/*.bas กับ src/smt/alignment.py +
+  session_logs/investigate_sinehalfwave_formula.md + investigate_cosine_arclength_inversion.md
+- ผล: PASS — รายงานสืบสวนเสร็จสมบูรณ์ ไม่มีการรัน test เพราะไม่มีการแก้โค้ด
+- commit: (รอ — แสดง commit message ให้ตรวจก่อน)
+- หมายเหตุ: ยังไม่มีแผนแก้ SMT_Alignment.bas จริง ต้องรอ Plan-Review-Approve รอบใหม่ก่อนลงมือ
+
 ## [2026-07-11] Execute Phase 3 — regenerate golden fixture, commit Phase 1+3 together
 
 - ทำ: execute แผน Phase 3 (session_logs/investigate_phase3_golden_regen_scope.md, commit 13b02e7)
