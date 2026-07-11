@@ -15,35 +15,41 @@ Transition shapes (spiral elements only):
   SINE               : f(τ) = τ-sin(2πτ)/(2π)         (zero jerk at both ends)
   COSINE             : Civil 3D "Sine Half-Wavelength Diminishing Tangent Curve" —
                        NOT a curvature-vs-arc-length shape like the three above.
-                       Closed form in tangent-projected distance x (approximated here
-                       by arc distance s, since x is not independently invertible from
-                       s in closed form): with X = L - 0.0226689447*L**3/R**2 and
-                       a = x/X,
+                       Closed form in tangent-projected distance x: with
+                       X = L - 0.0226689447*L**3/R**2 and a = x/X,
                          y(x)     = X**2/R * (a**2/4 - (1-cos(pi*a))/(2*pi**2))
                          theta(x) = atan(X/R * (a/2 - sin(pi*a)/(2*pi)))
-                       SPIN (k_in=0) uses this directly with x=d. SPOUT (k_out=0)
-                       mirrors it via s<->L-s (see `_sine_halfwave_point` and the
-                       SPOUT branch in `calculate_point_on_element`), matching the
-                       Civil 3D-confirmed invariant that SPIN and SPOUT of equal R,L
-                       share the same total turning angle. Verified against 2
-                       independent Civil 3D ground-truth points (R=900/L=100,
-                       R=250/L=50) — see session_logs/investigate_sinehalfwave_formula.md.
+                       `a` is recovered from the true arc distance `d` (not
+                       approximated as `d/X`) by inverting the arc-length integral
+                       s(a) = integral[0..a] X*sqrt(1+(dy/dx)^2) da' via Simpson
+                       quadrature + bisection (`_cosine_solve_a`) — except exactly at
+                       d=length, where a=1 is used directly (exact closed form, see
+                       `_sine_halfwave_point`). SPIN (k_in=0) uses this directly with
+                       d as given. SPOUT (k_out=0) mirrors it via s<->L-s (see
+                       `_sine_halfwave_point` and the SPOUT branch in
+                       `calculate_point_on_element`), matching the Civil
+                       3D-confirmed invariant that SPIN and SPOUT of equal R,L share
+                       the same total turning angle. Verified against 3 independent
+                       Civil 3D ground-truth points (R=900/L=100, R=250/L=50,
+                       R=500/L=70) — see session_logs/investigate_sinehalfwave_formula.md
+                       and session_logs/investigate_cosine_arclength_inversion.md.
                        Known limitations (documented there, not fixed here):
-                       (1) x≈s is an approximation; at the element's own true end
-                       (d=L, the point calculate_exit_state actually uses) this costs
-                       1.5548mm at R=900/L=100 and 4.5338mm at R=250/L=50 (measured:
-                       the gap between evaluating at d=X, where a=1 exactly and the
-                       formula matches Civil 3D to machine precision, vs d=L, where
-                       L-X is 0.027986m and 0.045338m respectively) — no interior
-                       point (d<L) is independently verified at all;
+                       (1) s(1) != length exactly — a genuine small imperfection in
+                       Autodesk's own closed-form X, not a quadrature artifact
+                       (residual 0.036mm at R=900/L=100, 0.187mm at R=250/L=50,
+                       stable from 48 to 48,000 Simpson intervals). Any d strictly
+                       between s(1) and length has no a<=1 solving s(a)=d;
+                       `_cosine_solve_a` clamps to a=1.0 in that gap rather than
+                       erroring (see its own comment for the mechanics);
                        (2) the SPOUT mid-curve trace is derived from the boundary
                        mirror only — no independent Civil 3D data confirms a SPOUT
                        interior point, only the shared endpoint invariant;
-                       (3) the LandXML export's totalX field (src/smt/landxml.py
-                       _spiral_geometry) reports L directly, not the true closed-form
-                       X — a natural consequence of the same x≈s approximation above,
-                       not a separate bug (see session_logs/
-                       investigate_sinehalfwave_formula.md).
+                       (3) `landxml.py`'s `_spiral_geometry` still computes
+                       totalY/tanShort from the same d=length evaluation this module
+                       now gets right, but has not itself been updated to stop
+                       separately overriding totalX only — totalY/tanShort there
+                       remain a smaller, still-open item (see that module's
+                       docstring) until a follow-up phase updates the export layer.
 
 Naming note: 'COSINE' is this project's internal name for the shape Civil 3D
 calls the Sine Half-Wavelength Diminishing Tangent Curve (spiType="sineHalfWave"
@@ -58,6 +64,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, NamedTuple
 
 from . import fpmath, wcb
@@ -132,23 +139,103 @@ def _shape_integral(transition: str, tau: float) -> float:
     return tau ** 2 / 2
 
 
-def _sine_halfwave_point(x: float, big_x: float, r: float) -> tuple[float, float, float]:
+def _cosine_dydx(a: float, big_x: float, r: float) -> float:
+    """dy/dx at normalised parameter a for the COSINE shape — the same expression
+    as the argument of atan() in the theta closed form (tan(theta) = dy/dx),
+    extracted so the arc-length integrand (`_cosine_arc_length`) and the theta
+    formula in `_sine_halfwave_point` share one definition.
+    """
+    return big_x / r * (a / 2 - math.sin(math.pi * a) / (2 * math.pi))
+
+
+def _cosine_arc_length(a: float, big_x: float, r: float, n_seg: int = SPIRAL_STEPS) -> float:
+    """s(a) = integral[0..a] X*sqrt(1+(dy/dx)^2) da'  via Simpson quadrature.
+
+    True physical arc length from the zero-curvature end to normalised parameter a.
+    Sign of r does not matter (dy/dx is squared inside the root) -- callers building
+    the cached table pass abs(r).
+    """
+    h = a / n_seg
+    total = 0.0
+    for i in range(n_seg + 1):
+        ai = i * h
+        integrand = big_x * math.hypot(1.0, _cosine_dydx(ai, big_x, r))
+        w = 1 if (i == 0 or i == n_seg) else (4 if i % 2 == 1 else 2)
+        total += w * integrand
+    return total * h / 3.0
+
+
+@lru_cache(maxsize=256)
+def _cosine_arc_length_table(length: float, r_abs: float) -> tuple[float, ...]:
+    """Cached s(a_i) at a_i = i/SPIRAL_STEPS, i=0..SPIRAL_STEPS, for one
+    (length, |R|) pair.
+
+    Shared by SPIN and SPOUT of equal length and |R| (mirror symmetry — see module
+    docstring), so a compound alignment using both only builds the table once. Used
+    to bracket the root of s(a)=d before bisection refinement in `_cosine_solve_a`.
+    """
+    big_x = calculate_sine_halfwave_tangent_length(length, r_abs)
+    n = SPIRAL_STEPS
+    return tuple(_cosine_arc_length(i / n, big_x, r_abs) for i in range(n + 1))
+
+
+def _cosine_solve_a(d: float, big_x: float, r: float, length: float) -> float:
+    """Solve s(a) = d for normalised parameter a: cached-table bracket + bisection
+    (same 50-iteration bisection style as `calculate_projection_to_element` below).
+
+    d must satisfy 0 <= d < length (the d==length case is short-circuited by the
+    caller, `_sine_halfwave_point`).
+    """
+    r_abs = abs(r)
+    table = _cosine_arc_length_table(length, r_abs)
+    n = SPIRAL_STEPS
+    i = 0
+    while i < n and table[i + 1] < d:
+        i += 1
+    # When d lies in (s(1), length) -- i.e. beyond the table's own last entry -- no
+    # a<=1 solves s(a)=d exactly, because s(1) != length exactly (a genuine small
+    # imperfection in Autodesk's closed-form X, not a quadrature artifact -- see
+    # session_logs/investigate_cosine_arclength_inversion.md section 3). In that
+    # case the while loop above runs to i=n, giving lo=hi=1.0: the bracket is
+    # degenerate but the bisection loop below is still safe (mid=1.0 every
+    # iteration, converges trivially) -- this deliberately clamps to a=1.0, the
+    # closest reachable value, instead of raising.
+    lo, hi = i / n, min(i + 1, n) / n
+    for _ in range(50):
+        mid = (lo + hi) / 2.0
+        if _cosine_arc_length(mid, big_x, r_abs) < d:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
+
+
+def _sine_halfwave_point(d: float, big_x: float, r: float, length: float) -> tuple[float, float, float]:
     """COSINE transition shape (Civil 3D Sine Half-Wave -- see module docstring
     "Transition shapes"), canonical (SPIN) form.
 
-    x     : tangent-projected distance from the zero-curvature end (approximated by
-            arc distance here — see module docstring "Known limitations").
+    d     : true arc distance from the zero-curvature end (station distance along
+            the element's centre line).
     big_x : X, the closed-form tangent-projected length at the curve's own full L
             (X = L - 0.0226689447*L**3/R**2), constant for one element.
     r     : signed radius at the curved end (+ right, - left).
-    Returns (x, y, theta): local offset y (+ left of entry tangent) and tangent
-    angle theta (radians) at x, both measured from the zero-curvature end.
+    length: element arc length L; used for the d==length exact shortcut and to key
+            the cached arc-length table (`_cosine_arc_length_table`).
+    Returns (x, y, theta): the true tangent-projected coordinate x=a*X, local offset
+    y (+ left of entry tangent), and tangent angle theta (radians) at d, all
+    measured from the zero-curvature end.
     Reference: Autodesk Civil 3D 2026 Help, "About Transition Definitions" — see
-    session_logs/investigate_sinehalfwave_formula.md for the verified derivation.
+    session_logs/investigate_sinehalfwave_formula.md and
+    session_logs/investigate_cosine_arclength_inversion.md for the verified
+    derivation and the arc-length inversion respectively.
     """
-    a = x / big_x
+    if abs(d - length) < 1e-9:
+        a = 1.0
+    else:
+        a = _cosine_solve_a(d, big_x, r, length)
     y = big_x ** 2 / r * (a ** 2 / 4 - (1 - math.cos(math.pi * a)) / (2 * math.pi ** 2))
-    theta = math.atan(big_x / r * (a / 2 - math.sin(math.pi * a) / (2 * math.pi)))
+    theta = math.atan(_cosine_dydx(a, big_x, r))
+    x = a * big_x
     return x, y, theta
 
 
@@ -294,12 +381,12 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
         if el.k_in == 0:   # SPIN: curvature 0 -> 1/R, canonical form used directly
             r = radius_from_curvature(el.k_out)
             big_x = calculate_sine_halfwave_tangent_length(length, r)
-            x_local, y_local, theta_local = _sine_halfwave_point(d, big_x, r)
+            x_local, y_local, theta_local = _sine_halfwave_point(d, big_x, r, length)
         else:   # SPOUT: curvature 1/R -> 0, mirror canonical form via s <-> L-d
             r = radius_from_curvature(el.k_in)
             big_x = calculate_sine_halfwave_tangent_length(length, r)
-            x_end, y_end, theta_total = _sine_halfwave_point(length, big_x, r)
-            x_g, y_g, theta_g = _sine_halfwave_point(length - d, big_x, r)
+            x_end, y_end, theta_total = _sine_halfwave_point(length, big_x, r, length)
+            x_g, y_g, theta_g = _sine_halfwave_point(length - d, big_x, r, length)
             dx, dy = x_end - x_g, y_end - y_g
             x_local = dx * math.cos(theta_total) + dy * math.sin(theta_total)
             y_local = dx * math.sin(theta_total) - dy * math.cos(theta_total)

@@ -1,5 +1,29 @@
 # Session Log
 
+## [2026-07-11] Execute Phase 3 — regenerate golden fixture, commit Phase 1+3 together
+
+- ทำ: execute แผน Phase 3 (session_logs/investigate_phase3_golden_regen_scope.md, commit 13b02e7)
+  - เขียนสคริปต์ regenerate ใน scratchpad (ไม่ commit) เรียก _make_vertices + build_alignment_from_pi
+    ตามกลไกเดิม แก้ 2 จุดตามที่ผู้ใช้สั่งก่อนรัน: radius เก็บเครื่องหมายจริง (ไม่ใช้ abs()), เขียนไฟล์
+    ด้วย CRLF ไม่มี trailing newline ให้ตรงกับ format เดิม
+  - dry-run diff เต็ม พบว่า element/control นอกกลุ่ม COSINE (index 1-10, 15-29) ก็มี diff ระดับ
+    ~1e-4m/~0.02-0.03 arcsec ด้วย (กว้างกว่า hard-stop gate เดิมที่เขียนไว้ในแผน) ตรวจสอบแล้วว่าไม่ใช่
+    ผลจาก Phase 1 จริง (Group 4 test ยืนยัน CLOTHOID/BLOSS/SINE byte-identical) จึงเป็น noise พื้นฐาน
+    จาก _make_vertices reconstruction ที่มีอยู่แล้ว — ผู้ใช้อนุมัติ apply หลังตรวจตัวเลขนี้
+  - apply จริงทับ tests/golden/tables.json + reference/tables.json → byte-compare สองไฟล์ identical
+    → pytest -q ได้ 490 passed, 0 failed ตรงเป้าเป๊ะ
+  - เพิ่ม addendum ใน investigate_phase3_golden_regen_scope.md แก้คำอธิบาย hard-stop gate ที่เขียน
+    แคบเกินจริงในแผน execute เดิม (ไม่ได้เผื่อ noise พื้นฐานทุกกลุ่มไว้) พร้อมเหตุผลพิสูจน์ได้ (Group 4
+    test) ไม่ใช่แค่ตัวเลขตรงกับรายงานเดิม
+  - ตัดสินใจ commit strategy (คำถามเปิดจากแผน Step 6): รวม Phase 1 + Phase 3 เป็น commit เดียว รวมทั้ง
+    session_logs/plan_cosine_arclength_core_fix.md (Phase 1 plan, untracked มาก่อน) และ
+    investigate_phase3_golden_regen_scope.md addendum เข้าด้วยกัน — ไม่รวม test_data 2 ไฟล์ที่ไม่
+    เกี่ยวข้อง (ยัง untracked ต่อไป)
+- คำสั่ง: python regenerate script (dry-run แล้ว --apply) → `diff -q` byte-compare → `pytest -q` →
+  Write .git\smt_commit_msg.txt → git add (6 ไฟล์เจาะจง) → git commit -F
+- ผล: PASS — 490 passed, 0 failed (ตรงเป้าที่กำหนดไว้ทุกประการ), byte-identical ยืนยันแล้ว
+- commit: (รอ — แสดง commit message ให้ตรวจก่อน)
+
 ## [2026-07-11] สืบสวน Phase 3 — ขอบเขตการ regenerate golden fixture (plan mode, ยังไม่แก้โค้ด)
 
 - ทำ: สืบสวนก่อนวางแผน Phase 3 (regenerate tests/golden/tables.json + reference/tables.json

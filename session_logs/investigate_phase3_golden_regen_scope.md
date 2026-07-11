@@ -171,3 +171,33 @@ mark จริง)
   `session_logs/investigate_cosine_builder_mismatch_20260705.md` — ประวัติการแก้ builder รอบก่อน
 - `session_logs/report_xfail_mismatch_20260705.md` — วิธีตรวจผล xfail จริงเทียบที่คาดไว้ (ใช้อ้างอิง
   ระเบียบวิธีเดียวกันสำหรับ Phase 3)
+
+---
+
+## เพิ่มเติม 2026-07-11 (หลัง execute Phase 3 จริง) — แก้คำอธิบาย hard-stop gate ที่เขียนแคบเกินจริง
+
+ระหว่าง execute แผน Phase 3 จริง (แผนแยกที่ approve ต่อจากรายงานนี้) dry-run diff จริงพบว่า
+element/control แถว**นอกเหนือ**จากกลุ่มที่ 4 (COSINE, index 11-14) ก็มีการเปลี่ยนแปลงเล็กน้อยด้วย
+(~0.0001-0.0002 m, ~0.02-0.03 arcsec ใน element index 1-10 และ 15-29) ทั้งที่ hard-stop gate ที่เขียน
+ไว้ตอนวางแผน execute ระบุไว้แคบเกินจริงว่า diff ต้อง "จำกัดอยู่แค่ element/control index 11-14 บวก
+station ตั้งแต่ index 12 เป็นต้นไปเท่านั้น" — ไม่ได้เผื่อ noise พื้นฐานที่มีอยู่แล้วในทุกกลุ่มไว้ในคำอธิบาย
+เดิม แม้ว่ารายงานนี้เอง (ข้อ 5 ด้านบน) จะบันทึกไว้อยู่แล้วว่า noise ระดับ 1e-4m เกิดในทุกกลุ่ม
+
+**เหตุผลที่ยืนยันได้แน่นอน ไม่ใช่แค่ตัวเลขตรงกับที่บันทึกไว้เดิม**: `session_logs/plan_cosine_arclength_core_fix.md`
+มี Group 4 test (`test_non_cosine_transitions_unaffected_by_cosine_fix`) ที่พิสูจน์แล้วว่า CLOTHOID/BLOSS/SINE
+ไม่ถูกแตะจาก Phase 1 เลยแม้แต่บิตเดียว (byte-identical ก่อน/หลัง Phase 1) ดังนั้น diff ใดๆ ที่เกิดกับ
+element ประเภท CLOTHOID/BLOSS/SINE (คือ element index 1-10 และ 15-29 ยกเว้นกลุ่ม COSINE เอง) **ต้อง
+มาจาก `_make_vertices` reconstruction เพียงอย่างเดียว ไม่ใช่ Phase 1** — เป็นข้อพิสูจน์เชิงสาเหตุที่แน่นอน
+กว่าการสังเกตว่าตัวเลขบังเอิญตรงกับรายงานเดิมเท่านั้น
+
+**คำอธิบาย gate ที่ถูกต้อง**: diff ที่มีนัยสำคัญ (>1mm) ต้องจำกัดอยู่แค่กลุ่มที่ 4 (COSINE, element/control
+index 11-14 บวก station cascade ตั้งแต่ index 12) เท่านั้น ส่วน diff ระดับ ~1e-4m ที่เกิดในกลุ่มอื่น
+(CLOTHOID/BLOSS/SINE) คือ noise พื้นฐานจาก `_make_vertices` reconstruction ที่มีอยู่แล้วก่อน Phase 1 —
+ไม่ใช่สัญญาณเตือนที่ต้องหยุดตรวจสอบ ไม่ใช่ "ห้ามมีการเปลี่ยนแปลงใดๆ นอกกลุ่ม 11-14 เลย" ตามที่เขียนไว้
+แคบเกินไปในแผน execute เดิม
+
+**ผล regenerate จริง (2026-07-11)**: dry-run + apply ยืนยันตรงตามที่คาด — element/control index 12,13
+เปลี่ยนแปลงระดับ 15-27mm (ตรงกับ `L-X` ที่ทำนายไว้ใน Phase 1 plan) ส่วนแถวอื่นทั้งหมดเปลี่ยนแปลงระดับ
+noise ~1e-4m เท่านั้น ตรงกับที่อธิบายไว้ข้างบน `diff -q` ยืนยัน `tests/golden/tables.json` และ
+`reference/tables.json` byte-identical เหมือน 2 รอบก่อน `pytest -q` ได้ **490 passed, 0 failed** ตรงเป้า
+ทุกประการ

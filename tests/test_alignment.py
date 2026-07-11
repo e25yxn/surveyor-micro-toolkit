@@ -407,12 +407,11 @@ def test_c2s_far_point_raises():
 # Curve) — ground truth from session_logs/investigate_sinehalfwave_formula.md,
 # itself sourced from Autodesk Civil 3D 2026 Help, "About Transition Definitions"
 # (https://help.autodesk.com/cloudhelp/2026/ENG/Civil3D-UserGuide/files/GUID-DD7C0EA1-8465-45BA-9A39-FC05106FD822.htm).
-# Evaluated at d=X (the closed-form tangent-projected length), not d=L, because
-# calculate_point_on_element approximates the tangent-projected coordinate by arc
-# distance (see alignment.py module docstring "Known limitations") — d=X is the one
-# point where that approximation is exact (a=1), matching how the formula itself was
-# hand-verified. The d=L approximation error (1.5548mm / 4.5338mm) is measured and
-# documented there and in alignment.py, not re-asserted here.
+# Evaluated at d=length directly (not d=X as previously) since
+# session_logs/investigate_cosine_arclength_inversion.md replaced the x~=d
+# approximation with true arc-length inversion (_cosine_solve_a) plus an exact
+# a=1 shortcut precisely at d=length -- see alignment.py module docstring
+# "Transition shapes" and "Known limitations".
 # ---------------------------------------------------------------------------
 
 def _cosine_local_turn_and_offset(el: al.Element, d: float) -> tuple[float, float]:
@@ -424,23 +423,88 @@ def _cosine_local_turn_and_offset(el: al.Element, d: float) -> tuple[float, floa
     return turn_deg, local_y
 
 
-def test_cosine_closed_form_endpoint_r900_l100():
-    R, L = 900.0, 100.0
-    big_x = L - al._SINE_HALFWAVE_C * L ** 3 / R ** 2
-    el = al.make_element('SPIN', 0, L, 0.0, 0.0, 90.0, R, None, 'COSINE')
-    turn_deg, local_y = _cosine_local_turn_and_offset(el, big_x)
-    assert math.isclose(turn_deg, 3.178942026888, abs_tol=1e-6)
-    assert math.isclose(local_y, 1.651062316115, abs_tol=1e-6)
+@pytest.mark.parametrize('r,length,theta_exact_deg,y_exact', [
+    (900.0, 100.0, 3.1789420268894153, 1.6510623161163274),
+    (250.0,  50.0, 5.705449190907088,  1.4840930725353705),
+    (500.0,  70.0, 4.002399624673551,  1.4557579182062208),
+])
+def test_cosine_endpoint_matches_a1_closed_form(r, length, theta_exact_deg, y_exact):
+    """At d=length, the engine must match the exact a=1 closed form to float64
+    precision (not just "close") -- this is the a==1.0 shortcut in
+    _sine_halfwave_point, not the general bisection path. Values verified in
+    session_logs/plan_cosine_arclength_core_fix.md (Group 1).
+    """
+    el = al.make_element('SPIN', 0, length, 0.0, 0.0, 90.0, r, None, 'COSINE')
+    turn_deg, local_y = _cosine_local_turn_and_offset(el, length)
+    assert math.isclose(turn_deg, theta_exact_deg, abs_tol=1e-9)
+    assert math.isclose(local_y, y_exact, abs_tol=1e-9)
 
 
-def test_cosine_closed_form_endpoint_r250_l50():
-    R, L = 250.0, 50.0
-    big_x = L - al._SINE_HALFWAVE_C * L ** 3 / R ** 2
-    assert math.isclose(big_x, 49.954662110533, abs_tol=1e-6)
-    el = al.make_element('SPIN', 0, L, 0.0, 0.0, 90.0, R, None, 'COSINE')
-    turn_deg, local_y = _cosine_local_turn_and_offset(el, big_x)
-    assert math.isclose(turn_deg, 5.705449190899, abs_tol=1e-6)
-    assert math.isclose(local_y, 1.484093072531, abs_tol=1e-6)
+@pytest.mark.parametrize('r,length,d', [(900.0, 100.0, 40.0), (250.0, 50.0, 20.0), (500.0, 70.0, 55.0)])
+def test_cosine_arc_length_inversion_self_consistent(r, length, d):
+    """At an interior point (d<length), the a solved by _cosine_solve_a must
+    itself satisfy s(a)=d (round-trip through the Simpson arc-length integral).
+    """
+    big_x = al.calculate_sine_halfwave_tangent_length(length, r)
+    a = al._cosine_solve_a(d, big_x, r, length)
+    s_check = al._cosine_arc_length(a, big_x, r)
+    assert math.isclose(s_check, d, abs_tol=1e-6)
+
+
+def test_cosine_arc_length_table_cached_across_spin_spout():
+    """SPIN and SPOUT of equal length/|R| must share one cached arc-length table
+    (mirror symmetry -- see module docstring "Transition shapes")."""
+    al._cosine_arc_length_table.cache_clear()
+    spin = al.make_element('SPIN', 0, 70.0, 0.0, 0.0, 90.0, 500.0, None, 'COSINE')
+    spout = al.make_element('SPOUT', 0, 70.0, 0.0, 0.0, 90.0, 500.0, None, 'COSINE')
+    al.calculate_point_on_element(spin, 55.0)
+    al.calculate_point_on_element(spout, 55.0)
+    info = al._cosine_arc_length_table.cache_info()
+    assert info.currsize == 1
+
+
+@pytest.mark.parametrize('r,length', [(900.0, 100.0), (250.0, 50.0), (500.0, 70.0)])
+def test_cosine_solve_a_clamps_gracefully_in_s1_length_gap(r, length):
+    """s(1) != length exactly (see session_logs/investigate_cosine_arclength_inversion.md
+    section 3) -- any d strictly between s(1) and length has no a<=1 solving
+    s(a)=d, and _cosine_solve_a must clamp to a=1.0 rather than error.
+    """
+    big_x = al.calculate_sine_halfwave_tangent_length(length, r)
+    s1 = al._cosine_arc_length(1.0, big_x, r)
+    gap = length - s1
+    assert gap > 0   # sanity: confirms this test actually exercises the gap
+    d_mid = length - gap / 2.0
+    a = al._cosine_solve_a(d_mid, big_x, r, length)
+    assert a == 1.0
+
+
+@pytest.mark.parametrize('trans,r,length,d,exp_n,exp_e,exp_az', [
+    ('CLOTHOID', 400.0, 60.0, 0.0,  0.0,                    0.0,                 1.5707963267948966),
+    ('CLOTHOID', 400.0, 60.0, 15.0, -0.02343746321541169,   14.999967041045013,  1.5754838267948967),
+    ('CLOTHOID', 400.0, 60.0, 30.0, -0.18749529162218986,   29.9989453295336,    1.5895463267948964),
+    ('CLOTHOID', 400.0, 60.0, 45.0, -0.6327320566067619,    44.99199162569003,   1.6129838267948964),
+    ('CLOTHOID', 400.0, 60.0, 60.0, -1.499397428754978,     59.96625878371091,   1.6457963267948967),
+    ('BLOSS',    400.0, 60.0, 0.0,  0.0,                    0.0,                 1.5707963267948966),
+    ('BLOSS',    400.0, 60.0, 15.0, -0.00791015389733473,   14.99999533039958,   1.572847108044897),
+    ('BLOSS',    400.0, 60.0, 30.0, -0.11249847240800069,   29.999539624480274,  1.5848588267948962),
+    ('BLOSS',    400.0, 60.0, 45.0, -0.4982850314579719,    44.994167949146686,  1.6103471080448966),
+    ('BLOSS',    400.0, 60.0, 60.0, -1.3494424055276184,    59.96920464868514,   1.6457963267948967),
+    ('SINE',     500.0, 70.0, 0.0,  0.0,                    0.0,                 1.5707963267948966),
+    ('SINE',     500.0, 70.0, 17.5, -0.0029697381528134234, 17.499999311860066,  1.5716250853674145),
+    ('SINE',     500.0, 70.0, 35.0, -0.08004763795198576,   34.999762188679995,  1.5812038439399334),
+    ('SINE',     500.0, 70.0, 52.5, -0.4633347068139018,    52.49508457246585,   1.6066250853674147),
+    ('SINE',     500.0, 70.0, 70.0, -1.38458305097449,      69.96995876779974,   1.6407963267948968),
+])
+def test_non_cosine_transitions_unaffected_by_cosine_fix(trans, r, length, d, exp_n, exp_e, exp_az):
+    """CLOTHOID/BLOSS/SINE never enter the COSINE branch in calculate_point_on_element
+    -- baseline values captured against the pre-fix engine, re-asserted here to
+    confirm the COSINE arc-length inversion fix changes nothing for these shapes.
+    """
+    el = al.make_element('SPIN', 0, length, 0.0, 0.0, 90.0, r, None, trans)
+    st = al.calculate_point_on_element(el, d)
+    assert math.isclose(st.n, exp_n, abs_tol=1e-9)
+    assert math.isclose(st.e, exp_e, abs_tol=1e-9)
+    assert math.isclose(st.azimuth, exp_az, abs_tol=1e-12)
 
 
 @pytest.mark.parametrize('r,length', [(900.0, 100.0), (250.0, 50.0), (500.0, 70.0)])
