@@ -1,5 +1,24 @@
 # Session Log
 
+## [2026-07-11] สืบสวน Phase 3 — ขอบเขตการ regenerate golden fixture (plan mode, ยังไม่แก้โค้ด)
+
+- ทำ: สืบสวนก่อนวางแผน Phase 3 (regenerate tests/golden/tables.json + reference/tables.json
+  ให้ตรงกับ Phase 1 ที่แก้ core engine COSINE arc-length inversion — plan_cosine_arclength_core_fix.md)
+  - ยืนยัน git status/diff ตรงกับที่คาด (206/-55 บน alignment.py + test_alignment.py)
+  - ตรวจ alignment_builder.py ยืนยันว่า `_spiral_turning_angle`/`_calculate_end_displacement`
+    เรียก `calculate_exit_state` ตรงๆ อยู่แล้ว — ไม่ต้องแก้โค้ด builder เพิ่มเลย รับผล Phase 1
+    อัตโนมัติ
+  - รัน pytest จริง: 9 failed, 481 passed — ยืนยัน single root cause (COSINE curve group เดียว
+    R=500/L=70 ที่ SC/CS gap ~31mm ตรงกับ L-X ที่ทำนายไว้ในแผน Phase 1)
+  - เทียบขอบเขตกับ 2 รอบ regenerate ก่อนหน้า: รอบนี้แคบกว่าในแง่ N,E ที่เปลี่ยนจริง (1 ใน 9 กลุ่ม)
+    แต่กว้างกว่าในแง่คอลัมน์ station (18 จาก 30 element rows ต้องเขียนทับเพราะ station สะสมต่อกัน)
+  - **ยังไม่มีการแก้โค้ดใดๆ ในรอบนี้** — เป็นรายงานสืบสวนล้วน ไม่ได้เขียนแผนแก้
+- คำสั่ง: `git status`, `git diff --stat`, `pytest -q`, `pytest -v` (9 ตัวที่ fail แยกทีละตัว),
+  python สคริปต์เทียบ `_make_vertices`+`build_alignment_from_pi` กับ golden fixture จริง →
+  Write session_logs/investigate_phase3_golden_regen_scope.md
+- ผล: PASS (ไม่มีการแก้โค้ด — งานสืบสวน/รายงานล้วน; pytest ปัจจุบัน 9 failed, 481 passed ตามที่คาด)
+- commit: (รอ — ยังไม่ commit ไฟล์รายงานนี้)
+
 ## [2026-07-07] สืบสวน COSINE totalY/theta/tanShort ใน LandXML export — สรุปว่าตกกรณียาก
 
 - ทำ: สืบสวน (plan mode, ยังไม่แก้โค้ด) ว่าทำไม theta/totalY/tanShort ของ COSINE ใน LandXML
