@@ -1,5 +1,49 @@
 # Session Log
 
+## [2026-07-12] แก้ SMT_WCBatSta ให้ delegate ผ่าน SMT_SolveForward/SMT_PointOnElement + แก้ ByRef compile error
+
+- ทำ: พบระหว่างทดสอบ Excel ว่า SMT_WCBatSta คำนวณ theta ผิดสำหรับ COSINE (และ
+  BLOSS/SINE ที่จุดกลางโค้งมานานแล้วก่อนหน้า Phase 4 ด้วย) เพราะเป็นฟังก์ชันแยกที่
+  เขียนสูตรมุมเอง ไม่เคยเรียก SMT_PointOnElement เลย ไม่อ่านคอลัมน์ Transition เลย
+  ด้วยซ้ำ แก้ตามแผน session_logs/plan_vba_wcbatsta_delegate_fix.md (Option B):
+  - ขยาย SMT_SolveForward ให้คืนค่า tangent azimuth เป็น element ที่ 3 (res(2))
+  - เขียน SMT_WCBatSta ใหม่ให้ delegate ผ่าน SMT_SolveForward แทนสูตรมุมเอง
+  - แก้ ByRef compile error ที่พบภายหลัง (ส่ง pt(2) ตรงๆ ให้ SMT_NormalizeAngle
+    ไม่ได้ ต้องผ่านตัวแปร Double คั่นกลางก่อน)
+  - อัปเดต comment block "Expected values" ท้ายไฟล์ เพิ่มตัวอย่าง COSINE ที่
+    ยืนยันแล้ว
+  - พิสูจน์พีชคณิตแล้วว่า T, C, SPIN/SPOUT-CLOTHOID ให้ผลเท่ากันทุกประการกับสูตร
+    เดิม (ผู้ใช้ยืนยันซ้ำด้วย sympy อิสระ)
+  - ทดสอบ Excel จริงผ่านครบ 17 จุด (3 COSINE + 10 BLOSS/SINE mid-curve + 1
+    boundary จาก test_data/SettingOutTest.csv จริง ผ่าน build_alignment_from_pi
+    + 3 T/C/CLOTHOID spot-check) ตรงกับ Python engine ทุกจุดในระดับ
+    floating-point noise
+  - grep ยืนยันฝั่ง Python (alignment.py, alignment_builder.py) ไม่มีสูตรแยกซ้ำ
+    แบบเดียวกัน ปลอดภัย
+- คำสั่ง: git add -p (hunk-level เฉพาะส่วน WCBatSta fix + plan file) ->
+  git commit -F .git\smt_commit_msg.txt
+- ผล: PASS — Excel 17/17 จุดผ่าน
+- commit: (เติมหลัง commit จริง)
+- หมายเหตุ: บั๊กนี้เป็นบั๊กเดิมที่มีมาก่อน Phase 4 (ไม่ใช่ผลจาก Phase 4) แค่ถูก
+  ค้นพบระหว่างทดสอบ Phase 4
+
+## [2026-07-12] Phase 4 — port COSINE closed-form + arc-length inversion to SMT_Alignment.bas
+
+- ทำ: apply diff ตามแผนที่อนุมัติ (plan mode) — เพิ่ม SMT_SINE_HALFWAVE_C constant,
+  5 ฟังก์ชันใหม่ (SMT_CosineDydx, SMT_CosineArcLength, SMT_CosineSolveA,
+  SMT_CalcSineHalfwaveTangentLength, SMT_SineHalfwavePoint) mirror
+  src/smt/alignment.py หลัง commit d8ebedd, เพิ่ม branch ใหม่ใน SMT_PointOnElement
+  ดักจับ COSINE pure SPIN/SPOUT ก่อนถึง Simpson path เดิม, แก้ header comment ให้
+  ตรงกับ implementation ใหม่ ไม่ทำ cache (Scripting.Dictionary) รอบแรกตามที่
+  ตัดสินใจไว้ (Excel UDF ไม่ได้เรียกถี่เท่า Python build pipeline)
+- คำสั่ง: Edit tool ตาม diff ที่อนุมัติทีละจุด -> git add -p (hunk-level เฉพาะ
+  ส่วน COSINE port) -> git commit -F .git\smt_commit_msg.txt
+- ผล: PASS (ยืนยันด้วย git diff --cached ก่อน commit ว่า stage ตรงตามที่ต้องการ)
+- commit: e285fd5
+- หมายเหตุ: ระหว่างทดสอบ Excel รอบแรกพบว่า SMT_WCBatSta ยังผิด เพราะเป็นฟังก์ชัน
+  แยกที่ไม่ผ่าน SMT_PointOnElement เลย ไม่ใช่ผลจาก diff รอบนี้ แต่เป็นบั๊กเดิมที่
+  มีมาก่อน — แก้แยกเป็นอีก commit (ดู entry ก่อนหน้า)
+
 ## [2026-07-12] สืบสวน Phase 4 — ขอบเขตอัปเดต VBA COSINE (plan mode, ยังไม่แก้โค้ด)
 
 - ทำ: สืบสวนสโคป Phase 4 (อัปเดต reference/vba/SMT_Alignment.bas ให้ตรงกับ core engine

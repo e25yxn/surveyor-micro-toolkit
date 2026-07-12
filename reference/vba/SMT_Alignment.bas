@@ -433,7 +433,8 @@ End Function
 
 ' ============================================================
 ' Private: forward solve -- sta + offset -> (N, E) across all elements
-' Returns Variant Array (0)=N  (1)=E, or CVErr(xlErrValue) if sta out of range.
+' Returns Variant Array (0)=N  (1)=E  (2)=tangentAzimuth(rad), or
+' CVErr(xlErrValue) if sta out of range.
 ' ============================================================
 
 Private Function SMT_SolveForward(sta As Double, offset As Double, _
@@ -445,7 +446,7 @@ Private Function SMT_SolveForward(sta As Double, offset As Double, _
     Dim radius As Double, typStr As String, transStr As String
     Dim kIn As Double, kOut As Double, L As Double, d As Double
     Dim pt As Variant, offAz As Double
-    Dim res(1) As Double
+    Dim res(2) As Double
 
     nRows = rng.Rows.Count
     For i = 1 To nRows
@@ -475,6 +476,7 @@ Private Function SMT_SolveForward(sta As Double, offset As Double, _
                 res(0) = pt(0)
                 res(1) = pt(1)
             End If
+            res(2) = pt(2)   ' NEW: tangent azimuth, independent of offset
             SMT_SolveForward = res
             Exit Function
         End If
@@ -625,84 +627,29 @@ Public Function SMT_WCBatSta(sta As Double, rng As Range) As Variant
     ' WCB (whole-circle bearing / azimuth) of the alignment centre-line tangent
     ' at station sta, in decimal degrees, normalised to [0, 360).
     '
+    ' Delegates to SMT_SolveForward/SMT_PointOnElement -- the same engine
+    ' SMT_StaToN/SMT_StaToE use -- instead of a separate hand-written angle
+    ' formula. The previous formula (theta=d^2/(2*R*L) for SPIN, theta=d/R -
+    ' d^2/(2*R*L) for SPOUT) ignored the Transition column entirely: exactly
+    ' correct for CLOTHOID only, silently wrong for BLOSS/SINE at interior
+    ' stations, and wrong for COSINE everywhere except the two endpoints
+    ' (where every transition shape's turning-angle integral coincidentally
+    ' equals the same value). See
+    ' session_logs/plan_vba_wcbatsta_delegate_fix.md.
+    '
     ' sta : arc distance along alignment (metres).
-    ' rng : SMT_Elements Named Range -- 8 columns, no header:
-    '         col1=StaStart  col2=StaEnd  col3=N  col4=E
-    '         col5=Azimuth(decimal deg)   col6=Radius(signed m)
-    '         col7=Type(T/C/SPIN/SPOUT)   col8=Transition
-    '
-    ' Type formulas (d = sta - StaStart, L = StaEnd - StaStart):
-    '   T    : WCB = Azimuth  (constant tangent)
-    '   C    : theta = d / R                       [rad]; R = signed radius
-    '   SPIN : theta = d^2 / (2*R*L)               [rad]; clothoid k(s)=s/(R*L)
-    '   SPOUT: theta = d/R - d^2 / (2*R*L)         [rad]; clothoid k_in=1/R -> k_out=0
-    '   WCB  = Azimuth_deg + SMT_RadToDeg(theta), then normalised to [0, 360).
-    '
-    ' Sign: R>0 = right curve = azimuth increases; R<0 = left = azimuth decreases.
+    ' rng : SMT_Elements Named Range -- 8 columns, no header row.
+    '       col5 Azimuth must be decimal degrees; converted to rad internally.
     ' Returns #VALUE! when sta is outside all elements.
-    Dim nRows As Long, i As Long
-    Dim staStart As Double, staEnd As Double
-    Dim azDeg As Double, radius As Double
-    Dim typStr As String
-    Dim isLast As Boolean
-    Dim d As Double, L As Double
-    Dim theta_rad As Double, wcb_raw As Double
-
-    nRows = rng.Rows.Count
-    For i = 1 To nRows
-        staStart = CDbl(rng.Cells(i, 1).Value)
-        staEnd   = CDbl(rng.Cells(i, 2).Value)
-        isLast   = (i = nRows)
-        If sta >= staStart And (sta < staEnd Or (isLast And sta <= staEnd)) Then
-            azDeg  = CDbl(rng.Cells(i, 5).Value)   ' entry azimuth at StaStart (degrees)
-            radius = CDbl(rng.Cells(i, 6).Value)   ' signed radius (m); 0 = tangent
-            typStr = CStr(rng.Cells(i, 7).Value)
-            d = sta - staStart
-            L = staEnd - staStart
-
-            Select Case UCase(Trim(typStr))
-                Case "T"
-                    theta_rad = 0#   ' tangent: azimuth is constant
-
-                Case "C"
-                    ' Circular arc: uniform curvature k = 1/R
-                    ' theta = d / R  (radians; sign follows R: +right, -left)
-                    If radius <> 0# Then
-                        theta_rad = d / radius
-                    Else
-                        theta_rad = 0#
-                    End If
-
-                Case "SPIN"
-                    ' Clothoid spiral-in (tangent -> curve):
-                    ' k(s) = s / (R*L),  theta = integral_0^d k ds = d^2 / (2*R*L)
-                    If radius <> 0# And L <> 0# Then
-                        theta_rad = (d * d) / (2# * radius * L)
-                    Else
-                        theta_rad = 0#
-                    End If
-
-                Case "SPOUT"
-                    ' Clothoid spiral-out (curve -> tangent):
-                    ' k(s) = 1/R - s/(R*L),  theta = d/R - d^2 / (2*R*L)
-                    If radius <> 0# And L <> 0# Then
-                        theta_rad = d / radius - (d * d) / (2# * radius * L)
-                    Else
-                        theta_rad = 0#
-                    End If
-
-                Case Else
-                    theta_rad = 0#   ' unknown type: treat as tangent
-            End Select
-
-            wcb_raw = azDeg + SMT_RadToDeg(theta_rad)
-            ' Normalise to [0, 360) via radians round-trip
-            SMT_WCBatSta = SMT_RadToDeg(SMT_NormalizeAngle(SMT_DegToRad(wcb_raw)))
-            Exit Function
-        End If
-    Next i
-
-    SMT_WCBatSta = CVErr(xlErrValue)   ' sta outside all elements
+    Dim pt As Variant
+    Dim tangentAz As Double
+    pt = SMT_SolveForward(sta, 0#, rng)
+    If IsError(pt) Then
+        SMT_WCBatSta = pt
+    Else
+        tangentAz = pt(2)
+        SMT_WCBatSta = SMT_RadToDeg(SMT_NormalizeAngle(tangentAz))
+    End If
 End Function
 
 ' ============================================================
@@ -718,4 +665,16 @@ End Function
 '     First element: Type=T, Azimuth=90 deg -> WCB = 90.0
 '   For C element with R=300, az=90, sta=StaStart+157.08 (quarter circle):
 '     theta = 157.08/300 = 0.5236 rad = 30.0 deg -> WCB = 120.0 deg
+'
+' COSINE (Civil 3D Sine Half-Wave) verification -- Phase 4, separate one-row
+' test table (StaStart=0, StaEnd=70, N=0, E=0, Azimuth=0, Radius=500,
+' Type=SPIN, Transition=COSINE), confirmed in real Excel against the Python
+' engine and a real smt export-landxml smoke test:
+'   SMT_StaToN(70, 0, SMT_Elements) = 69.968898  (closed-form tangent length X)
+'   SMT_StaToE(70, 0, SMT_Elements) = 1.455758   (totalY)
+'   SMT_WCBatSta(70, SMT_Elements)  = 4.002400   (theta, degrees)
+'   See session_logs/investigate_vba_phase4_scope.md and
+'   session_logs/plan_vba_wcbatsta_delegate_fix.md for the full 17-point
+'   Excel verification (3 COSINE + 10 BLOSS/SINE mid-curve + 1 boundary +
+'   3 T/C/CLOTHOID spot-checks), all confirmed 2026-07-12.
 ' ============================================================
