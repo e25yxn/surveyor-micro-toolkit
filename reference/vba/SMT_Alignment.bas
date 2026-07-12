@@ -20,6 +20,7 @@ Option Explicit
 
 Private Const SMT_SPIRAL_STEPS As Long = 48  ' Simpson intervals (must be even)
 Private Const SMT_STA_TOL As Double = 0.0001 ' station range tolerance (metres)
+Private Const SMT_SINE_HALFWAVE_C As Double = 0.0226689447  ' Civil 3D closed-form tangent-length correction constant
 
 ' ============================================================
 ' Private: atan2(y, x)
@@ -119,13 +120,99 @@ Private Sub SMT_GetCurvatures(typStr As String, radius As Double, _
 End Sub
 
 ' ============================================================
+' Private: COSINE (Civil 3D Sine Half-Wave) closed-form helpers
+' Mirrors src/smt/alignment.py (_cosine_dydx, _cosine_arc_length,
+' _cosine_solve_a, calculate_sine_halfwave_tangent_length,
+' _sine_halfwave_point) after commit d8ebedd. No caching in this port --
+' SMT_CosineSolveA bisects on [0,1] directly every call instead of using
+' a cached bracket table (see plan doc design decision).
+' ============================================================
+
+Private Function SMT_CosineDydx(a As Double, bigX As Double, r As Double) As Double
+    ' dy/dx at normalised parameter a -- same expression as the atan() argument
+    ' in SMT_SineHalfwavePoint's theta (tan(theta) = dy/dx).
+    Dim PI As Double
+    PI = SMT_Pi()
+    SMT_CosineDydx = bigX / r * (a / 2# - Sin(PI * a) / (2# * PI))
+End Function
+
+Private Function SMT_CosineArcLength(a As Double, bigX As Double, r As Double, _
+                                      Optional nSeg As Long = SMT_SPIRAL_STEPS) As Double
+    ' s(a) = integral[0..a] X*sqrt(1+(dy/dx)^2) da'  via Simpson quadrature.
+    ' Same 48-interval Simpson pattern already used in SMT_PointOnElement (spiral branch).
+    Dim h As Double, total As Double, ai As Double, integrand As Double
+    Dim i As Long, w As Long
+    h = a / CDbl(nSeg)
+    total = 0#
+    For i = 0 To nSeg
+        ai = CDbl(i) * h
+        integrand = bigX * Sqr(1# + SMT_CosineDydx(ai, bigX, r) ^ 2#)
+        If i = 0 Or i = nSeg Then
+            w = 1
+        ElseIf (i Mod 2) = 1 Then
+            w = 4
+        Else
+            w = 2
+        End If
+        total = total + CDbl(w) * integrand
+    Next i
+    SMT_CosineArcLength = total * h / 3#
+End Function
+
+Private Function SMT_CosineSolveA(d As Double, bigX As Double, r As Double, length As Double) As Double
+    ' Solve s(a) = d for normalised parameter a: direct 50-iteration bisection on
+    ' [0,1] -- no cached bracket table (design decision: see plan doc). Same
+    ' 50-iteration bisection style already used in SMT_ProjectOnElement.
+    Dim lo As Double, hi As Double, mid As Double, rAbs As Double
+    Dim iter As Long
+    rAbs = Abs(r)
+    lo = 0#
+    hi = 1#
+    For iter = 1 To 50
+        mid = (lo + hi) / 2#
+        If SMT_CosineArcLength(mid, bigX, rAbs) < d Then
+            lo = mid
+        Else
+            hi = mid
+        End If
+    Next iter
+    SMT_CosineSolveA = (lo + hi) / 2#
+End Function
+
+Public Function SMT_CalcSineHalfwaveTangentLength(length As Double, r As Double) As Double
+    ' Closed-form tangent-projected length X = L - 0.0226689447*L^3/R^2.
+    ' Public (not Private) so it can also be called directly from a worksheet cell
+    ' for the Excel verification checklist.
+    SMT_CalcSineHalfwaveTangentLength = length - SMT_SINE_HALFWAVE_C * length ^ 3# / r ^ 2#
+End Function
+
+Private Function SMT_SineHalfwavePoint(d As Double, bigX As Double, r As Double, length As Double) As Variant
+    ' COSINE transition shape, canonical (SPIN) form. Returns Variant array:
+    ' (0)=x (true tangent-projected coord, a*X)  (1)=y (local offset)  (2)=theta (rad).
+    ' d==length short-circuits to the exact a=1 closed form (same 1e-9 threshold as Python).
+    Dim a As Double
+    Dim res(2) As Double
+    If Abs(d - length) < 0.000000001 Then
+        a = 1#
+    Else
+        a = SMT_CosineSolveA(d, bigX, r, length)
+    End If
+    res(0) = a * bigX
+    res(1) = bigX ^ 2# / r * (a ^ 2# / 4# - (1# - Cos(SMT_Pi() * a)) / (2# * SMT_Pi() ^ 2#))
+    res(2) = Atn(SMT_CosineDydx(a, bigX, r))
+    SMT_SineHalfwavePoint = res
+End Function
+
+' ============================================================
 ' Private: position and tangent azimuth at arc distance d from element start
 ' Returns Variant Array: (0)=N  (1)=E  (2)=tangentAzimuth(rad)
 '
 ' Tangent (k_in=k_out=0): straight line.
 ' Circular (k_in=k_out=k): chord-and-half-angle formula.
 ' Spiral (k_in<>k_out): Simpson integration of (cos theta, sin theta),
-'   48 intervals -- matches Python oracle exactly for all 4 transition shapes.
+'   48 intervals -- matches Python oracle exactly for CLOTHOID/BLOSS/SINE.
+'   COSINE (pure SPIN/SPOUT) now bypasses this generic path -- see the
+'   dedicated closed-form branch above.
 ' ============================================================
 
 Private Function SMT_PointOnElement(n0 As Double, e0 As Double, az0 As Double, _
@@ -137,6 +224,12 @@ Private Function SMT_PointOnElement(n0 As Double, e0 As Double, az0 As Double, _
     Dim h As Double, sumX As Double, sumY As Double
     Dim s As Double, th As Double
     Dim ca As Double, sa As Double, x As Double, y As Double
+    Dim lenEl As Double, rr As Double, bigX As Double
+    Dim ptSine As Variant
+    Dim xLocal As Double, yLocal As Double, thLocal As Double
+    Dim xEnd As Double, yEnd As Double, thTotal As Double
+    Dim xG As Double, yG As Double, thG As Double
+    Dim dxs As Double, dys As Double
 
     If kIn = 0# And kOut = 0# Then
         ' Tangent: straight line along entry azimuth
@@ -153,6 +246,37 @@ Private Function SMT_PointOnElement(n0 As Double, e0 As Double, az0 As Double, _
         res(0) = n0 + chord * Cos(chordAz)
         res(1) = e0 + chord * Sin(chordAz)
         res(2) = SMT_NormalizeAngle(az0 + theta)
+
+    ElseIf UCase(Trim(transition)) = "COSINE" And ((kIn = 0#) <> (kOut = 0#)) Then
+        ' COSINE (Civil 3D Sine Half-Wave) pure SPIN/SPOUT closed form -- mirrors
+        ' alignment.py calculate_point_on_element:378-401. Bypasses the generic
+        ' Simpson-over-theta path below entirely for this case.
+        lenEl = L
+        If kIn = 0# Then
+            ' SPIN: curvature 0 -> 1/R, canonical form used directly
+            rr = 1# / kOut
+            bigX = SMT_CalcSineHalfwaveTangentLength(lenEl, rr)
+            ptSine = SMT_SineHalfwavePoint(d, bigX, rr, lenEl)
+            xLocal = ptSine(0): yLocal = ptSine(1): thLocal = ptSine(2)
+        Else
+            ' SPOUT: curvature 1/R -> 0, mirror canonical form via s <-> L-d
+            rr = 1# / kIn
+            bigX = SMT_CalcSineHalfwaveTangentLength(lenEl, rr)
+            ptSine = SMT_SineHalfwavePoint(lenEl, bigX, rr, lenEl)
+            xEnd = ptSine(0): yEnd = ptSine(1): thTotal = ptSine(2)
+            ptSine = SMT_SineHalfwavePoint(lenEl - d, bigX, rr, lenEl)
+            xG = ptSine(0): yG = ptSine(1): thG = ptSine(2)
+            dxs = xEnd - xG
+            dys = yEnd - yG
+            xLocal = dxs * Cos(thTotal) + dys * Sin(thTotal)
+            yLocal = dxs * Sin(thTotal) - dys * Cos(thTotal)
+            thLocal = thTotal - thG
+        End If
+        ca = Cos(az0)
+        sa = Sin(az0)
+        res(0) = n0 + xLocal * ca - yLocal * sa
+        res(1) = e0 + xLocal * sa + yLocal * ca
+        res(2) = SMT_NormalizeAngle(az0 + thLocal)
 
     Else
         ' Spiral: Simpson integration in local frame (x=along entry tangent, y=left)
