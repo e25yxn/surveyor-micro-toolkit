@@ -2,7 +2,7 @@
  * EXT-001: no-curve PI support — mirrors Python alignment_builder.py (commit cdf896d)
  *
  * ============================================================================
- *  AlignmentBuilderV2 — สร้างตาราง element จากเส้นโครง PI (แนว B)   [v2.0]
+ *  GS_AlignmentBuilder — สร้างตาราง element จากเส้นโครง PI (แนว B)   [v2.0]
  * ----------------------------------------------------------------------------
  *  รับ: PI polyline = [BP, {PI,...}, ..., EP]
  *    - BP (จุดแรก) / EP (จุดท้าย) = จุดปลาย ไม่มีโค้ง  {sta,n,e}

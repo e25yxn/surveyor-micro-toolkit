@@ -1,5 +1,16 @@
 # Session Log
 
+## [2026-07-13] cosmetic cleanup — แก้ชื่อค้าง "AlignmentBuilderV2" ใน JSDoc header ของ GS_AlignmentBuilder.gs
+
+- ทำ: แก้บรรทัด 5 ของ `reference/gsheet/GS_AlignmentBuilder.gs` (JSDoc header บนสุด) จาก
+  "AlignmentBuilderV2" เป็น "GS_AlignmentBuilder" ให้ตรงกับชื่อไฟล์/module จริงหลัง `git mv`
+  (ค้างไว้เป็นรายการ cleanup ตั้งแต่ commit `a4f7ae1` — ดู entry ด้านล่าง) ยืนยันก่อนแก้ว่า
+  git status สะอาด (เหลือแค่ 4 ไฟล์ untracked เดิมที่ไม่เกี่ยวข้อง) และ HEAD คือ `a4f7ae1` จริง
+- คำสั่ง: `git status`, `git log -1 --oneline`, `git diff -- reference/gsheet/GS_AlignmentBuilder.gs`
+- ผล: PASS — diff มีแค่บรรทัดเดียวตามที่ตั้งใจ ไม่กระทบโค้ด (เป็น comment ล้วนๆ)
+- commit: (เติมหลัง commit จริง)
+- หมายเหตุ: commit แยกต่างหาก ไม่รวมกับงาน GAS port หลัก ตามคำสั่งผู้ใช้
+
 ## [2026-07-13] พอร์ต GAS §5 เสร็จสมบูรณ์ — ทดสอบ Google Sheets จริง Group A/B + Node Group C, ปิดเอกสาร pre-commit gate
 
 - ทำ:
