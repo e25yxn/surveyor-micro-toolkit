@@ -1,5 +1,175 @@
 # Session Log
 
+## [2026-07-13] พอร์ต GAS §5 เสร็จสมบูรณ์ — ทดสอบ Google Sheets จริง Group A/B + Node Group C, ปิดเอกสาร pre-commit gate
+
+- ทำ:
+  - ทดสอบ Google Sheets จริง (§5 ของแผน) **Group A**: พิมพ์สูตร `=GS_COSINE_TANGENT_LENGTH` /
+    `=GS_COSINE_THETA_DEG` / `=GS_COSINE_TOTAL_Y` ในเซลล์จริง 3 จุด (R=900/L=100, R=250/L=50,
+    R=500/L=70) = 9 ค่า ตรงกับค่าคาดไว้ในแผนทุกตัว ทั้งก่อนและหลังแก้ปัญหา FPMath/WCB
+    dependency setup ใน Sheets project
+  - **Group B**: COSINE ผ่าน `buildFromPI` (BP=(0,0), IP=(1000,0), R=900/Ls=100/trans=COSINE,
+    EP ที่ deflection 30°) พิมพ์ในเซลล์ Sheets จริง ตรงกับ Python
+  - **Group C**: CLOTHOID ผ่าน `buildFromPI` (vertex เดียวกับ Group B เปลี่ยนแค่ `trans`) —
+    ยืนยัน python3 ตรงๆ ก่อน (deflection=30.000000000000018°, มุมเลี้ยว spiral
+    =3.1830988618378955° ตรงสูตรเชิงเส้น `Ls/(2R)` เป๊ะ) แล้วรัน Node เปรียบเทียบ
+    `GS_AlignmentBuilder.buildFromPI` กับ Python ผ่าน scratchpad script
+    `compare_groupC_clothoid.js` — ตรงกันทุกบิตทั้ง 6 control point (BP/TS/SC/CS/ST/EP)
+    และทุก element field — **ไม่ได้พิมพ์ในเซลล์ Google Sheets จริง** ต่างจาก Group A/B
+  - ปิดเงื่อนไขก่อน commit ที่เหลือฝั่งเอกสาร (4 จุด แสดง diff ให้ผู้ใช้ตรวจก่อน save ทุกจุด):
+    1. `reference/gsheet/GS_Alignment.gs` — เพิ่ม comment "Expected values" ท้ายไฟล์ ระบุ 9 ค่า
+       ที่ verify จริงจาก Sheets (Group A)
+    2. `reference/gsheet/GS_AlignmentBuilder.gs` — แก้ header comment (เดิมบรรทัด 28-29) ที่
+       เขียนว่า "curveSubs_ patch ยังไม่เสร็จ — รอ session ถัดไป" (ล้าสมัยแล้ว) เป็นสรุปสถานะจริง:
+       patch เสร็จสมบูรณ์ + ผลตรวจครบทุกชั้น ระบุแยกชัดว่า Group A/B ผ่าน Sheets จริง ส่วน
+       Group C ผ่านแค่ Node
+    3. `docs/extensions.md` EXT-003 — เพิ่มหัวข้อย่อย "GAS (Google Apps Script) mirror" อ้างอิง
+       ไฟล์ + สถานะทดสอบ Group A/B/C แบบเดียวกับข้อ 2
+    4. `session_logs/latest.md` — entry นี้เอง
+- คำสั่ง: `python3 -c "...build_alignment_from_pi..."` (Group C ยืนยันฝั่ง Python),
+  `node compare_groupC_clothoid.js` (scratchpad, Group C node-vs-python), `git diff --
+  reference/Alignment.gs reference/AlignmentBuilder.gs` (ตรวจว่ายังว่างเปล่า — ไม่แตะ
+  oracle เดิมแม้แต่บรรทัดเดียว)
+- ผล: PASS ทุกจุด — Group A 9/9 ค่าตรง (Sheets), Group B ตรง (Sheets), Group C diff=0
+  ทุก control point (Node-vs-Python เท่านั้น, ไม่ใช่ Sheets)
+- commit: ยังไม่ commit — รอผู้ใช้ตรวจ diff ทั้ง 4 ไฟล์ครบก่อนตามคำสั่งชัดเจน ("ยังไม่ commit
+  จนกว่าจะตรวจสอบครบทั้ง 4 ข้อ")
+- หมายเหตุ:
+  - พบจุด cosmetic ที่ยังไม่แก้: JSDoc header **บรรทัด 5** ของ `GS_AlignmentBuilder.gs` ยัง
+    เขียนชื่อไฟล์เดิมว่า "AlignmentBuilderV2" (ค้างจากก่อน `git mv` ไป `reference/gsheet/`)
+    ไม่กระทบการทำงานเพราะเป็นแค่ comment ไม่ใช่ชื่อ module/ตัวแปรจริง (module var เปลี่ยนเป็น
+    `GS_AlignmentBuilder` ถูกต้องแล้วตั้งแต่ §2 ขั้นตอน 1-5) — อยู่นอกสโคปที่อนุมัติรอบนี้
+    เก็บไว้เป็นรายการ cleanup รอสั่งแก้แยกใน session หน้า
+  - เงื่อนไขก่อน commit ที่เหลือตามแผน (`pytest -q` ซ้ำ, `git diff` oracle ว่างเปล่า, commit
+    message ผ่าน `.git\smt_commit_msg.txt`) ยังไม่ได้รันซ้ำในรอบนี้ (เอกสารเท่านั้น) — รอทำ
+    ก่อน commit จริง
+
+## [2026-07-13] พอร์ต GAS §2 เสร็จสมบูรณ์ — GS_AlignmentBuilder.gs curveSubs_ แก้แล้ว (ขั้นตอน 6-11)
+
+- ทำ: ทำต่อจาก session_logs/plan_20260713_0257.md §2 เฉพาะขั้นตอน 6-11 ในรอบนี้
+  (ขั้นตอน 1-5 ทำไปแล้วรอบก่อน — ดู entry ด้านล่าง)
+  - ยืนยันสถานะก่อนเริ่ม: git status ตรงตามคาด (rename staged, GS_AlignmentBuilder.gs
+    + session_logs/latest.md modified unstaged), `node -e "require(...)"` ผ่าน,
+    `node reference/gsheet/smoke_test.js` ยังผ่าน 23/23
+  - แก้ `curveSubs_` (reference/gsheet/GS_AlignmentBuilder.gs) แทนสูตรเชิงเส้น
+    `thIn = LsIn/(2R)` / `thOut = LsOut/(2R)` ด้วย helper ใหม่ `spiralTurningAngle_(R, length, trans)`
+    mirror `_spiral_turning_angle` (src/smt/builders/alignment_builder.py:139-150,
+    commit ba5de3c) — เรียกผ่าน synthetic SPIN element + `exitState().az` (ไม่ใช่ `.azimuth`
+    — ยืนยันซ้ำจาก GS_Alignment.gs ว่าทุก property state ชื่อ `az` เท่านั้น)
+  - ใช้ `vert.transIn || vert.trans` / `vert.transOut || vert.trans` เป็น argument
+    `trans` ให้ตรงกับ `subs.push` ที่ใช้อยู่แล้วในบล็อกเดียวกัน (ละเอียดกว่าคำสั่งเดิม
+    ที่ระบุแค่ `vert.trans`)
+  - ทดสอบเพิ่มก่อน save: เรียก `spiralTurningAngle_(R, L, undefined)` ตรงๆ ยืนยันว่า
+    `GS_Alignment.makeElement` fallback `trans` เป็น `undefined` ไปเป็น `'CLOTHOID'` เสมอ
+    (ไม่พังเงียบ) — ผลตรงกับ `trans='CLOTHOID'` เป๊ะ (diff=0) และตรงกับสูตรเชิงเส้นเดิม
+    `L/(2R)` (diff ระดับ 1e-17 float noise)
+  - ตรวจ EXT-001 patch 3 จุดเดิม (early-return บรรทัด 58-61, `names_` guard บรรทัด
+    84-87, `buildFromPI` angle-point branch บรรทัด 131-141 — เลขบรรทัดขยับจากเดิม
+    เพราะ header/require ยาวขึ้นจากขั้นตอน 4-5) ไม่ถูกแตะเลย ยืนยันด้วย git diff เต็มไฟล์
+  - เขียน quick Node script เปรียบเทียบ `spiralTurningAngle_` กับ Python
+    `_spiral_turning_angle` (เรียกตรงจาก src/smt/builders/alignment_builder.py ด้วย
+    python3) ที่ 3 จุด: COSINE R=900/L=100, COSINE R=250/L=50, CLOTHOID R=500/L=80
+    — **ผลตรงกันทุกบิต (diff=0.000e+0) ทั้ง 3 จุด**
+  - save ไฟล์จริงหลังผ่านการตรวจครบ ยืนยัน byte-level ด้วย `git diff` ก่อนเสมอ
+- คำสั่ง: `git status`, `node -e "require('./reference/gsheet/GS_AlignmentBuilder.gs')"`,
+  `node reference/gsheet/smoke_test.js`, `python3 -c "from src.smt.builders...` (คำนวณ
+  `_spiral_turning_angle` อิสระ 3 จุด), node script เปรียบเทียบ node-vs-python,
+  `git diff -- reference/gsheet/GS_AlignmentBuilder.gs`, `pytest -q`
+- ผล: PASS ทุกจุด
+  - `node reference/gsheet/smoke_test.js` → 23 passed, 0 failed (ไม่มี regression
+    จากการแก้ curveSubs_)
+  - `pytest -q` → 493 passed (ไม่ได้แก้ไฟล์ Python เลยรอบนี้ — ยืนยันว่าไม่พลาดแก้ผิดที่;
+    ตัวเลข 493 มากกว่า "407/407" ที่ CLAUDE.md บันทึกไว้เพราะมี test เพิ่มขึ้นตั้งแต่นั้น
+    ไม่ใช่ regression)
+  - Node-vs-Python: COSINE R=900/L=100 js=0.05548300509924253 python=0.05548300509924253
+    diff=0; COSINE R=250/L=50 js=0.09957887368657481 python=0.09957887368657481 diff=0;
+    CLOTHOID R=500/L=80 js=0.08000000000000007 python=0.08000000000000007 diff=0
+- commit: ยังไม่ commit — git status ยืนยันว่ามีแค่ staged rename + unstaged
+  modification ใน GS_AlignmentBuilder.gs และ session_logs/latest.md เท่านั้น
+- หมายเหตุ:
+  - พบ header comment (บรรทัด 28-29 เดิม) ยังเขียนว่า "curveSubs_ patch ยังไม่เสร็จ
+    ณ commit นี้ — รอ session ถัดไป" ซึ่งล้าสมัยแล้วตอนนี้ (patch เสร็จแล้วรอบนี้) —
+    ไม่ได้แก้เพราะอยู่นอกสโคปขั้นตอน 6-11 ที่อนุมัติ รอคำสั่งรอบหน้า
+  - §2 เสร็จสมบูรณ์ทั้งหมดแล้ว (ขั้นตอน 1-11) — **ยังไม่ commit** และ **ยังไม่แตะ §5**
+    (ทดสอบ Google Sheets จริง) ตามคำสั่งผู้ใช้ชัดเจน รอ session หน้าตัดสินใจ
+    commit strategy + เริ่ม §5
+
+## [2026-07-13] พอร์ต GAS §2 (บางส่วน) — GS_AlignmentBuilder.gs: git mv + rename + header (ยังไม่แก้ curveSubs_)
+
+- ทำ: ทำตามแผน session_logs/plan_20260713_0257.md §2 เฉพาะขั้นตอน 1-5 ในรอบนี้
+  (ขั้นตอน 6-11 ยังไม่ทำ รอ session หน้า)
+  - ยืนยันซ้ำก่อนเริ่มว่า node reference/gsheet/smoke_test.js (§1) ยังผ่าน 23/23
+    เหมือนเดิม และ grep AlignmentBuilderV2 ทั้ง repo ไม่พบ living reference อื่น
+    นอกจากตัวไฟล์เอง (ตรงกับที่แผนแม่สรุปไว้)
+  - git mv reference/AlignmentBuilderV2.gs -> reference/gsheet/GS_AlignmentBuilder.gs
+    (เก็บ git history ด้วย rename ไม่ใช่ delete+add)
+  - เปลี่ยนชื่อ module AlignmentBuilderV2 -> GS_AlignmentBuilder (var declaration
+    + module.exports) และแก้ require path 3 บรรทัดบนสุดให้ถูกต้องหลังย้ายไฟล์:
+    ./FPMath.gs -> ../FPMath.gs, ./WCB.gs -> ../WCB.gs, ./Alignment.gs ->
+    ./GS_Alignment.gs (จุดที่แผนแม่ไม่ได้ระบุชัดคือ FPMath/WCB path ก็ต้องแก้เป็น
+    ../ ด้วยเพราะไฟล์ย้ายลงไปอีกโฟลเดอร์ — พบระหว่างตรวจสอบตอนวางแผน ไม่ใช่ตอน execute)
+  - เปลี่ยน Alignment. -> GS_Alignment. ทั้ง 7 จุดที่เรียก .makeElement/.exitState
+    (บรรทัด 99, 101, 129, 149, 156, 159, 170) ยืนยันด้วย grep ว่าไม่มี "Alignment."
+    เดี่ยวๆ (ไม่มี GS_ นำหน้า) หลงเหลือเลยสักจุด
+  - อัปเดต header comment: คง EXT-001 (cdf896d) เดิมไว้ทั้งหมด เพิ่มย่อหน้าใหม่
+    อ้างอิง EXT-003 (ba5de3c) ระบุชัดว่า curveSubs_ patch ยังไม่เสร็จ ณ commit นี้
+    (ไม่ overclaim) และแก้บรรทัด "สร้างบน FPMath, WCB, Alignment" ที่ตกหล่นเป็น
+    "GS_Alignment" ให้ตรงกับชื่อ dependency จริงหลังย้าย
+  - ก่อนแก้ทุกจุด อ่าน curveSubs_ เต็มฟังก์ชันยืนยัน sign convention ของ R
+    (บรรทัด 56 var R = Math.abs(vert.R) — absolute เสมอ) แยกจาก sgn (บรรทัด 118
+    ใน buildFromPI) คนละ scope กันชัดเจน เทียบกับ Python
+    (alignment_builder.py:91 R = abs(float(vert['R']))) โครงสร้างตรงกัน 100% —
+    เตรียมไว้สำหรับขั้นตอน 6 (แก้ curveSubs_ ใส่ spiralTurningAngle_) ที่ยังไม่ทำ
+    รอบนี้ ไม่มีความเสี่ยงสลับเครื่องหมายมุมเลี้ยว
+- คำสั่ง: `node -e "require('./reference/gsheet/GS_AlignmentBuilder.gs')"` (ยืนยัน
+  require ผ่านหลังแก้แต่ละขั้น), `node reference/gsheet/smoke_test.js` (regression
+  check §1), `git status` / `git diff --stat`
+- ผล: PASS — require ไม่มี error, smoke test §1 ยังผ่าน 23/23 เหมือนเดิมทุกครั้งที่
+  ตรวจหลังแก้ ยังไม่ได้รัน pytest -q รอบนี้ (ยังไม่แตะ Python เลย)
+- commit: ยังไม่ commit — git status ยืนยันว่ามีแค่ staged rename +
+  unstaged modification ใน GS_AlignmentBuilder.gs และ session_logs/latest.md
+  เท่านั้น ไม่มี commit เกิดขึ้นเลยรอบนี้
+- หมายเหตุ: หยุดตามคำสั่งผู้ใช้ที่ขั้นตอน 1-5 ของ §2 รอบนี้ (session เหลือน้อย) —
+  ขั้นตอน 6 (แก้ curveSubs_ ใส่ spiralTurningAngle_ แทนสูตรเชิงเส้น thIn/thOut),
+  7 (quick Node-vs-Python test), 8 (save curveSubs_), 9 (pytest -q), 10 (log
+  entry สรุป §2 เต็ม), 11 (จบรอบ) และ §5 (ทดสอบ Google Sheets จริง) ยังไม่เริ่ม
+  รอทำต่อ session หน้า อ้างอิงแผนเดิม session_logs/plan_20260713_0257.md และ
+  plan file ของรอบนี้ที่ C:\Users\CK1024\.claude\plans\session-logs-plan-20260713-0257-md-2-gs-luminous-wall.md
+  (มีรายละเอียด sign-convention verification ของ R/sgn ที่ตรวจไว้แล้ว พร้อมใช้ต่อ
+  ในขั้นตอน 6)
+
+## [2026-07-13] พอร์ต GAS Phase 1 — GS_Alignment.gs (COSINE closed-form) + smoke test
+
+- ทำ: ทำตามแผน session_logs/plan_20260713_0257.md (เฉพาะ §1 และ §4 รอบนี้)
+  - สร้าง reference/gsheet/GS_Alignment.gs ใหม่ (copy จาก reference/Alignment.gs
+    oracle 268 บรรทัด ตรวจแล้วว่า 11 ฟังก์ชัน "copy ตรง" ตรงกับ oracle 100%
+    byte-for-byte) เพิ่ม COSINE (Civil 3D Sine Half-Wave) closed-form +
+    arc-length inversion mirror จาก src/smt/alignment.py (หลัง commit
+    ba5de3c) ใช้ Map แทน lru_cache ตามที่ investigation ยืนยันว่าใช้ได้จริงใน
+    GAS V8 runtime — ไม่แตะ reference/Alignment.gs เดิมเลยแม้แต่บรรทัดเดียว
+    (ยืนยันด้วย diff ก่อน commit)
+  - เขียน reference/gsheet/smoke_test.js ครอบคลุม 3 จุด ground truth
+    (R=900/L=100, R=250/L=50, R=500/L=70) x 3 ค่า (totalX/theta/totalY)
+    = 9 ค่า, SPIN/SPOUT theta symmetry, cache sharing, regression
+    CLOTHOID/BLOSS/SINE
+  - ระหว่างทดสอบพบ 2 บั๊กในตัว test เอง (ไม่ใช่บั๊กใน GS_Alignment.gs):
+    (1) cache test เดิมใช้ R=900/L=100 ซ้ำกับจุดที่ Test 2 (SPOUT) แคชไปแล้ว
+    เป็น side-effect ทำให้ assertEqual เพี้ยน แก้เป็น R=333/L=44 ที่ไม่ซ้ำ
+    กับจุดใดเลยในไฟล์ (2) Test 2 เดิม assert ว่า SPIN/SPOUT ต้องได้ totalY
+    เท่ากัน ซึ่งไม่จริงตามธรรมชาติสูตร (SPOUT วัด y จากกรอบอ้างอิงคนละจุดกับ
+    SPIN) พิสูจน์ด้วยการรัน python เทียบ src/smt/alignment.py โดยตรงว่า GS
+    กับ Python ให้ค่า SPOUT e ตรงกันบิตต่อบิต ยืนยันว่าไม่ใช่บั๊กพอร์ต แก้
+    test ให้เหลือแค่ assert theta เหมือน
+    tests/test_alignment.py::test_cosine_spin_spout_symmetry_matches_civil3d
+    จริง
+- คำสั่ง: node reference/gsheet/smoke_test.js (รันจากตำแหน่งจริงใน reference/gsheet/ ไม่ใช่ scratchpad)
+- ผล: PASS (23/23 assertion ผ่านหมด)
+- commit: ยังไม่ commit — ยังไม่ผ่านเงื่อนไข pre-commit gate ของแผน (ต้องทำ §2
+  GS_AlignmentBuilder.gs และ §5 ทดสอบ Google Sheets จริงให้เสร็จก่อน)
+- หมายเหตุ: หยุดตามคำสั่งผู้ใช้ที่ §1+§4 รอบนี้ — §2 (GS_AlignmentBuilder.gs,
+  git mv จาก reference/AlignmentBuilderV2.gs + แพตช์ turning-angle) และ §5
+  (ทดสอบ Google Sheets จริง) ยังไม่เริ่ม รอทำต่อ session หน้า อ้างอิงแผนเดิม
+  session_logs/plan_20260713_0257.md
+
 ## [2026-07-12] แก้ SMT_WCBatSta ให้ delegate ผ่าน SMT_SolveForward/SMT_PointOnElement + แก้ ByRef compile error
 
 - ทำ: พบระหว่างทดสอบ Excel ว่า SMT_WCBatSta คำนวณ theta ผิดสำหรับ COSINE (และ

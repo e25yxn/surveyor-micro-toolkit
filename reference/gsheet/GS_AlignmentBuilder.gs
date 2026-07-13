@@ -21,18 +21,39 @@
  *    -> วางจริง แล้วส่งทอด (Point Forwarding) หาจุด control ที่เหลือ
  *  วิธีนี้รองรับทุกโครงสร้างโค้ง + ทุกชนิด transition โดยอัตโนมัติ
  *
- *  สร้างบน FPMath, WCB, Alignment (ใช้ public API)
+ *  EXT-003: ไฟล์นี้จะพอร์ต spiralTurningAngle_ (มุมเลี้ยว spiral จริง แทนสูตรเชิงเส้น
+ *  Ls/(2R) เดิมใน curveSubs_) mirror src/smt/builders/alignment_builder.py:139-150
+ *  (commit ba5de3c) ให้ COSINE ได้มุมเลี้ยวถูกต้อง — เทียบเท่า VBA Phase 4
+ *  (reference/vba/SMT_Alignment.bas, commit e285fd5) ที่พอร์ตส่วนเดียวกันไปแล้ว ดู
+ *  session_logs/plan_20260713_0257.md §2 — curveSubs_ patch เสร็จสมบูรณ์แล้ว (spiralTurningAngle_
+ *  ใช้งานจริงในบรรทัด 45-49, 76-77 ด้านล่าง) ยืนยันผ่านครบทุกชั้น: Node-vs-Python (diff=0
+ *  ทั้ง COSINE R=900/L=100, R=250/L=50, CLOTHOID R=500/L=80), `node
+ *  reference/gsheet/smoke_test.js` (23/23), `pytest -q` (493 passed, ไม่ regression) ยืนยัน
+ *  2026-07-13 — Group A (GS_Alignment.gs UDF 9 ค่า) และ Group B (COSINE ผ่าน buildFromPI)
+ *  ผ่านการทดสอบพิมพ์สูตรจริงในเซลล์ Google Sheets แล้ว; Group C (CLOTHOID ผ่าน buildFromPI,
+ *  vertex เดียวกับ Group B) ผ่านเฉพาะ Node เปรียบเทียบ Python โดยตรง (diff=0 ทุก control
+ *  point) ในเครื่องเท่านั้น — ยังไม่เคยทดสอบพิมพ์สูตรในเซลล์ Sheets จริง
+ *
+ *  สร้างบน FPMath, WCB, GS_Alignment (ใช้ public API)
  * ============================================================================
  */
-if (typeof FPMath === 'undefined' && typeof require !== 'undefined')    { var FPMath = require('./FPMath.gs'); }
-if (typeof WCB === 'undefined' && typeof require !== 'undefined')       { var WCB = require('./WCB.gs'); }
-if (typeof Alignment === 'undefined' && typeof require !== 'undefined') { var Alignment = require('./Alignment.gs'); }
+if (typeof FPMath === 'undefined' && typeof require !== 'undefined')       { var FPMath = require('../FPMath.gs'); }
+if (typeof WCB === 'undefined' && typeof require !== 'undefined')          { var WCB = require('../WCB.gs'); }
+if (typeof GS_Alignment === 'undefined' && typeof require !== 'undefined') { var GS_Alignment = require('./GS_Alignment.gs'); }
 
-var AlignmentBuilderV2 = (function () {
+var GS_AlignmentBuilder = (function () {
   'use strict';
 
   // แตกโครงสร้างโค้งที่ PI ออกเป็นรายการ sub-element (kind, R, len, trans)
   // absD = มุมเลี้ยวรวม (รัศมีบวก), คืน {subs, issue}
+  // EXT-003: มุมเลี้ยว spiral จริง (แทนสูตรเชิงเส้น Ls/(2R)) mirror
+  // _spiral_turning_angle (src/smt/builders/alignment_builder.py:139-150, commit ba5de3c)
+  function spiralTurningAngle_(R, length, trans) {
+    var el = GS_Alignment.makeElement('SPIN', 0, length, 0, 0, 0, R, null, trans);
+    var exit = GS_Alignment.exitState(el);
+    return exit.az - el.az;
+  }
+
   function curveSubs_(vert, absD) {
     var subs = [], issue = null;
 
@@ -58,8 +79,8 @@ var AlignmentBuilderV2 = (function () {
     var LsOut = (vert.LsOut != null) ? vert.LsOut : (vert.Ls || 0);
 
     if (LsIn > 0 || LsOut > 0) {
-      var thIn  = LsIn  > 0 ? LsIn  / (2 * R) : 0;
-      var thOut = LsOut > 0 ? LsOut / (2 * R) : 0;
+      var thIn  = LsIn  > 0 ? spiralTurningAngle_(R, LsIn,  vert.transIn  || vert.trans) : 0;
+      var thOut = LsOut > 0 ? spiralTurningAngle_(R, LsOut, vert.transOut || vert.trans) : 0;
       var dc = absD - thIn - thOut;
       if (dc < 0) issue = 'spiral ยาวเกินมุมเลี้ยว (Δ < θsIn+θsOut)';
       if (LsIn  > 0) subs.push({ kind: 'SPIN',  R: R, len: LsIn,  trans: vert.transIn  || vert.trans });
@@ -96,9 +117,9 @@ var AlignmentBuilderV2 = (function () {
     var cur = { n: 0, e: 0, az: azIn }, sta = 0;
     for (var i = 0; i < subs.length; i++) {
       var s = subs[i];
-      var el = Alignment.makeElement(s.kind, sta, sta + s.len, cur.n, cur.e,
+      var el = GS_Alignment.makeElement(s.kind, sta, sta + s.len, cur.n, cur.e,
                                      FPMath.radToDeg(cur.az), sgn * s.R, undefined, s.trans);
-      cur = Alignment.exitState(el);
+      cur = GS_Alignment.exitState(el);
       sta += s.len;
     }
     return { n: cur.n, e: cur.e };
@@ -126,7 +147,7 @@ var AlignmentBuilderV2 = (function () {
       if (!subs || subs.length === 0) {
         var tanLen = WCB.distance2D(prev.n, prev.e, Vn, Ve);
         var staPi  = prev.sta + tanLen;
-        els.push(Alignment.makeElement('T', prev.sta, staPi, prev.n, prev.e,
+        els.push(GS_Alignment.makeElement('T', prev.sta, staPi, prev.n, prev.e,
                                         FPMath.radToDeg(azIn), 0));
         control.push({ name: 'IP', sta: staPi, n: Vn, e: Ve });
         prev = { n: Vn, e: Ve, sta: staPi };
@@ -146,17 +167,17 @@ var AlignmentBuilderV2 = (function () {
       // tangent: prev -> curveStart
       var tanLen = WCB.distance2D(prev.n, prev.e, curveStart.n, curveStart.e);
       var staCS = prev.sta + tanLen;
-      els.push(Alignment.makeElement('T', prev.sta, staCS, prev.n, prev.e, FPMath.radToDeg(azIn), 0));
+      els.push(GS_Alignment.makeElement('T', prev.sta, staCS, prev.n, prev.e, FPMath.radToDeg(azIn), 0));
       control.push({ name: nm.start, sta: staCS, n: curveStart.n, e: curveStart.e });
 
       // ส่งทอดสร้าง sub-element จริง พร้อมจุด control
       var cur = { n: curveStart.n, e: curveStart.e, az: azIn }, sta = staCS;
       for (var i = 0; i < subs.length; i++) {
         var s = subs[i];
-        var el = Alignment.makeElement(s.kind, sta, sta + s.len, cur.n, cur.e,
+        var el = GS_Alignment.makeElement(s.kind, sta, sta + s.len, cur.n, cur.e,
                                        FPMath.radToDeg(cur.az), sgn * s.R, undefined, s.trans);
         els.push(el);
-        cur = Alignment.exitState(el);
+        cur = GS_Alignment.exitState(el);
         sta += s.len;
         var ptName = (i < subs.length - 1) ? nm.jct[i] : nm.end;
         control.push({ name: ptName, sta: sta, n: cur.n, e: cur.e });
@@ -167,7 +188,7 @@ var AlignmentBuilderV2 = (function () {
     var ep = vertices[N - 1];
     var azEnd = WCB.azimuthFromCoords(prev.n, prev.e, ep.n, ep.e);
     var endLen = WCB.distance2D(prev.n, prev.e, ep.n, ep.e);
-    els.push(Alignment.makeElement('T', prev.sta, prev.sta + endLen, prev.n, prev.e, FPMath.radToDeg(azEnd), 0));
+    els.push(GS_Alignment.makeElement('T', prev.sta, prev.sta + endLen, prev.n, prev.e, FPMath.radToDeg(azEnd), 0));
     control.push({ name: 'EP', sta: prev.sta + endLen, n: ep.n, e: ep.e });
 
     return { elements: els, control: control, issues: issues };
@@ -196,4 +217,4 @@ var AlignmentBuilderV2 = (function () {
   return { buildFromPI: buildFromPI, crossCheck: crossCheck };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = AlignmentBuilderV2;
+if (typeof module !== 'undefined' && module.exports) module.exports = GS_AlignmentBuilder;

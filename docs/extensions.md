@@ -139,6 +139,18 @@ fix, and the unchanged golden-fixture rows outside the COSINE PI-group for the
 closed-form fix). Confirmed: `pytest -q` → `457 passed, 0 xfailed, 0 failed` — fully
 green, both xfail marks removed, no regression anywhere in the suite.
 
+### GAS (Google Apps Script) mirror
+`reference/gsheet/GS_Alignment.gs` + `reference/gsheet/GS_AlignmentBuilder.gs` port the same
+COSINE closed-form + arc-length inversion + builder turning-angle fix to Google Apps Script,
+mirroring the VBA port (`reference/vba/SMT_Alignment.bas`, commit `e285fd5`). Verified
+2026-07-13: Node smoke-test (23/23) and Node-vs-Python diff=0 across 3 R/L/trans points.
+Beyond that, three vertex groups were checked — **Group A** (9 `GS_COSINE_*` UDF values)
+and **Group B** (COSINE PI-vertex through `buildFromPI`) were confirmed by typing the
+formulas into real Google Sheets cells; **Group C** (CLOTHOID through `buildFromPI`, same
+vertex as Group B) was confirmed only via a local Node-vs-Python comparison (diff=0 on all
+6 control points) — it has not yet been typed into a real Sheets cell. See
+`session_logs/plan_20260713_0257.md`, `session_logs/latest.md`.
+
 ---
 
 ## EXT-002 — Radius Optimisation (fit_radius)
