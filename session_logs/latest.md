@@ -19,7 +19,7 @@
 - คำสั่ง: `.venv\Scripts\python.exe -m pytest -q`,
   `.venv\Scripts\python.exe -m pytest tests/builders/test_table_splitter.py -v`
 - ผล: PASS — 504/504 ทั้ง suite, 11/11 test ใหม่ (ไม่มี skip)
-- commit: (เติมหลัง commit จริง — commit B ตามแผน `session_logs/plan_20260723_1804.md`)
+- commit: `7abd919`
 - หมายเหตุ: อ้างอิงแผนที่อนุมัติแล้วที่ `session_logs/plan_20260723_1804.md`
 
 ## [2026-07-23] แก้ transcription error พิกัด PI-10 ใน test_data/HOR_ORR_04.csv
@@ -46,7 +46,7 @@
   git status สะอาด (เหลือแค่ 4 ไฟล์ untracked เดิมที่ไม่เกี่ยวข้อง) และ HEAD คือ `a4f7ae1` จริง
 - คำสั่ง: `git status`, `git log -1 --oneline`, `git diff -- reference/gsheet/GS_AlignmentBuilder.gs`
 - ผล: PASS — diff มีแค่บรรทัดเดียวตามที่ตั้งใจ ไม่กระทบโค้ด (เป็น comment ล้วนๆ)
-- commit: (เติมหลัง commit จริง)
+- commit: `1ed6b8e`
 - หมายเหตุ: commit แยกต่างหาก ไม่รวมกับงาน GAS port หลัก ตามคำสั่งผู้ใช้
 
 ## [2026-07-13] พอร์ต GAS §5 เสร็จสมบูรณ์ — ทดสอบ Google Sheets จริง Group A/B + Node Group C, ปิดเอกสาร pre-commit gate
@@ -242,7 +242,7 @@
 - คำสั่ง: git add -p (hunk-level เฉพาะส่วน WCBatSta fix + plan file) ->
   git commit -F .git\smt_commit_msg.txt
 - ผล: PASS — Excel 17/17 จุดผ่าน
-- commit: (เติมหลัง commit จริง)
+- commit: `ba5de3c`
 - หมายเหตุ: บั๊กนี้เป็นบั๊กเดิมที่มีมาก่อน Phase 4 (ไม่ใช่ผลจาก Phase 4) แค่ถูก
   ค้นพบระหว่างทดสอบ Phase 4
 
