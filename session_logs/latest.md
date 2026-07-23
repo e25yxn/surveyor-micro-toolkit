@@ -1,5 +1,43 @@
 # Session Log
 
+## [2026-07-23] เพิ่ม split_mixed_alignment_table() — table splitter สำหรับตารางที่มี BP/PI-n/PT/PC/TS/SC/CS/ST/EP ปนกัน
+
+- ทำ:
+  - สร้าง `src/smt/builders/table_splitter.py` — ฟังก์ชันใหม่ `split_mixed_alignment_table()`
+    รับตารางดิบที่มี BP/PI-n/PT/PC/TS/SC/CS/ST/EP ปนแถวเดียวกัน แล้วแยกเป็น vertex_rows
+    (POINT ตรง regex `^(BP|PI-\d+|EP)$` หรือ blank compound sub-row) ป้อนต่อ `parse_pi_table()`
+    ได้ตรง ๆ กับ drawing list (จุดที่เหลือ) ป้อนต่อ `check_against_drawing()` ได้ตรง ๆ
+    รวมถึงตัด thousands-separator comma ออกจากตัวเลข (เช่น `"1,537,772.85"`) ที่
+    `parse_pi_table()`/`float()` เดิมไม่รองรับ
+  - **ไม่แก้** `parse_pi_table()`, `build_alignment_from_pi()`, `check_against_drawing()` เลย
+    (auto-derive R sign ที่มีอยู่แล้วในโค้ดทั้ง Python core และ GAS mirror ไม่ต้องเขียนใหม่ —
+    งานนี้คือ table-splitter adapter ใหม่เท่านั้น)
+  - สร้าง `tests/builders/test_table_splitter.py` — golden fixture จาก
+    `test_data/HOR_ORR_04.csv` จริง (11 PI, ไม่มี compound) ยืนยัน split ถูกต้อง (13 vertex
+    rows, 22 drawing points) และ cross-check ผ่านครบ 22/22 จุดจริง ที่ tolerance=0.1
+    (gap_m สูงสุด 0.0789 เมตร)
+- คำสั่ง: `.venv\Scripts\python.exe -m pytest -q`,
+  `.venv\Scripts\python.exe -m pytest tests/builders/test_table_splitter.py -v`
+- ผล: PASS — 504/504 ทั้ง suite, 11/11 test ใหม่ (ไม่มี skip)
+- commit: (เติมหลัง commit จริง — commit B ตามแผน `session_logs/plan_20260723_1804.md`)
+- หมายเหตุ: อ้างอิงแผนที่อนุมัติแล้วที่ `session_logs/plan_20260723_1804.md`
+
+## [2026-07-23] แก้ transcription error พิกัด PI-10 ใน test_data/HOR_ORR_04.csv
+
+- ทำ: ระหว่างเตรียม golden fixture ให้ `split_mixed_alignment_table()` พบว่า cross-check
+  พังหนัก (gap 100–420 เมตร) ตั้งแต่โค้ง PI-9 เป็นต้นไป สืบสาเหตุพบว่าพิกัด PI-10 ในไฟล์
+  (`NORTHING=1,537,748.127`, `EASTING=682,827.952`) คลาดเคลื่อนจากจุดตัดเส้นสัมผัส
+  (tangent-intersection) ที่คำนวณจาก TS/SC/CS/ST รอบๆ ประมาณ 1000 ทั้งสองแกน (ΔN=1000.23,
+  ΔE=1000.43) ผู้ใช้ (CK1024) เช็คกับ source survey ต้นทางจริงแล้วยืนยันค่าที่ถูกต้องคือ
+  N=1,536,748.127, E=681,827.952 (ตรงกับที่คำนวณได้พอดี 1000.000 ทั้งสองแกน) แก้เฉพาะ 2
+  ค่านี้ในไฟล์ ไม่แตะค่าอื่น — รายละเอียดครบใน
+  `session_logs/investigate_hor_orr04_pi10_typo.md`
+- คำสั่ง: คำนวณ tangent-intersection ยืนยัน (scratchpad script, ไม่ได้ commit), ผู้ใช้ยืนยัน
+  ด้วยวาจาเทียบ source ต้นทาง
+- ผล: PASS — หลังแก้ cross-check ผ่านครบ 22/22 จุด (ดู entry ด้านบน สำหรับ pytest run เต็ม)
+- commit: `2074343`
+- หมายเหตุ: ไม่ใช่บั๊กของ `alignment_builder.py` — ปัญหาอยู่ที่ข้อมูล survey ต้นทางเท่านั้น
+
 ## [2026-07-13] cosmetic cleanup — แก้ชื่อค้าง "AlignmentBuilderV2" ใน JSDoc header ของ GS_AlignmentBuilder.gs
 
 - ทำ: แก้บรรทัด 5 ของ `reference/gsheet/GS_AlignmentBuilder.gs` (JSDoc header บนสุด) จาก
