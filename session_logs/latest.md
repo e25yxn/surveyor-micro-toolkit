@@ -1,5 +1,35 @@
 # Session Log
 
+## [2026-07-24] พอร์ต GS_TableSplitter.gs เสร็จ — verify diff=0 กับ Sheet HOR-ORR-04 จริง, พบ+แก้ข้อมูล PI-10 ผิด
+
+- ทำ:
+  - พอร์ต `src/smt/builders/table_splitter.py::split_mixed_alignment_table()` เป็น
+    Google Apps Script — สร้าง `reference/gsheet/GS_TableSplitter.gs`
+    (`GS_TableSplitter.splitMixedAlignmentTable(rows)`) รับตาราง array-of-arrays
+    (แถวแรก=header) แยกเป็น `vertexRows` (BP/PI-n/EP + compound sub-row) กับ
+    `drawing` ({name,sta,n,e}) ตัด thousands-separator comma ออกจากตัวเลขเหมือน
+    Python ต้นฉบับทุกประการ — adapter เท่านั้น ไม่แตะ parse/build/check เดิม
+  - เขียน `testSplitAgainstHorOrr04()` ใน `D:\MyClasp_SMT_DEMO\TestDrive.js`
+    (นอก git repo — โฟลเดอร์ clasp แยกต่างหาก) อ่านจริงจาก Google Sheet
+    `HOR-ORR-04` (`SPREADSHEET_ID` เดิมที่เคยเข้าใจผิดว่าเป็น SMT_COGO_Builder_DEMO
+    ยืนยันแล้วว่าเป็นไฟล์ HOR-ORR-04 จริง) เรียก `splitMixedAlignmentTable()`
+    แล้ว log โครงสร้างผลลัพธ์ทั้งหมด
+  - `clasp push` ยืนยันว่า `GS_TableSplitter.js` ถูกส่งขึ้น Apps Script project จริง
+    ก่อนรัน (4 files: appsscript.json, code.js, GS_TableSplitter.js, TestDrive.js)
+  - ระหว่าง verify พบว่าการเทียบผลลัพธ์ split (diff) ที่ PI-10 ไม่ตรงกัน เพราะข้อมูล
+    ในสเปรดชีต HOR-ORR-04 เอง (ไม่ใช่บั๊กโค้ด): EASTING ผิดไปประมาณ 1000 เมตร และ
+    ช่อง Transition ว่างเปล่า (ควรเป็น CLOTHOID) — ผู้ใช้ (CK1024) แก้ตรงในสเปรดชีต
+    เป็น EASTING=681827.952 + Transition=CLOTHOID
+  - รัน `testSplitAgainstHorOrr04()` ซ้ำหลังแก้ข้อมูล — ผลตรงกับ Python 100% ทุกฟิลด์
+- คำสั่ง: `clasp push`, รัน `testSplitAgainstHorOrr04` ผ่าน Apps Script web editor
+  (Execution log), `git commit -F .git\smt_commit_msg.txt`
+- ผล: PASS — Sheet HOR-ORR-04 จริง 36 แถว → 14 vertexRows + 22 drawing entries
+  ตรงกับ Python reference (`split_mixed_alignment_table()`) ทุกฟิลด์ diff=0
+- commit: `67d06e4`
+- หมายเหตุ: ปัญหา PI-10 (EASTING/Transition) เป็นความผิดพลาดของข้อมูลในสเปรดชีต
+  HOR-ORR-04 เอง ไม่ใช่บั๊กของ `GS_TableSplitter.gs` หรือ Python ต้นฉบับ — ค้นพบ
+  เพราะการ verify รอบนี้เท่านั้น
+
 ## [2026-07-23] เพิ่ม split_mixed_alignment_table() — table splitter สำหรับตารางที่มี BP/PI-n/PT/PC/TS/SC/CS/ST/EP ปนกัน
 
 - ทำ:
