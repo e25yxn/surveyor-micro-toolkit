@@ -1,5 +1,30 @@
 # Session Log
 
+## [2026-07-25] export ตารางที่ 1 (element table) — Session D, verify diff=0 กับ Python ทุกจุด
+
+- ทำ: เพิ่ม GS_ElementTable.gs ให้ flatten `elements` array จาก
+  GS_AlignmentBuilder.buildFromPI() เป็นตาราง 8 คอลัมน์ (StaStart, StaEnd, N,
+  E, Azimuth, Radius, Type, Transition) mirror src/smt/cli.py::_run_build
+  (บรรทัด 118-168) และ _radius_from_element() (บรรทัด 109-115) รวมพฤติกรรม
+  blank Transition เป็น '' สำหรับ element T/C เก็บค่าเป็นตัวเลขจริงแทน string
+  ปัดทศนิยม (.6f) เพื่อให้ใช้สูตร sort/sum บน Sheet ได้ตรงๆ verify diff=0
+  เทียบ Python ครบทั้ง 25 rows/8 คอลัมน์ รวมเช็คแถว SPIN/SPOUT ว่า Transition
+  ถูกต้อง
+  เพิ่ม exportElementsToSheet(elements) ใน TestDrive.js — เช็ค tab "Elements"
+  ผ่าน ss.getSheetByName ก่อน ถ้ามีอยู่แล้วให้ clear() แล้วเขียนทับ (ไม่
+  insertSheet ซ้ำ กัน error ชื่อซ้ำ) เขียน [HEADER, ...rows] ด้วย setValues()
+  ครั้งเดียว
+  เพิ่ม testFullPipelineExportAgainstHorOrr04() ทดสอบ pipeline เต็ม
+  (split→parse→build→export) กับ Sheet HOR-ORR-04 จริง แล้วอ่านค่ากลับจาก tab
+  "Elements" มาเช็ค
+- คำสั่ง: clasp push, รัน testFullPipelineExportAgainstHorOrr04() ผ่าน Apps
+  Script web editor + Execution log, git commit -F .git\smt_commit_msg.txt
+- ผล: PASS — Elements tab ถูกสร้าง/เขียนถูกต้อง diff=0 ทุกจุดเทียบ Python
+- commit: b3e5926
+- หมายเหตุ: exportElementsToSheet() hardcode SPREADSHEET_ID ไว้ในตัวเอง แทนที่
+  จะรับ ss เป็น parameter — ใช้ได้ปกติสำหรับไฟล์ทดสอบตอนนี้ แต่ต้องแก้ตอน
+  Session F ที่ต้องรองรับหลาย alignment/หลายสเปรดชีต
+
 ## [2026-07-25] ต่อ pipeline เต็ม split→parse→build แล้ว verify end-to-end สำเร็จ — Session C
 
 - ทำ: wiring test เต็ม pipeline (split→parse→build) ยืนยัน GS_AlignmentBuilder.gs
