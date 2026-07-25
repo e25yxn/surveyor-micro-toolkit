@@ -1,5 +1,27 @@
 # Session Log
 
+## [2026-07-25] ต่อ pipeline เต็ม split→parse→build แล้ว verify end-to-end สำเร็จ — Session C
+
+- ทำ: wiring test เต็ม pipeline (split→parse→build) ยืนยัน GS_AlignmentBuilder.gs
+  (v2.0) เป็น oracle ที่ถูกต้อง, verify ผ่าน Node/Python (diff=0 ทั้งข้อมูลจริงและ
+  PI-only) เจอว่า D:\MyClasp_SMT_DEMO ไม่เคยมี FPMath.js/WCB.js/GS_Alignment.js/
+  GS_AlignmentBuilder.js เลย (Groups A/B/C ที่เคย verify ไว้ก่อนหน้าทำคนละโปรเจกต์
+  sandbox) เพิ่ม 4 ไฟล์นี้เข้า clasp folder (คัดลอก verbatim จาก reference/FPMath.gs,
+  reference/WCB.gs, reference/gsheet/GS_Alignment.gs,
+  reference/gsheet/GS_AlignmentBuilder.gs) แล้ว push สำเร็จ พร้อมเพิ่มฟังก์ชัน
+  testBuildFromPIAgainstHorOrr04() ต่อท้าย TestDrive.js
+  รันจริง testBuildFromPIAgainstHorOrr04() บน Sheet HOR-ORR-04: elements=25,
+  control=26, issues=0 ตรงตามคาด ตอนแรกดูเหมือนพิกัดจุด PC/PT ต่างจากที่ verify
+  ไว้มาก แต่พิสูจน์แล้วว่าเป็นผลจากพิกัด BP ที่ต่างกัน 5 มม. (CSV fixture vs
+  ชีตจริง) ขยายผลผ่านเรขาคณิตช่วงสั้นๆ ใกล้ BP เท่านั้น ไม่ใช่บั๊ก (ยืนยันด้วยการ
+  ป้อน vertices จากชีตจริงเข้า Python โดยตรง ได้ผลตรงกับ log ทุกตัวเลข)
+- คำสั่ง: clasp pull, clasp push, รัน testBuildFromPIAgainstHorOrr04() ผ่าน Apps
+  Script web editor + Execution log
+- ผล: PASS — pipeline ทำงานถูกต้องสมบูรณ์ end-to-end
+- commit: ไม่มี (ไม่มีไฟล์ repo เปลี่ยนแปลง — 4 ไฟล์ dependency มีอยู่แล้วใน
+  reference/ ไม่ได้แก้, TestDrive.js อยู่นอก repo)
+- หมายเหตุ: —
+
 ## [2026-07-25] พอร์ต GS_PiTableParser.gs เสร็จ — Session B, verify diff=0 ทั้ง Node/Python และ Sheet จริง
 
 - ทำ: พอร์ต parse_pi_table() (alignment_builder.py:219-328) เป็น
