@@ -1,5 +1,28 @@
 # Session Log
 
+## [2026-07-25] พอร์ต GS_PiTableParser.gs เสร็จ — Session B, verify diff=0 ทั้ง Node/Python และ Sheet จริง
+
+- ทำ: พอร์ต parse_pi_table() (alignment_builder.py:219-328) เป็น
+  GS_PiTableParser.gs — reuse parseHeader_/cell_ pattern จาก GS_TableSplitter.gs,
+  mirror pending/flush state machine, R+compound ambiguity error, R blank/"0"
+  = angle point, LsIn/LsOut override Ls, เพิ่ม toFloat_() helper mirror
+  พฤติกรรม float() ของ Python (throw แทน parseFloat ที่ปล่อยผ่านเงียบๆ)
+  ยืนยัน contract กับ buildFromPI ที่มีอยู่แล้ว: ตรงกัน 8/9 key (n,e,sta,R,Ls,
+  LsIn,LsOut,trans,compound) ส่วน transIn/transOut ไม่กระทบ (parse_pi_table
+  ไม่เคยผลิต key นี้อยู่แล้ว และ buildFromPI fallback ไปที่ .trans เอง)
+  Verify 2 ชั้น: (1) Node.js เทียบ Python จริง 8 เคส (ข้อมูลจริงผ่าน pipeline
+  เต็ม + 7 synthetic case ครอบคลุม symmetric Ls, angle point, compound
+  sub-row, ambiguous error, BP sta, LsIn-only) diff=0 ทุกจุด (2) รันจริงผ่าน
+  Apps Script กับ Sheet HOR-ORR-04 จริง (vertexRows=14, vertices=13) ตรงกับ
+  Node/Python ทุกฟิลด์ (ต่างแค่ทศนิยมส่วนเกินตามที่รู้จักแล้ว) ไม่มี regression
+  ที่ PI-10
+- คำสั่ง: Node.js verify script, clasp push, รัน testParseAgainstHorOrr04 ผ่าน
+  Apps Script web editor, git commit -F .git\smt_commit_msg.txt
+- ผล: PASS — diff=0 ทั้งสองชั้นการ verify
+- commit: a4a094b
+- หมายเหตุ: บันทึก backlog เรื่อง transIn/transOut ไม่รองรับผ่าน CSV
+  (pre-existing limitation ทั้งสองฝั่ง ไม่ใช่ปัญหาจาก Session B)
+
 ## [2026-07-25] แผน element export — Session A สำรวจ (อ่านอย่างเดียว ไม่แก้โค้ด)
 
 - ทำ:
