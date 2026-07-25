@@ -1,5 +1,53 @@
 # Session Log
 
+## [2026-07-25] แผน element export — Session A สำรวจ (อ่านอย่างเดียว ไม่แก้โค้ด)
+
+- ทำ:
+  - อ่าน `src/smt/builders/alignment_builder.py` เต็มไฟล์ — ยืนยัน signature จริง:
+    - `parse_pi_table(rows) -> list[dict]`, `build_alignment_from_pi(vertices) -> BuildResult`
+      (`NamedTuple(elements, control, issues)`)
+    - `Element` (dataclass, `alignment.py:83-99`) มี field: `type, sta_start, sta_end,
+      n, e, azimuth, k_in, k_out, transition` — ไม่มี radius ตรง ๆ (ต้องคำนวณจาก
+      `1/k_in` หรือ `1/k_out`) และไม่มี deflection angle เก็บไว้เลย
+    - `ControlPoint` (dataclass) มีแค่ 4 field: `name, sta, n, e`
+    - `check_against_drawing(control, drawing, tolerance)` คืน dict ต่อจุด
+      `{name, sta_calc, sta_draw, gap_m, ok}` — คำนวณแค่ `gap_m` รวม (hypot ของ N,E)
+      เท่านั้น ไม่มี delta แยกแกน ไม่มี radius/deflection
+  - grep "element"/"export"/"flatten" ทั่ว `src/smt/` — พบว่า logic flatten ตารางที่ 1
+    มีอยู่แล้วใน `cli.py::_run_build` (`smt build`, บรรทัด 118-168) และถูก mirror ใน
+    `app.py` (Streamlit UI) — header ตรงกัน: `StaStart, StaEnd, N, E, Azimuth, Radius,
+    Type, Transition` (Radius แปลงจาก k_in/k_out ผ่าน `_radius_from_element()`)
+  - หาที่มา `elements_for_excel.csv` (ไฟล์ untracked) — grep ทั่ว repo ไม่เจอชื่อไฟล์นี้
+    ในโค้ดเลย เทียบเนื้อหาแล้วตรงกับ `elements_output.csv` ทุกคอลัมน์ เพียงตัด header
+    ออก → สรุปว่าเป็นไฟล์ copy มือ (ตัด header) เพื่อ paste ใส่ Excel Named Range
+    `SMT_Elements` ไม่ใช่ output อัตโนมัติจากฟังก์ชันไหน
+  - เช็ค 3 ฟังก์ชันเทียบกันสำหรับตารางที่ 2 (cross-check comparison):
+    - `check_against_drawing()` — gap_m รวมเท่านั้น, ไม่มี production caller
+    - `check_horizontal()` (`check.py:113-147`) — คืน `HorizontalCheckResult`
+      (`delta_n, delta_e, gap_metres, is_ok`) แยกแกนแล้ว แต่ grep ทั่ว repo (รวม
+      cli.py, app.py) ไม่พบ production caller เลย — มีแค่ `tests/test_check.py`
+      คลุมอยู่ (dead-but-tested)
+    - `bulk_cross_check()` (`check.py:150-178`) — คืน `list[FieldCrossCheckResult]`
+      (`name, n, e, z, sta, offset, disc`) เป็น inverse (N,E → sta,offset) สำหรับจุด
+      สำรวจสนามลอย ๆ ไม่มี delta/radius/deflection เลย และเป็นคนละงานกับ Table 2
+      — มี production caller จริงคือ `cli.py::_run_cross_check` (`smt cross-check`)
+    - ไม่มีฟังก์ชันไหนใน 3 ตัวนี้คำนวณ radius delta หรือ deflection delta
+  - ยืนยัน `smt build` (`_run_build`) กับ `smt cross-check` (`_run_cross_check`) เป็น
+    2 subcommand แยกกันเลย (`cli.py:350-368`) — `_run_build` ไม่เรียก
+    `bulk_cross_check()` ต่อท้ายแต่อย่างใด ผู้ใช้ต้องรัน `smt cross-check` แยกเอง
+- คำสั่ง: Read + Grep เท่านั้น (ไม่มีคำสั่งแก้ไฟล์ ไม่มี pytest — สำรวจอย่างเดียวตาม
+  scope ของ Session A ใน `session_logs/PLAN_SMT_ELEMENT_EXPORT_20260724.md`)
+- ผล: N/A (ไม่มีการรันทดสอบ — งานนี้คือสำรวจ/อ่านโค้ดอย่างเดียว)
+- commit: ไม่มี (ไม่มีการแก้ไฟล์ในงานนี้)
+- หมายเหตุ:
+  - สรุปผล Session A: **ตารางที่ 1** พอร์ตจาก `cli.py::_run_build` ตรง ๆ ได้เลย
+    (คอลัมน์ชัดเจนแล้ว, Session D จะเบา) / **ตารางที่ 2** ต้องต่อยอดจาก
+    `check_horizontal()` (มี delta_n/delta_e ให้แล้ว ตรงโจทย์ที่สุดในบรรดา 3 ตัว)
+    แต่ Session E ต้องเขียนส่วน radius delta + deflection delta เพิ่มเองทั้งหมด
+    เพราะไม่มีที่ไหนในโค้ดคำนวณไว้เลยแม้แต่ที่เดียว
+  - รอ Claude (แชท) วางแผน Session B (พอร์ต `parse_pi_table()` เป็น GAS) ต่อ —
+    ยังไม่เริ่มเขียนโค้ดใด ๆ
+
 ## [2026-07-24] พอร์ต GS_TableSplitter.gs เสร็จ — verify diff=0 กับ Sheet HOR-ORR-04 จริง, พบ+แก้ข้อมูล PI-10 ผิด
 
 - ทำ:
