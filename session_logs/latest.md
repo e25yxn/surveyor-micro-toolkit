@@ -1,5 +1,53 @@
 # Session Log
 
+## [2026-07-26] export ตารางที่ 2 (cross-check 3 ตารางย่อย) — Session E, verify diff=0 กับ Python + live Sheet
+
+- ทำ: เพิ่ม GS_CrossCheck.gs สร้าง 3 ตาราง cross-check ต่อจาก GS_ElementTable.gs
+  (Session D):
+  - ตาราง 2a (CrossCheck_Points): mirror `check.py::check_horizontal()` ตรงๆ
+    verify diff=0 เทียบ Python จริงครบ 22 แถว x 5 คอลัมน์ (name/sta/deltaN/
+    deltaE/gap/ok) ภายใน 1e-9
+  - ตาราง 2b (CrossCheck_Radius) / 2c (CrossCheck_Deflection): logic ใหม่
+    ไม่มี oracle ให้ mirror (ออกแบบไว้ใน session_logs/plan_20260726_1558.md
+    ที่อนุมัติแล้ว) — แต่ละ PI โค้งธรรมดา คำนวณ tangent length/deflection
+    ตามแบบจริงจากแถว PC/PT ข้างเคียงในตารางดิบ (จับคู่ตามลำดับแถวเดิม ไม่ใช่
+    จาก vertexRows/drawing ที่แยกไปแล้ว) เทียบกับรัศมี/deflection ออกแบบ
+    verify ด้วย Python prototype อิสระ + ตรวจมือหลายจุดก่อนพอร์ต
+  - กฎ EP-substitution: PI-11 ไม่มีแถว PT แยกในตารางดิบ (โค้งสุดท้ายจบเกือบ
+    พอดีที่ EP) — ใช้พิกัด EP แทนได้เฉพาะเมื่อ PT ที่ buildFromPI() คำนวณจริง
+    อยู่ใกล้ EP ภายใน snap tolerance เท่านั้น (ยืนยันด้วย engine จริง ไม่ใช่เดา
+    gap จริงที่วัดได้ = 0.19 มม.)
+  - เพิ่ม assertion เช็ค vertices.length ตรงกับจำนวนแถว vertex ที่
+    scanRawRows_ นับได้ กัน PI จับคู่ PC/PT ผิดตำแหน่งแบบเงียบๆ — ยืนยันแล้ว
+    ว่า throw จริงด้วย negative test (บังคับข้อมูลผิด 12 vs 13 แถว)
+  เพิ่ม exportCrossCheckToSheet() (เขียน 3 tab: CrossCheck_Points/Radius/
+  Deflection) + testFullCrossCheckAgainstHorOrr04() ใน TestDrive.js
+- คำสั่ง: Node diff เทียบ check_horizontal() จริง (diff=0), node
+  reference/gsheet/smoke_test.js, pytest -q, clasp push, รัน
+  testFullCrossCheckAgainstHorOrr04() ผ่าน Apps Script web editor + Execution
+  log, git commit -F .git/smt_commit_msg.txt
+- ผล: PASS — smoke_test.js 23/23, pytest 504 passed, live Sheet execution
+  ตรงกับ Python prototype ทุกค่า (Table 2a spot-check + ตาราง 2b ครบ 10 PI +
+  ตาราง 2c ครบ 9 PI)
+- commit: d9d95e6
+- หมายเหตุ — 3 บทเรียนสำคัญที่เจอระหว่างทาง (ทั้งหมดแก้/ตรวจสอบก่อนพอร์ตแล้ว):
+  1. **สูตร deflection ตามแบบจริง**: แผนแม่ (HANDOFF_SMT_SESSION_E_PLAN) เขียน
+     ว่า "มุมระหว่างเวกเตอร์ PI→PC กับ PI→PT" ซึ่งถ้าทำตามตัวอักษรจะได้
+     `180°−Δ` ไม่ใช่ `Δ` จริง (เวกเตอร์ PI→PC ชี้ย้อนทางเดินทาง) แก้เป็น
+     `azimuth(PC→PI)` กับ `azimuth(PI→PT)` แทน (ทิศทางเดินทางจริง) ก่อนพอร์ต
+     ดู session_logs/plan_20260726_1558.md §2
+  2. **PI-11/EP ที่เคยเข้าใจผิดว่าเป็นบั๊ก**: ระหว่างวางแผน เคยเขียนไว้ผิดว่า
+     PT ของ PI-11 "เลย EP ไป ~4.8 ม." ซึ่งคำนวณผิดจากการเอา PI_sta ดิบบวก
+     T_in ตรงๆ (ไม่ใช่วิธีคำนวณ station ที่ถูกต้อง) — ตรวจสอบซ้ำด้วยการรัน
+     buildFromPI() จริงแล้วพบว่าโค้งจบห่างจาก EP แค่ 0.19 มม. เท่านั้น ไม่มี
+     ปัญหาจริง ไม่กระทบ core geometry ที่ verify แล้วใน Session C ถอนคำพูด
+     จุดนั้นในแผนที่อนุมัติแล้ว ดู session_logs/plan_20260726_1558.md §3.1
+  3. **EP-substitution guard**: จากบทเรียนข้อ 2 เลยออกแบบให้ใช้พิกัด EP แทน
+     แถว PT ที่ขาดหายได้ (เฉพาะ PI-11 ในชุดข้อมูลนี้) แต่ต้อง guard ด้วยการ
+     เช็ค PT ที่ engine คำนวณจริงว่าอยู่ใกล้ EP ภายใน snap tolerance ก่อน
+     เสมอ (ไม่ใช่ substitute แบบไม่มีเงื่อนไข) กันกรณีอื่นที่โค้งสุดท้ายไม่ได้
+     จบใกล้ EP จริงจะถูก mis-apply กฎนี้ผิดที่
+
 ## [2026-07-25] export ตารางที่ 1 (element table) — Session D, verify diff=0 กับ Python ทุกจุด
 
 - ทำ: เพิ่ม GS_ElementTable.gs ให้ flatten `elements` array จาก
