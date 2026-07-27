@@ -1,5 +1,35 @@
 # Session Log
 
+## [2026-07-27] parameterize export functions ใน TestDrive.js — Session F.1, verify diff เทียบ draft ที่อนุมัติ + รันจริงผ่าน Apps Script
+
+- ทำ: parameterize `exportElementsToSheet()`/`exportCrossCheckToSheet()` ใน
+  `D:\MyClasp_SMT_DEMO\TestDrive.js` ให้รับ `ss` + `alignmentName` เป็น
+  parameter แทน hardcode `SPREADSHEET_ID` เดิม เปลี่ยนชื่อ tab ผลลัพธ์เป็น
+  `result_(alignmentName)_Elements` / `result_(alignmentName)_CrossCheck_Points`
+  / `result_(alignmentName)_CrossCheck_Radius` /
+  `result_(alignmentName)_CrossCheck_Deflection` อัปเดต
+  `testFullPipelineExportAgainstHorOrr04()` และ
+  `testFullCrossCheckAgainstHorOrr04()` ให้เรียกฟังก์ชันแบบใหม่ (ส่ง
+  `ss`+`SHEET_NAME` เป็น alignment name) — ไม่มีการแก้ logic คำนวณใดๆ ทั้งสิ้น
+  เป็นแค่ signature/tab-naming change
+  - สำรอง `TestDrive.js.bak_20260727` ไว้ในโฟลเดอร์เดียวกันก่อนแก้จริง
+  - diff เต็มไฟล์ตรวจใน Claude Chat ตรงตาม draft ที่อนุมัติทุกจุด ไม่มีบรรทัด
+    อื่นถูกแตะ
+- คำสั่ง: `cp TestDrive.js TestDrive.js.bak_20260727`, Edit 4 จุดตาม draft,
+  `diff -u` เทียบไฟล์สำรอง, `clasp push`, รัน
+  `testFullPipelineExportAgainstHorOrr04()` และ
+  `testFullCrossCheckAgainstHorOrr04()` ผ่าน Apps Script web editor
+- ผล: PASS — `clasp push` สำเร็จ (11 ไฟล์) รันทดสอบจริงผ่าน Apps Script web
+  editor: `testFullPipelineExportAgainstHorOrr04` (Elements tab 26×8, header
+  ตรง) และ `testFullCrossCheckAgainstHorOrr04` (CrossCheck_Points 23×6,
+  CrossCheck_Radius 11×10, CrossCheck_Deflection 10×5) — ผลตรงกับ Session D/E
+  ทุกตัวเลข รวม PI-1/PI-11 special-case notes เดิม ไม่มี regression
+- commit: (docs เท่านั้น — ดูหมายเหตุ)
+- หมายเหตุ: `TestDrive.js` ไม่ track ใน git (ตกลงไว้ตั้งแต่ต้น เพราะเป็นไฟล์
+  ทดสอบใน clasp folder แยกต่างหาก `D:\MyClasp_SMT_DEMO\`) — commit รอบนี้จึง
+  เป็น docs ล้วน (`PROJECT_STATE.md` + `session_logs/latest.md`) ไม่มี feat
+  commit ควบคู่
+
 ## [2026-07-26] export ตารางที่ 2 (cross-check 3 ตารางย่อย) — Session E, verify diff=0 กับ Python + live Sheet
 
 - ทำ: เพิ่ม GS_CrossCheck.gs สร้าง 3 ตาราง cross-check ต่อจาก GS_ElementTable.gs

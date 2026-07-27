@@ -65,8 +65,8 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 3. `testSplitAgainstHorOrr04()` — verify `GS_TableSplitter`
 4. `testParseAgainstHorOrr04()` — verify `GS_PiTableParser`
 5. `testBuildFromPIAgainstHorOrr04()` — verify `buildFromPI`
-6. `exportElementsToSheet(elements)` + `testFullPipelineExportAgainstHorOrr04()` — Session D (**hardcode SPREADSHEET_ID, ต้องแก้ Session F**)
-7. `exportCrossCheckToSheet(...)` + `testFullCrossCheckAgainstHorOrr04()` — Session E (**hardcode เช่นกัน**)
+6. `exportElementsToSheet(ss, alignmentName, elements)` + `testFullPipelineExportAgainstHorOrr04()` — Session D, **parameterize แล้วใน Session F.1** (เขียนไป tab `result_(alignmentName)_Elements`)
+7. `exportCrossCheckToSheet(ss, alignmentName, elements, drawing, rows, vertices, control)` + `testFullCrossCheckAgainstHorOrr04()` — Session E, **parameterize แล้วใน Session F.1** (เขียนไป 3 tab `result_(alignmentName)_CrossCheck_Points/Radius/Deflection`)
 8. `dumpRawHorOrr04()` — dump 36 แถวดิบจากชีตจริง
 
 **หมายเหตุสำคัญ**: `SPREADSHEET_ID` เดิมที่เข้าใจผิดว่าเป็น
@@ -99,7 +99,7 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 | C | Wire pipeline เต็ม | ✅ | `6246cdf` |
 | D | Export ตารางที่ 1 | ✅ | `b3e5926`, `118234b` |
 | E | Export ตารางที่ 2 (3 ตาราง) | ✅ | `d9d95e6`, `ced10c2`, `de223b2` |
-| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** | 🔵 **กำลังทำ** | — |
+| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1 เสร็จ, F.2 กำลังทำต่อ | 🔵 **กำลังทำ** | F.1: ไม่มี (docs เท่านั้น, TestDrive.js ไม่ track) |
 
 **HEAD ปัจจุบันของ `origin/main`**: `de223b2`
 
@@ -116,11 +116,12 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
    — ต้องปรับ `exportElementsToSheet()`/`exportCrossCheckToSheet()` ให้รับ
    `ss` + ชื่อ alignment เป็น parameter แทน hardcode
 
-### แผนขั้นย่อยที่เสนอไว้ (ยังไม่เริ่ม F.1)
+### แผนขั้นย่อยที่เสนอไว้
 
-F.1 ปรับ export functions ให้ parameterize → F.2 ฟังก์ชัน backend เดิน
-Drive (list folder/file/tab) → F.3 `doGet()`+HTML cascade UI → F.4 เชื่อม
-ปุ่มคำนวณกับ pipeline → F.5 Deploy web app จริง → F.6 ทดสอบ end-to-end
+~~F.1 ปรับ export functions ให้ parameterize~~ **(เสร็จแล้ว)** → F.2 ฟังก์ชัน
+backend เดิน Drive (list folder/file/tab) → F.3 `doGet()`+HTML cascade UI →
+F.4 เชื่อมปุ่มคำนวณกับ pipeline → F.5 Deploy web app จริง → F.6 ทดสอบ
+end-to-end
 
 ---
 
