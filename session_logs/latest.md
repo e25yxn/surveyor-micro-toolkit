@@ -1296,3 +1296,32 @@
 - Part 2 (vertical, crossfall, surface, check, builders) รอ session ถัดไป
 - Test carry case ต้องใช้ `dms_to_rad(0,59,59.997)` แทน deg_to_rad(59.5/3600) เพราะ float precision ทำให้ 59.5 → 59.4999... (ไม่ carry ด้วย sec_decimals=0)
 - test_c2s_far_point_raises ต้องใช้ single-element alignment แทน golden alignment เพราะ spiral elements สามารถ absorb projection ของจุดไกลๆ ได้
+
+## [2026-07-27 15:40] สร้างไฟล์ continuity ข้ามแชท 4 ไฟล์ (PROJECT_STATE, BUNDLE_gsheet, BUNDLE_python_core, DEPENDENCY_MAP)
+
+- ทำ: ตรวจร่าง PROJECT_STATE.md ที่ผู้ใช้เตรียมไว้ (พบที่ root แล้ว, timestamp
+  ตรงกับ session นี้) เทียบกับสภาพจริงในเครื่อง 2 จุดตามที่ผู้ใช้ขอ:
+  - §3 รายชื่อไฟล์ .gs + dependency: grep `require\(` จริงใน reference/*.gs +
+    reference/gsheet/*.gs ตรงกับตารางในร่างทุกแถว (FPMath ไม่มี dep, WCB->FPMath,
+    GS_Alignment->FPMath+WCB, GS_AlignmentBuilder/GS_CrossCheck->FPMath+WCB+
+    GS_Alignment, GS_TableSplitter/GS_PiTableParser ไม่มี dep, GS_ElementTable->
+    FPMath) — ไม่พบจุดที่ไม่ตรง
+  - §4 ฟังก์ชันใน TestDrive.js: grep `^function` ใน D:\MyClasp_SMT_DEMO\TestDrive.js
+    ได้ 10 ฟังก์ชัน ตรงกับลิสต์ในร่างทุกตัว ไม่มีฟังก์ชันเกิน
+  ผลตรวจ: ร่างถูกต้อง ไม่ต้องแก้ — บันทึกไว้ที่ root ตามที่ขอ
+  สร้างเพิ่มอีก 3 ไฟล์:
+  - BUNDLE_gsheet.md: concat FPMath.gs, WCB.gs, GS_Alignment.gs,
+    GS_AlignmentBuilder.gs, GS_TableSplitter.gs, GS_PiTableParser.gs,
+    GS_ElementTable.gs, GS_CrossCheck.gs (ลำดับที่ผู้ใช้ระบุ ตรวจแล้วว่าเป็น
+    dependency order ที่ถูกต้องพอดี)
+  - BUNDLE_python_core.md: concat fpmath.py, wcb.py, alignment.py, check.py,
+    builders/table_splitter.py, builders/alignment_builder.py, + cli.py
+    บรรทัด 109-168 เฉพาะ _radius_from_element/_run_build
+  - DEPENDENCY_MAP.md: ตาราง dependency จาก grep จริง + หมายเหตุสำคัญว่า
+    require() มีผลแค่ตอนรัน Node local เท่านั้น ไม่มีผลใน Apps Script runtime
+    จริง (global scope เดียวกันหมด ไม่มีโฟลเดอร์) — อธิบายรากของปัญหา Session C
+- คำสั่ง: grep require\( ข้าม reference/, reference/gsheet/; grep ^function
+  TestDrive.js; ls ตรวจ D:\MyClasp_SMT_DEMO\
+- ผล: PASS — ไม่มี test รันเพราะเป็นเอกสารล้วนๆ ไม่กระทบโค้ดจริง
+- commit: (ยังไม่ commit — รอผู้ใช้ตรวจสรุปตามมาตรฐาน ส่วนที่ 3/6)
+- หมายเหตุ: 4 ไฟล์ทั้งหมดเป็นเอกสารอ้างอิง ไม่แก้โค้ดใดๆ ในโปรเจกต์
