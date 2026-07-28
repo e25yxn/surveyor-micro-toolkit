@@ -104,9 +104,9 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 | C | Wire pipeline เต็ม | ✅ | `6246cdf` |
 | D | Export ตารางที่ 1 | ✅ | `b3e5926`, `118234b` |
 | E | Export ตารางที่ 2 (3 ตาราง) | ✅ | `d9d95e6`, `ced10c2`, `de223b2` |
-| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.3 เสร็จ, F.4 กำลังทำต่อ | 🔵 **กำลังทำ** | F.1-F.2: HEAD ผ่าน `9e5e608`; F.3 (feat): `ecc0a69`; F.3 (docs): <เติม hash หลัง commit นี้จริง> |
+| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.3 เสร็จ, F.4 กำลังทำต่อ | 🔵 **กำลังทำ** | F.1-F.2: HEAD ผ่าน `9e5e608`; F.3 (feat): `ecc0a69`; F.3 (docs): `b6c7eac` |
 
-**HEAD ปัจจุบันของ `origin/main`**: `ecc0a69` (จะขยับเป็น hash ของ docs commit นี้เอง — รัน `git log -1 --oneline` หลัง commit แล้วแก้เลขนี้อีกทีก่อน push)
+**HEAD ปัจจุบันของ `origin/main`**: `b6c7eac`
 
 ### Session F.3 — เสร็จแล้ว (2026-07-28)
 
