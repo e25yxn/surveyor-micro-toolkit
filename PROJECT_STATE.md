@@ -47,13 +47,14 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 | `GS_PiTableParser.gs` | ✅ Session B, verify diff=0 | ไม่มี | `parsePiTable(vertexRows)` → vertices array |
 | `GS_ElementTable.gs` | ✅ Session D, verify diff=0 | FPMath | `elementsToRows(elements)` → ตาราง 8 คอลัมน์ |
 | `GS_CrossCheck.gs` | ✅ Session E, verify diff=0 (2a) + prototype (2b/2c) | FPMath, WCB, GS_Alignment | `checkPoints()`/`checkPiCurves()` → 3 ตาราง cross-check |
+| `GS_DriveWalker.gs` | ✅ Session F.2, verified live (2026-07-28) | GS_ElementTable, GS_CrossCheck (+ transitively FPMath, WCB, GS_Alignment) | `listCategoryFolders()`/`listFilesInFolder(folderId)`/`listAlignmentTabsInFile(fileId)` — เดิน Drive สดทุกครั้ง (ไม่ hardcode) รองรับ folder/file/tab ที่ผู้ใช้เพิ่มได้อิสระตลอดเวลา, เรียงผลลัพธ์ตามชื่อ (alphabetical) |
 
 **Pipeline เต็ม**: `splitMixedAlignmentTable(rows)` → `parsePiTable(vertexRows)`
 → `buildFromPI(vertices)` → `{elements, control, issues}` → export ผ่าน
 `GS_ElementTable`/`GS_CrossCheck`
 
-**ทั้งหมด push เข้า `D:\MyClasp_SMT_DEMO\` แล้ว** (9 ไฟล์ .js/.gs +
-`appsscript.json` + `code.js` = 11 ไฟล์ตอนล่าสุด)
+**ทั้งหมด push เข้า `D:\MyClasp_SMT_DEMO\` แล้ว** (10 ไฟล์ .js/.gs +
+`appsscript.json` + `code.js` = 12 ไฟล์ตอนล่าสุด)
 
 ---
 
@@ -68,6 +69,9 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 6. `exportElementsToSheet(ss, alignmentName, elements)` + `testFullPipelineExportAgainstHorOrr04()` — Session D, **parameterize แล้วใน Session F.1** (เขียนไป tab `result_(alignmentName)_Elements`)
 7. `exportCrossCheckToSheet(ss, alignmentName, elements, drawing, rows, vertices, control)` + `testFullCrossCheckAgainstHorOrr04()` — Session E, **parameterize แล้วใน Session F.1** (เขียนไป 3 tab `result_(alignmentName)_CrossCheck_Points/Radius/Deflection`)
 8. `dumpRawHorOrr04()` — dump 36 แถวดิบจากชีตจริง
+9. `testListCategoryFolders()` — verify `listCategoryFolders` (Session F.2)
+10. `testListFilesInFolder()` — verify `listFilesInFolder` (Session F.2)
+11. `testListAlignmentTabsInFile()` — verify `listAlignmentTabsInFile` (Session F.2)
 
 **หมายเหตุสำคัญ**: `SPREADSHEET_ID` เดิมที่เข้าใจผิดว่าเป็น
 `SMT_COGO_Builder_DEMO` แท้จริงคือไฟล์ **`HOR-ORR-04` เอง**
@@ -99,14 +103,17 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 | C | Wire pipeline เต็ม | ✅ | `6246cdf` |
 | D | Export ตารางที่ 1 | ✅ | `b3e5926`, `118234b` |
 | E | Export ตารางที่ 2 (3 ตาราง) | ✅ | `d9d95e6`, `ced10c2`, `de223b2` |
-| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1 เสร็จ, F.2 กำลังทำต่อ | 🔵 **กำลังทำ** | F.1: ไม่มี (docs เท่านั้น, TestDrive.js ไม่ track) |
+| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.2 เสร็จ, F.3 กำลังทำต่อ | 🔵 **กำลังทำ** | F.1: ไม่มี (docs เท่านั้น); F.2: รอ commit รอบถัดไป |
 
 **HEAD ปัจจุบันของ `origin/main`**: `de223b2`
 
 ### Session F — ดีไซน์ที่ยืนยันแล้ว (ยังไม่เขียนโค้ด)
 
 1. **Cascade เต็มรูปแบบ v1**: Drive folder → Google Sheets file → Sheet tab
-   (ชื่อ tab = ชื่อ alignment) — แม้ตอนนี้มีแค่ 1 alignment จริง
+   (ชื่อ tab = ชื่อ alignment) — แม้ตอนนี้มีแค่ 1 alignment จริง **หมวด/ไฟล์/tab
+   ทั้งหมดเดินหาสดจาก Drive จริงทุกครั้ง ไม่ hardcode รายชื่อไว้ที่ไหนเลย —
+   จำนวนเปลี่ยนแปลงได้ตลอดตามที่ผู้ใช้เพิ่มเอง (ยืนยันจาก F.2 live test: เจอ 8
+   หมวดจริง ไม่ใช่ 6-7 ตามที่เคยประมาณไว้)**
 2. **ปุ่ม "คำนวณ" รันจริง**: split→parse→build→export เต็ม pipeline ทุกครั้ง
    ที่กด ไม่ใช่แค่โชว์ผลเก่า
 3. **ผลลัพธ์**: เขียนกลับเข้าไฟล์เดียวกับข้อมูลต้นทาง (ไม่ใช่ไฟล์แยก) เป็น
@@ -118,10 +125,10 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 
 ### แผนขั้นย่อยที่เสนอไว้
 
-~~F.1 ปรับ export functions ให้ parameterize~~ **(เสร็จแล้ว)** → F.2 ฟังก์ชัน
-backend เดิน Drive (list folder/file/tab) → F.3 `doGet()`+HTML cascade UI →
-F.4 เชื่อมปุ่มคำนวณกับ pipeline → F.5 Deploy web app จริง → F.6 ทดสอบ
-end-to-end
+~~F.1 ปรับ export functions ให้ parameterize~~ **(เสร็จแล้ว)** →
+~~F.2 ฟังก์ชัน backend เดิน Drive (list folder/file/tab)~~ **(เสร็จแล้ว)** →
+F.3 `doGet()`+HTML cascade UI → F.4 เชื่อมปุ่มคำนวณกับ pipeline →
+F.5 Deploy web app จริง → F.6 ทดสอบ end-to-end
 
 ---
 

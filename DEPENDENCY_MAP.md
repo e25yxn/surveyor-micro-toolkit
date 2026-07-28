@@ -41,6 +41,7 @@ the same Apps Script project; it does not imply any folder layout there.
 | `reference/gsheet/GS_PiTableParser.gs` | *(none)* | — | — |
 | `reference/gsheet/GS_ElementTable.gs` | `../FPMath.gs` | `reference/FPMath.gs` | FPMath |
 | `reference/gsheet/GS_CrossCheck.gs` | `../FPMath.gs`, `../WCB.gs`, `./GS_Alignment.gs` | `reference/FPMath.gs`, `reference/WCB.gs`, `reference/gsheet/GS_Alignment.gs` | FPMath, WCB, GS_Alignment |
+| `reference/gsheet/GS_DriveWalker.gs` | *(none — references `GS_ElementTable.HEADER`/`GS_CrossCheck.*_HEADER` directly as globals, not via `require()`; Apps-Script-only, no Node smoke test possible since it calls `DriveApp`/`SpreadsheetApp`)* | — | GS_ElementTable, GS_CrossCheck |
 
 Transitive closure (if you push file X, you need everything in its row plus
 that dependency's own row, recursively):
@@ -53,6 +54,7 @@ that dependency's own row, recursively):
 - **GS_PiTableParser** — no dependencies. Always safe alone.
 - **GS_ElementTable** — needs FPMath.
 - **GS_CrossCheck** — needs FPMath, WCB, GS_Alignment.
+- **GS_DriveWalker** — needs GS_ElementTable, GS_CrossCheck (and transitively FPMath, WCB, GS_Alignment).
 
 So a full working push (e.g. the `SMT_COGO_DEMO` / `HOR-ORR-04` pipeline) needs
 all 8 files together — there is no smaller subset that supports
@@ -61,6 +63,9 @@ the 8 files already confirmed present in `D:\MyClasp_SMT_DEMO\` as of
 2026-07-27 (`FPMath.js`, `WCB.js`, `GS_Alignment.js`, `GS_AlignmentBuilder.js`,
 `GS_TableSplitter.js`, `GS_PiTableParser.js`, `GS_ElementTable.js`,
 `GS_CrossCheck.js`, plus `TestDrive.js`, `code.js`, `appsscript.json`).
+GS_DriveWalker.gs is a 9th file needed only for the Drive-walking cascade
+feature (Session F.2+) — the core split→parse→build→export pipeline above
+doesn't need it.
 
 ## Raw grep output (source of truth for the table above)
 

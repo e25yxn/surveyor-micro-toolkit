@@ -1,5 +1,91 @@
 # Session Log
 
+## [2026-07-28] Drive-walking backend functions for cascade UI — Session F.2, verified live incl. two rounds of real-world edge cases
+
+- ทำ: สร้าง `reference/gsheet/GS_DriveWalker.gs` ใหม่ (ไฟล์ track จริง ไม่ใช่
+  scratch — เป็น backend logic จริงที่ `doGet()` จะเรียกใช้ใน F.3+) มี 3
+  ฟังก์ชัน: `listCategoryFolders()` (เดินจาก root `SMT_Web_App_demo`, hardcode
+  เฉพาะ root ID เดียว), `listFilesInFolder(folderId)` (filter
+  `MimeType.GOOGLE_SHEETS` กัน PDF/รูปที่ปนอยู่ในโฟลเดอร์),
+  `listAlignmentTabsInFile(fileId)` (filter 2 ชั้น: ชื่อ tab ขึ้นต้น
+  `result_` + header signature ตรงกับ 4 ตารางผลลัพธ์ที่รู้จัก — อ้างอิง
+  `GS_ElementTable.HEADER`/`GS_CrossCheck.*_HEADER` ตรงๆ ไม่ copy ค่า กัน
+  drift) ทั้ง 3 ฟังก์ชันเรียงผลลัพธ์ตามตัวอักษร (`localeCompare`) ก่อน
+  return เพิ่มฟังก์ชันทดสอบคู่กัน 3 ตัวใน `TestDrive.js`
+  (`testListCategoryFolders`/`testListFilesInFolder`/
+  `testListAlignmentTabsInFile`) อัปเดต `DEPENDENCY_MAP.md` เพิ่มแถว
+  `GS_DriveWalker` (พึ่ง `GS_ElementTable` + `GS_CrossCheck` โดยตรง)
+- คำสั่ง: สร้างไฟล์ตาม draft ที่อนุมัติ, `clasp push`, รันทดสอบทั้ง 3
+  ฟังก์ชันผ่าน Apps Script web editor 2 รอบ (ก่อน/หลังเพิ่ม sort)
+- ผล: PASS ทั้งสองรอบ — รอบแรกเจอ edge case จริง 2 จุด: (1) เจอ 8 หมวดจริง
+  (ไม่ใช่ 6-7 ตามที่บันทึกเก่าประมาณไว้ รวมหมวดที่ไม่เคยบันทึกมาก่อนคือ
+  `007_Cross_Beam`) ยืนยันว่าตัดสินใจเดินหา Drive สดแทน hardcode ถูกต้อง
+  เพราะ hardcode จะมองไม่เห็นหมวดใหม่นี้เลย (2) เจอ tab แปลกปลอม
+  `Test_Sheet` ปนกับ `HOR-ORR-04` ในไฟล์เดียวกัน — ตรวจแล้วว่า filter
+  ทำงานถูกตามสเปคทุกจุด ไม่ใช่บั๊ก CK1024 ยืนยันว่าทั้งสองจุดเป็นข้อมูล
+  ทดสอบที่เพิ่มเองโดยตั้งใจ และชี้แจงว่าการใช้งานจริงตั้งใจให้ผู้ใช้เพิ่ม
+  folder/file/tab ได้อิสระ ตัดสินใจ: ไม่ต้องสร้าง whitelist ตรวจ header
+  เพิ่ม (เกินจำเป็น — ผู้ใช้เลือกเองอยู่แล้วเหมือน file browser, safety net
+  จริงอยู่ที่ pipeline validation ใน F.4) — เพิ่ม sort ตามชื่อแทนเพื่อ UX ที่
+  คาดเดาได้เมื่อรายการยาวขึ้นตามการใช้งานจริง รอบสองยืนยัน: 8 หมวดเรียงถูก
+  (001→002→...→999), ไฟล์/tab เรียงถูกเช่นกัน (`HOR-ORR-04` ก่อน
+  `Test_Sheet`)
+- commit: feat (`reference/gsheet/GS_DriveWalker.gs`) + docs
+  (`DEPENDENCY_MAP.md`, `PROJECT_STATE.md`, `session_logs/latest.md`) —
+  ฟังก์ชันทดสอบ 3 ตัวใน `TestDrive.js` ไม่ track ใน git เหมือน F.1
+
+## [2026-07-28 07:16] แก้ + push GS_DriveWalker.gs เพิ่ม result.sort() 3 จุด (Session F.2 follow-up) — รอผล log ก่อน commit
+
+- ทำ: เพิ่ม `result.sort(function(a, b) {...localeCompare...})` ก่อน
+  `return result;` ในทั้ง 3 ฟังก์ชันของ `reference/gsheet/GS_DriveWalker.gs`
+  (`listCategoryFolders`, `listFilesInFolder` — sort ตาม `.name`;
+  `listAlignmentTabsInFile` — sort ตาม string ตรงๆ เพราะ result เป็น
+  array-of-string) ตาม draft ที่ Claude (แชท) อนุมัติ ไม่แตะส่วนอื่นของไฟล์
+  แก้ `PROJECT_STATE.md` คู่กัน 6 จุด (ตาราง GAS files, จำนวนไฟล์ push,
+  รายการ TestDrive.js, ตาราง session F, roadmap F.2, ดีไซน์ cascade) —
+  ตรวจแล้วว่า `GS_DriveWalker.gs` ที่อัปโหลดไปให้ Claude (แชท) ตรวจรอบแรก
+  พลาดหยิบไฟล์ผิด (หยิบ `D:\MyClasp_SMT_DEMO\GS_DriveWalker.js` เก่าแทน
+  ไฟล์ repo จริง) แก้ความเข้าใจผิดแล้วอัปโหลดไฟล์ repo ตัวจริงไปตรวจซ้ำ ผ่าน
+  แล้ว จึง copy ไฟล์ repo (มี sort ครบ) ทับ `D:\MyClasp_SMT_DEMO\
+  GS_DriveWalker.js` เดิม (ยืนยัน byte-identical ด้วย `diff`) ก่อน push
+- คำสั่ง: `cp reference/gsheet/GS_DriveWalker.gs D:/MyClasp_SMT_DEMO/GS_DriveWalker.js`,
+  `diff` ยืนยัน byte-identical, `clasp push`
+- ผล: PASS — clasp push สำเร็จ 12/12 ไฟล์เหมือนเดิม (เนื้อหา
+  `GS_DriveWalker.js` อัปเดตเป็นเวอร์ชันมี sort แล้ว)
+- commit: ยังไม่ commit — รอผู้ใช้ (CK1024) รัน 3 ฟังก์ชันทดสอบซ้ำผ่าน Apps
+  Script web editor (`testListCategoryFolders` คาด 8 หมวดเรียง alphabetical,
+  `testListFilesInFolder` คาด HOR-ORR-04 ไฟล์เดียวเหมือนเดิม,
+  `testListAlignmentTabsInFile` คาด HOR-ORR-04 + Test_Sheet เรียง H ก่อน T)
+  แล้วนำ Execution log กลับมาตรวจก่อน
+- หมายเหตุ: บทเรียนรอบนี้ — เมื่อไฟล์เดียวกันมีอยู่ 2 ที่ (repo กับ clasp
+  deploy folder) ต้อง sync ให้ตรงกันทุกครั้งก่อนอัปโหลดให้ Claude (แชท)
+  ตรวจ และก่อน push จริง ระบุ path เต็มชัดเจนเสมอกันสับสนซ้ำ
+
+## [2026-07-28 06:26] clasp push GS_DriveWalker.gs (Session F.2) — รอผล Execution log ก่อน commit
+
+- ทำ: หลัง Claude (แชท) ตรวจ 3 ไฟล์ผ่านแล้ว (GS_DriveWalker.gs, TestDrive.js,
+  DEPENDENCY_MAP.md ตรง draft ทุกจุด) อนุมัติให้ push:
+  - copy `reference/gsheet/GS_DriveWalker.gs` (approved content, byte-identical
+    ยืนยันด้วย `diff`) ไปเป็น `D:\MyClasp_SMT_DEMO\GS_DriveWalker.js` — ขั้นตอนนี้
+    ไม่ได้เขียนไว้ชัดในแผนเดิม (แผนพูดแค่สร้างไฟล์ใน repo + แก้ TestDrive.js)
+    แต่จำเป็นเพื่อให้ `clasp push` เห็นไฟล์ใหม่ (clasp push จากโฟลเดอร์
+    `D:\MyClasp_SMT_DEMO\` เท่านั้น ไม่รู้จัก `reference/gsheet/`)
+  - `clasp push` ครั้งแรก (ก่อน copy) ได้แค่ 11 ไฟล์ตามที่คาด (ไม่มี
+    GS_DriveWalker.js) — ยืนยันว่าต้อง copy ก่อนจริง ไม่ใช่ clasp bug
+  - `clasp push` ครั้งที่สอง (หลัง copy) ได้ 12 ไฟล์ตามที่ผู้ใช้คาดไว้
+- คำสั่ง: `cp reference/gsheet/GS_DriveWalker.gs D:/MyClasp_SMT_DEMO/GS_DriveWalker.js`,
+  `diff` ยืนยัน byte-identical, `clasp push` (x2)
+- ผล: PASS — clasp push สำเร็จ 12/12 ไฟล์ (`appsscript.json`, `code.js`,
+  `FPMath.js`, `GS_Alignment.js`, `GS_AlignmentBuilder.js`, `GS_CrossCheck.js`,
+  `GS_DriveWalker.js`, `GS_ElementTable.js`, `GS_PiTableParser.js`,
+  `GS_TableSplitter.js`, `TestDrive.js`, `WCB.js`)
+- commit: ยังไม่ commit — รอผู้ใช้ (CK1024) รัน 3 ฟังก์ชันทดสอบผ่าน Apps Script
+  web editor ด้วยตัวเอง (`testListCategoryFolders`, `testListFilesInFolder`,
+  `testListAlignmentTabsInFile`) แล้วนำ Execution log กลับมาตรวจก่อน
+- หมายเหตุ: `D:\MyClasp_SMT_DEMO\` ไม่ใช่ git repo (ยืนยันด้วย `git status` คืน
+  "not a git repository") จึงไม่มี git diff ให้ดูฝั่งนั้นโดยตรง ใช้ diff เต็มไฟล์
+  แบบ manual ในแชทแทนตอนตรวจ (ตามที่ Claude แชทตรวจผ่านแล้วรอบก่อนหน้า)
+
 ## [2026-07-27] parameterize export functions ใน TestDrive.js — Session F.1, verify diff เทียบ draft ที่อนุมัติ + รันจริงผ่าน Apps Script
 
 - ทำ: parameterize `exportElementsToSheet()`/`exportCrossCheckToSheet()` ใน
