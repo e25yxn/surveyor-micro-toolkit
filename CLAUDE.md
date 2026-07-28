@@ -243,10 +243,18 @@ Claude Code ต้องทำสิ่งต่อไปนี้โดยอ�
 
 ## ส่วนที่ 5 — มาตรฐานการ commit
 
-1. เขียน commit message ลงไฟล์ `.git\smt_commit_msg.txt` ด้วย Write tool ก่อนเสมอ
-2. รัน `git commit -F .git\smt_commit_msg.txt`
-3. ห้ามใช้ heredoc บน PowerShell
+1. เขียน commit message ลงไฟล์ `.git/smt_commit_msg.txt` ด้วย heredoc ผ่าน Bash tool
+   (Git Bash) — ใช้ forward slash เสมอ ห้ามใช้ backslash (ตีความเป็น escape
+   character ทำให้สร้างไฟล์ผิดชื่อ)
+2. รัน `cat -A .git/smt_commit_msg.txt` ตรวจทุกครั้งก่อน commit — LF ล้วน
+   (ไม่มี ^M/CRLF ปน), ไม่มีบรรทัดขาดหาย, ไม่มี EOF/echo หลุดเข้าไฟล์
+3. รัน `git commit -F .git/smt_commit_msg.txt`
 4. หลัง commit รัน `git log -1 --oneline` ตรวจก่อน push เสมอ
+
+(อัปเดต 2026-07-28: เดิมห้าม heredoc เพราะยุคนั้น bash tool รันผ่าน PowerShell
+โดยตรง — ตอนนี้เปลี่ยนมารันผ่าน Git Bash แล้ว heredoc + forward slash ใช้งานได้จริง
+ยืนยันจาก Session F.3 ถ้า bash tool เปลี่ยนกลับไปรันผ่าน PowerShell อีกในอนาคต
+ต้องกลับมาทบทวนกฎข้อนี้ใหม่)
 
 ---
 
@@ -264,7 +272,8 @@ Claude Code ต้องทำสิ่งต่อไปนี้โดยอ�
 2. "Do you want to create/overwrite?" → กด **2** (allow all this session)
 3. "Compound command contains cd..." → กด **1**
 4. เมนูมีคำว่า "don't ask again" แบบกว้าง → เลี่ยง กด 1 ธรรมดา
-5. commit ที่ใช้ heredoc → กด **No** แล้วสั่งใช้ Write + commit -F
+5. commit message เขียนผ่าน heredoc (Git Bash) → กด **Yes** ได้ปกติ — เช็ค
+   `cat -A` ผ่านก่อนเสมอ (ดูส่วนที่ 5)
 
 ---
 

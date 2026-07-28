@@ -30,8 +30,9 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 
 **กฎเหล็ก**: ห้าม Claude Code เขียนไฟล์จริงโดยไม่ผ่านการตรวจจาก Claude Chat
 ก่อนเสมอ (ยกเว้นไฟล์ scratch ชั่วคราวนอก repo) — commit message ผ่าน
-`.git\smt_commit_msg.txt` ด้วย heredoc เท่านั้น (ห้าม Write tool overwrite
-ตรงๆ) ตรวจ `cat -A` ก่อน commit ทุกครั้ง — ดูรายละเอียดเต็มใน `CLAUDE.md`
+`.git/smt_commit_msg.txt` ด้วย heredoc ผ่าน Git Bash เท่านั้น (forward slash
+เสมอ ห้าม backslash — ถ้า Write tool ถาม overwrite ไฟล์นี้ตรงๆ ให้กด No)
+ตรวจ `cat -A` ก่อน commit ทุกครั้ง — ดูรายละเอียดเต็มใน `CLAUDE.md`
 
 ---
 
@@ -103,9 +104,19 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 | C | Wire pipeline เต็ม | ✅ | `6246cdf` |
 | D | Export ตารางที่ 1 | ✅ | `b3e5926`, `118234b` |
 | E | Export ตารางที่ 2 (3 ตาราง) | ✅ | `d9d95e6`, `ced10c2`, `de223b2` |
-| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.2 เสร็จ, F.3 กำลังทำต่อ | 🔵 **กำลังทำ** | F.1: ไม่มี (docs เท่านั้น); F.2: รอ commit รอบถัดไป |
+| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.3 เสร็จ, F.4 กำลังทำต่อ | 🔵 **กำลังทำ** | F.1-F.2: HEAD ผ่าน `9e5e608`; F.3 (feat): `ecc0a69`; F.3 (docs): <เติม hash หลัง commit นี้จริง> |
 
-**HEAD ปัจจุบันของ `origin/main`**: `de223b2`
+**HEAD ปัจจุบันของ `origin/main`**: `ecc0a69` (จะขยับเป็น hash ของ docs commit นี้เอง — รัน `git log -1 --oneline` หลัง commit แล้วแก้เลขนี้อีกทีก่อน push)
+
+### Session F.3 — เสร็จแล้ว (2026-07-28)
+
+`doGet()` + `Index.html` cascade UI (หมวด→ไฟล์→alignment tab) ตามสเปคที่ยืนยันไว้
+ด้านบนครบทุกข้อ — dropdown ทั้ง 3 ชั้นแสดงตลอด disabled+placeholder รอข้อมูล,
+หมวด/ไฟล์ว่างแสดงทั้ง option เดียว disabled + ข้อความเตือนแยก, ปุ่ม "คำนวณ"
+disabled ถาวร (รอ F.4), central `showError()` จับ `google.script.run` fail
+ทดสอบผ่านจริงผ่าน Test deployments แล้ว (`001_Hor_Align` ไล่ครบ 3 ชั้น, หมวดว่าง
+7 หมวดแสดงถูกต้อง) ไฟล์: `reference/gsheet/Index.html` (ใหม่),
+`reference/gsheet/code.gs` (ใหม่) — ไม่แตะ engine/backend ใดๆ
 
 ### Session F — ดีไซน์ที่ยืนยันแล้ว (ยังไม่เขียนโค้ด)
 
