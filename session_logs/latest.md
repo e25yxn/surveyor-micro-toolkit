@@ -1475,3 +1475,39 @@
 - ผล: PASS — ไม่มี test รันเพราะเป็นเอกสารล้วนๆ ไม่กระทบโค้ดจริง
 - commit: (ยังไม่ commit — รอผู้ใช้ตรวจสรุปตามมาตรฐาน ส่วนที่ 3/6)
 - หมายเหตุ: 4 ไฟล์ทั้งหมดเป็นเอกสารอ้างอิง ไม่แก้โค้ดใดๆ ในโปรเจกต์
+
+## [2026-07-28 17:34] Session F.3 — สร้าง cascade UI (Index.html + doGet)
+
+- ทำ: ทำตามแผนที่อนุมัติแล้วใน DRAFT_plan_session_F3_cascade_ui.md ทุกข้อ
+  (หัวข้อ 4-7) สร้าง 2 ไฟล์ใหม่:
+  - `reference/gsheet/Index.html` — 3 dropdown cascade (หมวด→ไฟล์→alignment)
+    แสดงตลอด disabled รอ parent เลือก, หมวดว่างแสดง option เดียว disabled
+    "ไม่มีไฟล์ในหมวดนี้" + ข้อความเตือนแยกใต้ dropdown (ตามข้อ 2.2), ปุ่ม
+    "คำนวณ" แสดงตลอด disabled ถาวร + hint ว่าจะต่อจริงใน F.4, มี
+    showError()/errorBanner กลางสำหรับ google.script.run ล้มเหลว
+  - `reference/gsheet/code.gs` — เพิ่ม `doGet()` เดียว เรียก
+    `createHtmlOutputFromFile('Index')` ตามสเปคข้อ 4 เป๊ะ (ไม่ใช้
+    createTemplateFromFile ตามที่ตกลงไว้)
+  ก็อปปี้ทั้งสองไฟล์ไปที่ `D:\MyClasp_SMT_DEMO\` (Index.html ตรงตัว,
+  code.gs -> code.js แทนที่ placeholder `myFunction(){}` เดิม) แล้ว byte-diff
+  ยืนยันว่าไฟล์ repo กับไฟล์ clasp folder เหมือนกันทุกตัวอักษร
+  ไม่แตะ GS_DriveWalker.gs/js หรือไฟล์ engine อื่นใดตามขอบเขต F.3
+- คำสั่ง: diff (byte-compare repo vs clasp folder ทั้ง 2 ไฟล์)
+- ผล: PASS — diff ว่างทั้งคู่ (ไฟล์ตรงกัน) ยังไม่ได้ทดสอบจริงในเบราว์เซอร์
+  (รอผู้ใช้ตรวจไฟล์ก่อนตามมาตรฐานส่วนที่ 3)
+- commit: ยังไม่ commit ตามคำสั่งผู้ใช้ (ห้าม commit/push จนกว่าจะตรวจ)
+- หมายเหตุ: `code.gs` เป็นไฟล์ใหม่ที่ยังไม่เคย track ใน repo มาก่อน (เดิมมีแต่
+  placeholder ใน clasp folder เท่านั้น ไม่มีใน git) — เมื่อ commit จะเป็นไฟล์
+  ใหม่ ไม่ใช่การแก้ไฟล์เดิม
+
+## [2026-07-28 20:02] Session F.3 — clasp push หลัง Claude Chat อนุมัติ
+
+- ทำ: Claude (แชท) ตรวจ Index.html + code.gs แล้วอนุมัติ สั่ง `clasp push`
+  จาก D:\MyClasp_SMT_DEMO\
+- คำสั่ง: clasp push
+- ผล: PASS — "Pushed 13 files" รวม code.js (doGet) และ Index.html (cascade UI)
+  ใหม่ทั้งคู่ ไฟล์อื่นไม่เปลี่ยน (engine/backend เดิมตามขอบเขต F.3)
+- commit: ยังไม่ commit git (รอผู้ใช้ทดสอบผ่าน Test deployments ก่อน)
+- หมายเหตุ: ขั้นต่อไปคือเปิด "Test deployments" ในตัว Apps Script editor
+  ทดสอบ manual ตาม checklist หัวข้อ 8 ของแผน (หมวดมีข้อมูลจริง +
+  หมวดว่าง 7 หมวด) ก่อนค่อย commit

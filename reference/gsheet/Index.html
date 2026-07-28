@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      max-width: 480px;
+    }
+    h1 {
+      font-size: 18px;
+    }
+    label {
+      display: block;
+      margin-top: 16px;
+      font-weight: bold;
+    }
+    select {
+      width: 100%;
+      padding: 6px;
+      margin-top: 4px;
+    }
+    .warning {
+      color: #b00020;
+      font-size: 13px;
+      margin-top: 4px;
+      display: none;
+    }
+    .hint {
+      color: #666;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+    button {
+      margin-top: 24px;
+      padding: 8px 16px;
+    }
+    .error-banner {
+      background: #fdecea;
+      color: #b00020;
+      padding: 8px 12px;
+      margin-top: 16px;
+      border-radius: 4px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>SMT — เลือกข้อมูล Alignment</h1>
+
+  <div id="errorBanner" class="error-banner"></div>
+
+  <label for="catSelect">1. หมวด</label>
+  <select id="catSelect" disabled onchange="handleCategoryChange()">
+    <option value="">กำลังโหลด...</option>
+  </select>
+
+  <label for="fileSelect">2. ไฟล์ Google Sheets</label>
+  <select id="fileSelect" disabled onchange="handleFileChange()">
+    <option value="">-- เลือกหมวดก่อน --</option>
+  </select>
+  <div id="fileWarning" class="warning"></div>
+
+  <label for="tabSelect">3. Alignment / Tab</label>
+  <select id="tabSelect" disabled>
+    <option value="">-- เลือกไฟล์ก่อน --</option>
+  </select>
+  <div id="tabWarning" class="warning"></div>
+
+  <button id="calcBtn" disabled>คำนวณ</button>
+  <div class="hint">ปุ่มนี้ยังไม่เชื่อมกับการคำนวณจริง — จะทำใน Session F.4</div>
+
+  <script>
+    function setLoading(selectEl) {
+      selectEl.innerHTML = '<option value="">กำลังโหลด...</option>';
+      selectEl.disabled = true;
+    }
+
+    function setPlaceholder(selectEl, text) {
+      selectEl.innerHTML = '<option value="">' + text + '</option>';
+      selectEl.disabled = true;
+    }
+
+    function setEmpty(selectEl, warningEl, emptyText, warningText) {
+      selectEl.innerHTML = '<option value="">' + emptyText + '</option>';
+      selectEl.disabled = true;
+      warningEl.textContent = warningText;
+      warningEl.style.display = 'block';
+    }
+
+    function clearWarning(warningEl) {
+      warningEl.textContent = '';
+      warningEl.style.display = 'none';
+    }
+
+    function showError(err) {
+      var banner = document.getElementById('errorBanner');
+      var message = (err && err.message) ? err.message : String(err);
+      banner.textContent = 'เกิดข้อผิดพลาด: ' + message;
+      banner.style.display = 'block';
+    }
+
+    function clearError() {
+      var banner = document.getElementById('errorBanner');
+      banner.style.display = 'none';
+      banner.textContent = '';
+    }
+
+    window.onload = function () {
+      google.script.run
+        .withSuccessHandler(populateCategories)
+        .withFailureHandler(showError)
+        .listCategoryFolders();
+    };
+
+    function populateCategories(categories) {
+      var catSelect = document.getElementById('catSelect');
+      catSelect.innerHTML = '';
+
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '-- เลือกหมวด --';
+      catSelect.appendChild(placeholder);
+
+      categories.forEach(function (c) {
+        var opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        catSelect.appendChild(opt);
+      });
+
+      catSelect.disabled = false;
+    }
+
+    function handleCategoryChange() {
+      clearError();
+
+      var catSelect = document.getElementById('catSelect');
+      var fileSelect = document.getElementById('fileSelect');
+      var tabSelect = document.getElementById('tabSelect');
+      var fileWarning = document.getElementById('fileWarning');
+      var tabWarning = document.getElementById('tabWarning');
+
+      clearWarning(fileWarning);
+      clearWarning(tabWarning);
+      setPlaceholder(tabSelect, '-- เลือกไฟล์ก่อน --');
+
+      var folderId = catSelect.value;
+      if (!folderId) {
+        setPlaceholder(fileSelect, '-- เลือกหมวดก่อน --');
+        return;
+      }
+
+      setLoading(fileSelect);
+
+      google.script.run
+        .withSuccessHandler(function (files) { populateFiles(files); })
+        .withFailureHandler(showError)
+        .listFilesInFolder(folderId);
+    }
+
+    function populateFiles(files) {
+      var fileSelect = document.getElementById('fileSelect');
+      var fileWarning = document.getElementById('fileWarning');
+
+      if (!files || files.length === 0) {
+        setEmpty(
+          fileSelect,
+          fileWarning,
+          'ไม่มีไฟล์ในหมวดนี้',
+          'หมวดนี้ไม่มีไฟล์ Google Sheets — เลือกหมวดอื่น หรือเพิ่มไฟล์ในหมวดนี้ก่อน'
+        );
+        return;
+      }
+
+      fileSelect.innerHTML = '';
+
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '-- เลือกไฟล์ --';
+      fileSelect.appendChild(placeholder);
+
+      files.forEach(function (f) {
+        var opt = document.createElement('option');
+        opt.value = f.id;
+        opt.textContent = f.name;
+        fileSelect.appendChild(opt);
+      });
+
+      fileSelect.disabled = false;
+    }
+
+    function handleFileChange() {
+      clearError();
+
+      var fileSelect = document.getElementById('fileSelect');
+      var tabSelect = document.getElementById('tabSelect');
+      var tabWarning = document.getElementById('tabWarning');
+
+      clearWarning(tabWarning);
+
+      var fileId = fileSelect.value;
+      if (!fileId) {
+        setPlaceholder(tabSelect, '-- เลือกไฟล์ก่อน --');
+        return;
+      }
+
+      setLoading(tabSelect);
+
+      google.script.run
+        .withSuccessHandler(populateTabs)
+        .withFailureHandler(showError)
+        .listAlignmentTabsInFile(fileId);
+    }
+
+    function populateTabs(tabs) {
+      var tabSelect = document.getElementById('tabSelect');
+      var tabWarning = document.getElementById('tabWarning');
+
+      if (!tabs || tabs.length === 0) {
+        setEmpty(
+          tabSelect,
+          tabWarning,
+          'ไม่มี alignment ในไฟล์นี้',
+          'ไม่พบ tab ที่เป็น alignment ในไฟล์นี้ — ตรวจสอบไฟล์ หรือเลือกไฟล์อื่น'
+        );
+        return;
+      }
+
+      tabSelect.innerHTML = '';
+
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '-- เลือก alignment --';
+      tabSelect.appendChild(placeholder);
+
+      tabs.forEach(function (name) {
+        var opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        tabSelect.appendChild(opt);
+      });
+
+      tabSelect.disabled = false;
+    }
+  </script>
+</body>
+</html>
