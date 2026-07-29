@@ -1511,3 +1511,173 @@
 - หมายเหตุ: ขั้นต่อไปคือเปิด "Test deployments" ในตัว Apps Script editor
   ทดสอบ manual ตาม checklist หัวข้อ 8 ของแผน (หมวดมีข้อมูลจริง +
   หมวดว่าง 7 หมวด) ก่อนค่อย commit
+
+## [2026-07-28 20:45] Session F.3 — commit
+
+- ทำ: Claude (แชท) อนุมัติ git status/diff --stat แล้ว รัน
+  `git commit -F .git/smt_commit_msg.txt` (เขียนไฟล์ commit message ผ่าน
+  heredoc ใน Bash tool ตามที่ผู้ใช้ยืนยันชัดเจนว่าต้องการแบบนี้ แม้ขัดกับ
+  ธรรมเนียมเดิมที่บันทึกไว้ใน memory ว่าใช้ Write tool — cat -A ตรวจแล้วว่า
+  LF ล้วน ไม่มี CRLF ปน ก่อน commit)
+- คำสั่ง: git commit -F .git/smt_commit_msg.txt ; git log -1 --oneline
+- ผล: PASS — commit ecc0a69, 3 files changed (290 insertions)
+- commit: ecc0a69
+- หมายเหตุ: ยังไม่ push — รอคำสั่งผู้ใช้
+
+## [2026-07-28 21:15] Session F.3 — docs commit (PROJECT_STATE.md + CLAUDE.md)
+
+- ทำ: Claude (แชท) ตรวจ diff ของ CLAUDE.md + PROJECT_STATE.md แล้ว สั่ง commit
+  แก้ 2 จุดใน PROJECT_STATE.md (§6 mark F.3 เสร็จ + HEAD, §2 commit-rule
+  summary) และ 2 จุดใน CLAUDE.md (§5 มาตรฐาน commit, §7 ข้อ 5 เมนูปุ่ม) —
+  กลับกฎ heredoc เดิม (เคยห้ามเพราะ bash tool รัน PowerShell ยุคก่อน ตอนนี้
+  รันผ่าน Git Bash แล้ว heredoc+forward slash ใช้ได้จริง ยืนยันจาก F.3)
+- คำสั่ง: git add CLAUDE.md PROJECT_STATE.md ; git commit -F
+  .git/smt_commit_msg.txt ; git log -1 --oneline
+- ผล: PASS — commit b6c7eac, 2 files changed (28 insertions, 8 deletions)
+- commit: b6c7eac
+- หมายเหตุ: PROJECT_STATE.md §6 ยังมี placeholder
+  "<เติม hash หลัง commit นี้จริง>" สำหรับ hash ของ commit นี้เอง (b6c7eac)
+  และบรรทัด HEAD ที่เขียนไว้ว่า "ecc0a69 (จะขยับเป็น hash ของ docs commit นี้
+  เอง)" ก็ต้องอัปเดตเป็น b6c7eac เช่นกัน — ยังไม่แก้ รอคำสั่งผู้ใช้/Claude แชท
+  ว่าจะให้แก้รอบถัดไปหรือปล่อยไว้ก่อน push
+
+## [2026-07-28 21:40] Session F.3 — เติม hash placeholder ใน PROJECT_STATE.md
+
+- ทำ: Claude (แชท) อนุมัติ diff แล้ว commit แก้ placeholder
+  "<เติม hash หลัง commit นี้จริง>" ใน §6 เป็น `b6c7eac` จริง + อัปเดตบรรทัด
+  HEAD ปัจจุบันของ origin/main เป็น `b6c7eac` (ก้อนเล็กแยกจาก b6c7eac เดิม
+  ตามที่ตกลงไว้ ไม่ amend)
+- คำสั่ง: git add PROJECT_STATE.md ; git commit -F .git/smt_commit_msg.txt ;
+  git log -1 --oneline
+- ผล: PASS — commit 2e0c340, 1 file changed (2 insertions, 2 deletions)
+- commit: 2e0c340
+- หมายเหตุ: local ahead ของ origin/main อยู่ 3 commit แล้ว (ecc0a69, b6c7eac,
+  2e0c340) ยังไม่ push รอคำสั่งผู้ใช้
+
+## [2026-07-28 21:55] Session F.3 — push origin/main
+
+- ทำ: push 3 commits ของ Session F.3 ขึ้น origin/main ตามคำสั่งผู้ใช้
+- คำสั่ง: git push origin main
+- ผล: PASS — 2f30d9b..2e0c340 main -> main
+- commit: ecc0a69, b6c7eac, 2e0c340 (ทั้ง 3 อยู่บน origin/main แล้ว)
+- หมายเหตุ: Session F.3 ปิดจบสมบูรณ์ (เขียนโค้ด + ทดสอบจริง + commit + push)
+  ขั้นต่อไปคือ Session F.4 (เชื่อมปุ่ม "คำนวณ" กับ pipeline เต็ม)
+
+## [2026-07-29 10:19] Session F.4 — สร้าง GS_Pipeline.gs + GS_SheetExport.gs (ตามแผนที่ Claude Chat อนุมัติ)
+
+- ทำ: สร้างไฟล์ใหม่ 2 ไฟล์ตาม `DRAFT_plan_session_F4_calculate_pipeline.md`
+  (อนุมัติแล้ว) — ทำทีละไฟล์ ส่งเนื้อหาเต็มให้ผู้ใช้ตรวจในแชทก่อนเขียนจริง
+  ทุกไฟล์ ตามที่ผู้ใช้ขอ (ยังไม่ commit — รอไฟล์ที่เหลือ)
+  - `reference/gsheet/GS_Pipeline.gs` (ใหม่) — `normalizePiLabels_(rows)`
+    (แปลง label "PI1"→"PI-1" เฉพาะคอลัมน์ POINT ก่อนเข้า splitter) +
+    `runFullPipeline(fileId, tabName)` (orchestrator: split→parse→build→
+    export 3 จุด รวม issues)
+  - `reference/gsheet/GS_SheetExport.gs` (ใหม่) — ย้าย
+    `exportElementsToSheet()`/`exportCrossCheckToSheet()` จาก
+    `D:\MyClasp_SMT_DEMO\TestDrive.js` (ไฟล์ไม่ track ใน git) มาไว้ที่นี่
+    เนื้อโค้ดเดิมทุกจุด รวม logic การเขียน tab เป็น helper กลาง `writeTab_()`
+    ตัวเดียว (พฤติกรรมเดิมทุกจุด) + เพิ่ม `exportIssuesToSheet()` ใหม่
+    (ไม่สร้าง tab ถ้า issues ว่าง, เคลียร์ tab เก่าถ้ามีจาก run ก่อนหน้า)
+  - ตรวจ namespace call ในแผน (`GS_TableSplitter`, `GS_PiTableParser`,
+    `GS_AlignmentBuilder`, `GS_ElementTable`, `GS_CrossCheck`) ตรงกับของจริง
+    ในโค้ดที่มีอยู่แล้วทุกจุด
+- คำสั่ง: (ยังไม่รัน test — รอเขียนไฟล์ที่เหลือครบก่อน: แก้ `TestDrive.js`
+  ลบ 2 ฟังก์ชันที่ย้ายออก, แก้ `Index.html` ผูกปุ่มคำนวณ)
+- ผล: ยังไม่ทดสอบ (รอไฟล์ครบ)
+- commit: ยังไม่ commit (ผู้ใช้สั่งหยุดรอก่อนไปไฟล์ที่ 3)
+- หมายเหตุ: ทำตามแผนคำต่อคำ (verbatim) ไม่มีการแก้ logic ใดๆ
+
+## [2026-07-29 10:39] Session F.4 — แก้ TestDrive.js + Index.html (ไฟล์ 3-4 ตามแผน)
+
+- ทำ: แก้ 2 ไฟล์ที่เหลือตาม `DRAFT_plan_session_F4_calculate_pipeline.md`
+  §4/§6/§7 (อนุมัติแล้ว) — เขียนลงดิสก์ตรงๆ ตามที่ผู้ใช้สั่ง ไม่ paste โค้ด
+  ยาวๆ ในแชทอีก
+  - `D:\MyClasp_SMT_DEMO\TestDrive.js` — ลบเฉพาะ definition ของ
+    `exportElementsToSheet()`/`exportCrossCheckToSheet()` (ย้ายไป
+    `GS_SheetExport.gs` แล้วรอบก่อนหน้า) ฟังก์ชันอื่นทั้งหมดไม่แตะ รวม
+    `testFullPipelineExportAgainstHorOrr04()`/
+    `testFullCrossCheckAgainstHorOrr04()` ที่ยังเรียกชื่อเดิมได้ปกติ
+    (global scope เดียวกัน)
+  - `reference/gsheet/Index.html` — `calcBtn` เปลี่ยนจาก `disabled` ถาวร
+    เป็นผูก `onclick="handleCalcClick()"`, เพิ่ม `handleCalcClick()` (อ่าน
+    fileId/tabName, disable dropdown 3 ชั้น+ปุ่ม, เรียก
+    `runFullPipeline` ผ่าน `google.script.run`), `onCalcDone(summary)`
+    (re-enable ทั้งหมด + สรุปผล elements/issues), `onCalcFail(err)`
+    (re-enable ทั้งหมด + เรียก `showError()` เดิมจาก F.3)
+  - ส่วนที่ต่างจากตัวอักษรแผนเล็กน้อย (แจ้งผู้ใช้แล้วในแชท): ลบ hint เดิม
+    "ปุ่มนี้ยังไม่เชื่อมกับการคำนวณจริง — จะทำใน Session F.4" (กลายเป็นข้อความ
+    เท็จหลังผูกปุ่มแล้ว) ใช้ div เดิมนั้นเป็น `#calcStatus` แทนที่จะเพิ่ม div
+    ใหม่ซ้อน — ไม่ใช่การเพิ่ม logic ใหม่ แค่ข้อความ/id เปลี่ยน
+- คำสั่ง: Edit เท่านั้น (ยังไม่รัน clasp push / test ใดๆ — รอผู้ใช้ตรวจ diff
+  ทั้ง 4 ไฟล์ก่อน)
+- ผล: ยังไม่ทดสอบ
+- commit: ยังไม่ commit (ผู้ใช้สั่งหยุดรอตามแผน)
+- หมายเหตุ: ครบ 4 จุดตามแผน F.4 แล้ว (GS_Pipeline.gs, GS_SheetExport.gs,
+  TestDrive.js, Index.html) — รอ Claude (แชท) ตรวจไฟล์ 3-4 ก่อนไปขั้นทดสอบจริง
+
+## [2026-07-29 11:35] Session F.4 — clasp push สำเร็จ (รันเองนอก Claude Code) + ยืนยัน appsscript.json ปลอดภัย
+
+- ทำ: อัปเดตสถานะจาก CK1024 — 2 จุดที่ Claude Code เคยรายงานว่าค้างอยู่
+  จริงๆ เสร็จไปแล้ว:
+  1. `clasp push` สำเร็จแล้ว — รันเองผ่าน Git Bash แยกต่างหาก (ไม่ผ่าน
+     Claude Code เนื่องจาก Bash tool ในเซสชันนี้ไม่ใช่ TTY ทำให้ clasp
+     ขึ้น "Skipping push." ทุกครั้งตามที่สืบสาเหตุไว้ก่อนหน้า) ผล: Pushed 15
+     files รวม `GS_Pipeline.js`/`GS_SheetExport.js`/`Index.html`/
+     `TestDrive.js` ของ F.4 ครบ
+  2. เช็ค `appsscript.json` บน Apps Script online editor เทียบกับ Claude
+     (แชท) แล้ว — เนื้อหาตรงกับ local ทุกตัวอักษร ไม่มี field เกิน (ไม่มี
+     `webapp`/deployment config ที่ local ขาด) ยืนยันว่าความกังวลเรื่อง
+     `--force` ไปทับ config ของ Test deployment (F.3) ไม่เป็นปัญหาจริง
+- คำสั่ง: (รันนอก Claude Code ทั้งหมด — ไม่มีคำสั่งฝั่งนี้)
+- ผล: PASS — push สำเร็จ 15/15 ไฟล์
+- commit: ยังไม่ commit (รอทดสอบผ่าน checklist ก่อน)
+- หมายเหตุ: งานที่ค้างจริงตอนนี้เหลือแค่ 2 จุด — (1) ทดสอบผ่าน Test
+  deployments ตาม checklist หัวข้อ 9 ของ
+  `DRAFT_plan_session_F4_calculate_pipeline.md` (คำนวณ HOR-ORR-04 ไม่มี
+  issues, อัปโหลด SettingOutTest_Part_2.csv ทดสอบ normalizer, กดคำนวณซ้ำ 2
+  ครั้ง, เช็ค dropdown/ปุ่ม disable ด้วยตา) (2) commit git หลังทดสอบผ่านครบ
+
+## [2026-07-29 12:10] เขียนทับ DEPENDENCY_MAP.md + PROJECT_STATE.md ตามที่ Claude (แชท) ร่างมา — ยังไม่ commit
+
+- ทำ: เขียนทับ 2 ไฟล์เอกสารสถานะโปรเจกต์ตามเนื้อหาที่ Claude (แชท) ร่าง+ตรวจ
+  มาให้ (หา/แทนที่ตรงตัวเป๊ะทุกจุด ไม่ใช่ Claude Code แต่งเอง):
+  1. `DEPENDENCY_MAP.md` — 4 จุด: (1) scope header เพิ่ม GS_DriveWalker/
+     GS_SheetExport/GS_Pipeline + note bundle เลิกใช้ (2) เพิ่ม 2 แถวตาราง
+     GS_SheetExport.gs/GS_Pipeline.gs (3) เพิ่ม 2 bullet transitive closure
+     (4) เพิ่มย่อหน้าท้ายไฟล์อธิบาย 15 ไฟล์ clasp + ประกาศเลิกใช้ BUNDLE_*.md
+     — Claude (แชท) ตรวจ diff แล้วอนุมัติ (เขียนทับ+ตรวจผ่านสมบูรณ์)
+  2. `PROJECT_STATE.md` — เขียนทับทั้งไฟล์ (header วันที่, ตาราง §3 เพิ่ม
+     GS_SheetExport.gs/GS_Pipeline.gs, §4 ข้อ 6-7 แก้ให้ตรงว่าฟังก์ชัน export
+     ย้ายไป GS_SheetExport.gs แล้ว, §6 แถว F + section ใหม่ "Session F.4 —
+     สถานะ ณ handoff" + roadmap F.3 ขีดฆ่า F.4 ระบุสถานะ, §7 เพิ่ม 2 บรรทัด
+     backlog, §8 เปลี่ยนตัวอย่างข้อความเริ่ม session) — รอ Claude (แชท) ตรวจ
+     diff รอบนี้ก่อน
+  - ระหว่างทางมีรอบ Edit tool ถูกปฏิเสธหลายครั้ง (ผู้ใช้อยากเห็น `git diff`
+    เป็น text ในเทอร์มินัลก่อน ไม่เอา preview ในแชท) — แก้เป็นใช้ Write
+    เขียนทับทั้งไฟล์ตรงจากเนื้อหาที่ผู้ใช้แปะในแชท แล้วรัน `git diff` ยืนยัน
+    แทน ตาม feedback memory "show diff before save"
+- คำสั่ง: `git diff DEPENDENCY_MAP.md`, Write (เขียนทับ DEPENDENCY_MAP.md),
+  `git diff DEPENDENCY_MAP.md` (ยืนยันรอบสอง), Write (เขียนทับ
+  PROJECT_STATE.md — ครั้งแรก error "file modified since read", Read ใหม่
+  พบว่าเนื้อหาตรงเป้าหมายอยู่แล้ว), `git diff PROJECT_STATE.md`
+- ผล: DEPENDENCY_MAP.md — PASS, Claude (แชท) อนุมัติแล้ว. PROJECT_STATE.md —
+  diff ตรงตามที่ร่างไว้ทุกจุด รอ Claude (แชท) ตรวจ
+- commit: ยังไม่ commit ทั้ง 2 ไฟล์ (ตามคำสั่งผู้ใช้)
+- หมายเหตุ: ไม่มีการแก้ไฟล์โค้ด/engine ใดๆ ในรอบนี้ เป็นเอกสารสถานะล้วน
+
+## [2026-07-29 12:25] Claude (แชท) อนุมัติ PROJECT_STATE.md แล้ว — เอกสารทั้ง 2 ไฟล์ผ่านหมด รอทดสอบ F.4
+
+- ทำ: บันทึกผลอนุมัติจาก Claude (แชท) — ตรวจไฟล์จริง PROJECT_STATE.md ผ่าน
+  สมบูรณ์ (ต่อจาก DEPENDENCY_MAP.md ที่อนุมัติไปก่อนหน้าใน entry 12:10)
+  สรุปสถานะเอกสาร: DEPENDENCY_MAP.md ✅ อนุมัติแล้ว, PROJECT_STATE.md ✅
+  อนุมัติแล้ว — ทั้ง 2 ไฟล์ยังไม่ commit ตามคำสั่งผู้ใช้ รอทดสอบ F.4 ผ่าน
+  checklist (Test deployments) ก่อนจึงจะ commit รวมกัน
+- คำสั่ง: (ไม่มีคำสั่งรันเพิ่มรอบนี้ — แค่ log ผลอนุมัติ)
+- ผล: PASS (เอกสารสถานะ 2/2 ไฟล์ผ่านการตรวจจาก Claude (แชท))
+- commit: ยังไม่ commit — รอ CK1024 ทดสอบ F.4 ผ่าน Test deployments ก่อน
+- หมายเหตุ: งานที่ค้างจริงตอนนี้เหมือนเดิมคือ 2 จุด — (1) ทดสอบผ่าน Test
+  deployments ตาม checklist หัวข้อ 9 ของ
+  `DRAFT_plan_session_F4_calculate_pipeline.md` (2) commit git รวมทั้งโค้ด
+  F.4 (GS_Pipeline.gs/GS_SheetExport.gs/TestDrive.js/Index.html) และเอกสาร
+  สถานะ 2 ไฟล์ (DEPENDENCY_MAP.md/PROJECT_STATE.md) หลังทดสอบผ่านครบ —
+  CK1024 ไปทดสอบเองต่อ ไม่มีงานฝั่ง Claude Code ต่อในรอบนี้

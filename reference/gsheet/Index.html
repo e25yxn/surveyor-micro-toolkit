@@ -69,8 +69,8 @@
   </select>
   <div id="tabWarning" class="warning"></div>
 
-  <button id="calcBtn" disabled>คำนวณ</button>
-  <div class="hint">ปุ่มนี้ยังไม่เชื่อมกับการคำนวณจริง — จะทำใน Session F.4</div>
+  <button id="calcBtn" onclick="handleCalcClick()">คำนวณ</button>
+  <div id="calcStatus" class="hint"></div>
 
   <script>
     function setLoading(selectEl) {
@@ -244,6 +244,50 @@
       });
 
       tabSelect.disabled = false;
+    }
+
+    function handleCalcClick() {
+      clearError();
+
+      var catSelect = document.getElementById('catSelect');
+      var fileSelect = document.getElementById('fileSelect');
+      var tabSelect = document.getElementById('tabSelect');
+      var calcBtn = document.getElementById('calcBtn');
+      var calcStatus = document.getElementById('calcStatus');
+
+      var fileId = fileSelect.value;
+      var tabName = tabSelect.value;
+
+      catSelect.disabled = true;
+      fileSelect.disabled = true;
+      tabSelect.disabled = true;
+      calcBtn.disabled = true;
+      calcStatus.textContent = 'กำลังคำนวณ...';
+
+      google.script.run
+        .withSuccessHandler(onCalcDone)
+        .withFailureHandler(onCalcFail)
+        .runFullPipeline(fileId, tabName);
+    }
+
+    function onCalcDone(summary) {
+      document.getElementById('catSelect').disabled = false;
+      document.getElementById('fileSelect').disabled = false;
+      document.getElementById('tabSelect').disabled = false;
+      document.getElementById('calcBtn').disabled = false;
+
+      var calcStatus = document.getElementById('calcStatus');
+      calcStatus.textContent = 'คำนวณเสร็จแล้ว: ' + summary.elementsCount + ' elements' +
+        (summary.issuesCount ? ', พบ issues ' + summary.issuesCount + ' รายการ' : ', ไม่พบ issues');
+    }
+
+    function onCalcFail(err) {
+      document.getElementById('catSelect').disabled = false;
+      document.getElementById('fileSelect').disabled = false;
+      document.getElementById('tabSelect').disabled = false;
+      document.getElementById('calcBtn').disabled = false;
+
+      showError(err);
     }
   </script>
 </body>
