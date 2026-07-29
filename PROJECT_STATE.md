@@ -2,7 +2,7 @@
 
 **เอกสารนี้คือ "สแนปช็อตสถานะปัจจุบัน" — เขียนทับใหม่ทุกครั้งที่จบ session
 (ต่างจาก `session_logs/latest.md` ที่เป็นบันทึกย้อนหลังทุก session)**
-**อัปเดตล่าสุด: 2026-07-29, F.4 ทดสอบผ่านครบ + feat commit เสร็จ, รอ docs commit**
+**อัปเดตล่าสุด: 2026-07-29, F.4 ทดสอบผ่านครบ + feat/docs commit เสร็จหมด, รอ push**
 
 ---
 
@@ -118,9 +118,9 @@ text ใน terminal ตรวจได้ตามปกติ
 | C | Wire pipeline เต็ม | ✅ | `6246cdf` |
 | D | Export ตารางที่ 1 | ✅ | `b3e5926`, `118234b` |
 | E | Export ตารางที่ 2 (3 ตาราง) | ✅ | `d9d95e6`, `ced10c2`, `de223b2` |
-| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.4 เสร็จ (โค้ด+ทดสอบ), รอ docs commit + push | 🔵 **กำลังทำ** | F.1-F.2: HEAD ผ่าน `9e5e608`; F.3 (feat): `ecc0a69`; F.3 (docs): `b6c7eac`; F.4 (feat): `51f3818`; F.4 (docs): ยังไม่ commit |
+| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.4 เสร็จ (โค้ด+ทดสอบ+commit ครบ), รอ push | 🔵 **กำลังทำ** | F.1-F.2: HEAD ผ่าน `9e5e608`; F.3 (feat): `ecc0a69`; F.3 (docs): `b6c7eac`; F.4 (feat): `51f3818`; F.4 (docs): `0656528` |
 
-**HEAD ปัจจุบันของ `origin/main`**: `b6c7eac` (local ahead ด้วย `51f3818` ยังไม่ push)
+**HEAD ปัจจุบันของ `origin/main`**: `0656528` (local ahead 2 commits: `51f3818` + `0656528`, ยังไม่ push)
 
 ### Session F.4 — เสร็จแล้ว (2026-07-29)
 
@@ -141,15 +141,16 @@ text ใน terminal ตรวจได้ตามปกติ
 
 Feat commit: `51f3818` (4 ไฟล์: `GS_Pipeline.gs`, `GS_SheetExport.gs`,
 `Index.html`, `session_logs/latest.md` — `TestDrive.js` ไม่ track ใน git
-ไม่ได้ commit) **ยังไม่ push**
+ไม่ได้ commit) — Docs commit: `0656528` (`DEPENDENCY_MAP.md` +
+`PROJECT_STATE.md`) **ทั้ง 2 commit ยังไม่ push**
 
 ### แผนขั้นย่อยที่เสนอไว้
 
 ~~F.1 ปรับ export functions ให้ parameterize~~ **(เสร็จแล้ว)** →
 ~~F.2 ฟังก์ชัน backend เดิน Drive (list folder/file/tab)~~ **(เสร็จแล้ว)** →
 ~~F.3 `doGet()`+HTML cascade UI~~ **(เสร็จแล้ว)** →
-~~F.4 เชื่อมปุ่มคำนวณกับ pipeline~~ **(เสร็จแล้ว — ทดสอบผ่าน+feat commit,
-รอ docs commit+push)** →
+~~F.4 เชื่อมปุ่มคำนวณกับ pipeline~~ **(เสร็จแล้ว — ทดสอบผ่าน+commit ครบ,
+รอ push)** →
 F.5 Deploy web app จริง → F.6 ทดสอบ end-to-end
 
 ---
@@ -180,11 +181,10 @@ F.5 Deploy web app จริง → F.6 ทดสอบ end-to-end
 ## 8. ข้อความเริ่ม session ใหม่ (ตัวอย่าง)
 
 ```
-นี่คือ handoff สำหรับต่อ Session F.4 (แนบไฟล์ HANDOFF_CONTINUE_F4_20260729.md
-พร้อม PROJECT_STATE.md, CLAUDE.md, DEPENDENCY_MAP.md) — F.4 ทดสอบผ่านครบ +
-feat commit แล้ว (51f3818) ยังไม่ push และยังไม่ commit เอกสารสถานะ
-(DEPENDENCY_MAP.md/PROJECT_STATE.md)
+นี่คือ handoff สำหรับต่อ Session F.4/F.5 (แนบไฟล์
+HANDOFF_CONTINUE_F4_20260729.md พร้อม PROJECT_STATE.md, CLAUDE.md,
+DEPENDENCY_MAP.md) — F.4 ทดสอบผ่านครบ + commit ครบทั้ง feat (`51f3818`) และ
+docs (`0656528`) แล้ว เหลือแค่ push
 
-งานแรกของแชทใหม่: commit เอกสาร 2 ไฟล์ (docs commit) แล้ว push ทั้งหมด
-(feat 51f3818 + docs) ก่อนเริ่ม F.5
+งานแรกของแชทใหม่: push ทั้ง 2 commit (`git push origin main`) แล้วเริ่ม F.5
 ```
