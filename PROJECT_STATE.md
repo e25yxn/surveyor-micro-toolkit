@@ -2,7 +2,7 @@
 
 **เอกสารนี้คือ "สแนปช็อตสถานะปัจจุบัน" — เขียนทับใหม่ทุกครั้งที่จบ session
 (ต่างจาก `session_logs/latest.md` ที่เป็นบันทึกย้อนหลังทุก session)**
-**อัปเดตล่าสุด: 2026-07-27, หลังจบ Session E, เริ่ม Session F**
+**อัปเดตล่าสุด: 2026-07-29, F.4 ทดสอบผ่านครบ + feat commit เสร็จ, รอ docs commit**
 
 ---
 
@@ -34,6 +34,12 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 เสมอ ห้าม backslash — ถ้า Write tool ถาม overwrite ไฟล์นี้ตรงๆ ให้กด No)
 ตรวจ `cat -A` ก่อน commit ทุกครั้ง — ดูรายละเอียดเต็มใน `CLAUDE.md`
 
+**ไฟล์ใหญ่/เขียนทับทั้งไฟล์/มีบรรทัดยาว**: ข้ามการโชว์ preview/diff ในแชท
+ไปเลย (พิสูจน์แล้วว่าไม่น่าเชื่อถือ — เพี้ยนซ้ำหลายรอบเฉพาะตอน paste ผ่าน
+แชท ไม่เคยเพี้ยนที่ไฟล์จริงบนดิสก์เลย) เขียนไฟล์จริงแล้ว**อัปโหลดไฟล์จริง
+จากดิสก์มาตรวจรอบเดียวจบ** แทน — ไฟล์เล็ก/บรรทัดสั้น (< 20 บรรทัด) โชว์
+text ใน terminal ตรวจได้ตามปกติ
+
 ---
 
 ## 3. ไฟล์ GAS ที่มีอยู่แล้ว (`reference/gsheet/` + `reference/`)
@@ -49,17 +55,21 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 | `GS_ElementTable.gs` | ✅ Session D, verify diff=0 | FPMath | `elementsToRows(elements)` → ตาราง 8 คอลัมน์ |
 | `GS_CrossCheck.gs` | ✅ Session E, verify diff=0 (2a) + prototype (2b/2c) | FPMath, WCB, GS_Alignment | `checkPoints()`/`checkPiCurves()` → 3 ตาราง cross-check |
 | `GS_DriveWalker.gs` | ✅ Session F.2, verified live (2026-07-28) | GS_ElementTable, GS_CrossCheck (+ transitively FPMath, WCB, GS_Alignment) | `listCategoryFolders()`/`listFilesInFolder(folderId)`/`listAlignmentTabsInFile(fileId)` — เดิน Drive สดทุกครั้ง (ไม่ hardcode) รองรับ folder/file/tab ที่ผู้ใช้เพิ่มได้อิสระตลอดเวลา, เรียงผลลัพธ์ตามชื่อ (alphabetical) |
+| `GS_SheetExport.gs` | ✅ Session F.4, verified live (2026-07-29), committed `51f3818` | GS_ElementTable, GS_CrossCheck (+ transitively FPMath, WCB, GS_Alignment) | `writeTab_()` helper กลาง + `exportElementsToSheet()`/`exportCrossCheckToSheet()` (ย้ายมาจาก `TestDrive.js`) + `exportIssuesToSheet()` ใหม่ |
+| `GS_Pipeline.gs` | ✅ Session F.4, verified live (2026-07-29), committed `51f3818` | GS_TableSplitter, GS_PiTableParser, GS_AlignmentBuilder, GS_SheetExport | `normalizePiLabels_(rows)` (แปลง `"PI1"`→`"PI-1"`) + `runFullPipeline(fileId, tabName)` — orchestrator ของปุ่ม "คำนวณ" |
 
 **Pipeline เต็ม**: `splitMixedAlignmentTable(rows)` → `parsePiTable(vertexRows)`
 → `buildFromPI(vertices)` → `{elements, control, issues}` → export ผ่าน
-`GS_ElementTable`/`GS_CrossCheck`
+`GS_SheetExport` (ซึ่งเรียก `GS_ElementTable`/`GS_CrossCheck` ภายใน) — เรียกรวม
+ทั้งหมดผ่าน `GS_Pipeline.runFullPipeline(fileId, tabName)`
 
-**ทั้งหมด push เข้า `D:\MyClasp_SMT_DEMO\` แล้ว** (10 ไฟล์ .js/.gs +
-`appsscript.json` + `code.js` = 12 ไฟล์ตอนล่าสุด)
+**ทั้งหมด push เข้า `D:\MyClasp_SMT_DEMO\` แล้ว** (13 ไฟล์ .js/.gs +
+`appsscript.json` + `Index.html` = 15 ไฟล์ตอนล่าสุด, ยืนยันจาก `clasp push`
+2026-07-29)
 
 ---
 
-## 4. `TestDrive.js` (`D:\MyClasp_SMT_DEMO\TestDrive.js`) — ฟังก์ชันทดสอบที่มี
+## 4. `TestDrive.js` (`D:\MyClasp_SMT_DEMO\TestDrive.js` — clasp folder เท่านั้น ไม่ track ใน git) — ฟังก์ชันทดสอบที่มี
 
 1. `testExploreFolders()` — เดินโฟลเดอร์ Drive (FOLDER_ID เก่าคือของ
    `SMT_Web_App_demo` ไม่ใช่ `001_Hor_Align`)
@@ -67,8 +77,12 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 3. `testSplitAgainstHorOrr04()` — verify `GS_TableSplitter`
 4. `testParseAgainstHorOrr04()` — verify `GS_PiTableParser`
 5. `testBuildFromPIAgainstHorOrr04()` — verify `buildFromPI`
-6. `exportElementsToSheet(ss, alignmentName, elements)` + `testFullPipelineExportAgainstHorOrr04()` — Session D, **parameterize แล้วใน Session F.1** (เขียนไป tab `result_(alignmentName)_Elements`)
-7. `exportCrossCheckToSheet(ss, alignmentName, elements, drawing, rows, vertices, control)` + `testFullCrossCheckAgainstHorOrr04()` — Session E, **parameterize แล้วใน Session F.1** (เขียนไป 3 tab `result_(alignmentName)_CrossCheck_Points/Radius/Deflection`)
+6. `testFullPipelineExportAgainstHorOrr04()` — Session D, parameterize ใน F.1,
+   เรียก `exportElementsToSheet()` ที่**ย้ายไป `GS_SheetExport.gs` แล้วใน
+   Session F.4** (เขียนไป tab `result_(alignmentName)_Elements`)
+7. `testFullCrossCheckAgainstHorOrr04()` — Session E, parameterize ใน F.1,
+   เรียก `exportCrossCheckToSheet()` ที่**ย้ายไป `GS_SheetExport.gs` แล้วใน
+   Session F.4** (เขียนไป 3 tab `result_(alignmentName)_CrossCheck_Points/Radius/Deflection`)
 8. `dumpRawHorOrr04()` — dump 36 แถวดิบจากชีตจริง
 9. `testListCategoryFolders()` — verify `listCategoryFolders` (Session F.2)
 10. `testListFilesInFolder()` — verify `listFilesInFolder` (Session F.2)
@@ -104,41 +118,38 @@ SMT = Python library คำนวณ horizontal road alignment (ทางตร�
 | C | Wire pipeline เต็ม | ✅ | `6246cdf` |
 | D | Export ตารางที่ 1 | ✅ | `b3e5926`, `118234b` |
 | E | Export ตารางที่ 2 (3 ตาราง) | ✅ | `d9d95e6`, `ced10c2`, `de223b2` |
-| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.3 เสร็จ, F.4 กำลังทำต่อ | 🔵 **กำลังทำ** | F.1-F.2: HEAD ผ่าน `9e5e608`; F.3 (feat): `ecc0a69`; F.3 (docs): `b6c7eac` |
+| **F** | **หน้าเว็บจริง (`doGet()`+HTML)** — F.1-F.4 เสร็จ (โค้ด+ทดสอบ), รอ docs commit + push | 🔵 **กำลังทำ** | F.1-F.2: HEAD ผ่าน `9e5e608`; F.3 (feat): `ecc0a69`; F.3 (docs): `b6c7eac`; F.4 (feat): `51f3818`; F.4 (docs): ยังไม่ commit |
 
-**HEAD ปัจจุบันของ `origin/main`**: `b6c7eac`
+**HEAD ปัจจุบันของ `origin/main`**: `b6c7eac` (local ahead ด้วย `51f3818` ยังไม่ push)
 
-### Session F.3 — เสร็จแล้ว (2026-07-28)
+### Session F.4 — เสร็จแล้ว (2026-07-29)
 
-`doGet()` + `Index.html` cascade UI (หมวด→ไฟล์→alignment tab) ตามสเปคที่ยืนยันไว้
-ด้านบนครบทุกข้อ — dropdown ทั้ง 3 ชั้นแสดงตลอด disabled+placeholder รอข้อมูล,
-หมวด/ไฟล์ว่างแสดงทั้ง option เดียว disabled + ข้อความเตือนแยก, ปุ่ม "คำนวณ"
-disabled ถาวร (รอ F.4), central `showError()` จับ `google.script.run` fail
-ทดสอบผ่านจริงผ่าน Test deployments แล้ว (`001_Hor_Align` ไล่ครบ 3 ชั้น, หมวดว่าง
-7 หมวดแสดงถูกต้อง) ไฟล์: `reference/gsheet/Index.html` (ใหม่),
-`reference/gsheet/code.gs` (ใหม่) — ไม่แตะ engine/backend ใดๆ
+`GS_Pipeline.gs`/`GS_SheetExport.gs` (ใหม่) + `Index.html`/`TestDrive.js` (แก้)
+ตามแผน `DRAFT_plan_session_F4_calculate_pipeline.md` ทุกข้อ — ปุ่ม "คำนวณ"
+เชื่อมกับ `runFullPipeline()` เต็มรูปแบบ, dropdown ทั้ง 3 + ปุ่ม disable ระหว่าง
+รัน, สรุปผล (จำนวน elements/issues) แสดงบนหน้าเว็บ, `issues` เขียนลง tab ใหม่
+`result_(alignment)_Issues` เฉพาะตอนมีจริง
 
-### Session F — ดีไซน์ที่ยืนยันแล้ว (ยังไม่เขียนโค้ด)
+**ทดสอบผ่านจริงผ่าน Test deployments ครบ 3 เคส (2026-07-29):**
+1. `HOR-ORR-04` (ข้อมูลจริง): 25 elements, ไม่มี issues, 4 tab ผลลัพธ์ถูกต้อง
+2. `SettingOutTest_Part_2.csv` (PI label ไม่มีขีด, spiral ไม่สมมาตร LsIn/LsOut):
+   `normalizePiLabels_()` ยืนยันทำงานถูกต้อง 100% — 29 elements ตรงกับที่
+   verify มือทุกตัวเลข; `CrossCheck_Points`/`Deflection` ว่างตามดีไซน์ (ไม่มี
+   จุดสำรวจ PT/PC/TS/SC/CS/ST ในไฟล์นี้ — ยืนยันจากการอ่าน `GS_CrossCheck.gs`
+   ตรงๆ ไม่ใช่เดา), `CrossCheck_Radius` แสดง 3 แถว fallback ใช้ Δ ออกแบบ
+3. กดคำนวณซ้ำ 2 ครั้งติด: ไม่ error, ทับผลเดิมถูกต้อง
 
-1. **Cascade เต็มรูปแบบ v1**: Drive folder → Google Sheets file → Sheet tab
-   (ชื่อ tab = ชื่อ alignment) — แม้ตอนนี้มีแค่ 1 alignment จริง **หมวด/ไฟล์/tab
-   ทั้งหมดเดินหาสดจาก Drive จริงทุกครั้ง ไม่ hardcode รายชื่อไว้ที่ไหนเลย —
-   จำนวนเปลี่ยนแปลงได้ตลอดตามที่ผู้ใช้เพิ่มเอง (ยืนยันจาก F.2 live test: เจอ 8
-   หมวดจริง ไม่ใช่ 6-7 ตามที่เคยประมาณไว้)**
-2. **ปุ่ม "คำนวณ" รันจริง**: split→parse→build→export เต็ม pipeline ทุกครั้ง
-   ที่กด ไม่ใช่แค่โชว์ผลเก่า
-3. **ผลลัพธ์**: เขียนกลับเข้าไฟล์เดียวกับข้อมูลต้นทาง (ไม่ใช่ไฟล์แยก) เป็น
-   **4 tab แยกกัน** เติมชื่อ alignment นำหน้า:
-   `result_(alignment)_Elements`, `result_(alignment)_CrossCheck_Points`,
-   `result_(alignment)_CrossCheck_Radius`, `result_(alignment)_CrossCheck_Deflection`
-   — ต้องปรับ `exportElementsToSheet()`/`exportCrossCheckToSheet()` ให้รับ
-   `ss` + ชื่อ alignment เป็น parameter แทน hardcode
+Feat commit: `51f3818` (4 ไฟล์: `GS_Pipeline.gs`, `GS_SheetExport.gs`,
+`Index.html`, `session_logs/latest.md` — `TestDrive.js` ไม่ track ใน git
+ไม่ได้ commit) **ยังไม่ push**
 
 ### แผนขั้นย่อยที่เสนอไว้
 
 ~~F.1 ปรับ export functions ให้ parameterize~~ **(เสร็จแล้ว)** →
 ~~F.2 ฟังก์ชัน backend เดิน Drive (list folder/file/tab)~~ **(เสร็จแล้ว)** →
-F.3 `doGet()`+HTML cascade UI → F.4 เชื่อมปุ่มคำนวณกับ pipeline →
+~~F.3 `doGet()`+HTML cascade UI~~ **(เสร็จแล้ว)** →
+~~F.4 เชื่อมปุ่มคำนวณกับ pipeline~~ **(เสร็จแล้ว — ทดสอบผ่าน+feat commit,
+รอ docs commit+push)** →
 F.5 Deploy web app จริง → F.6 ทดสอบ end-to-end
 
 ---
@@ -154,13 +165,26 @@ F.5 Deploy web app จริง → F.6 ทดสอบ end-to-end
   Sheets-verification ยังไม่อัปเดต
 - `clasp run-function`/`clasp logs` ยังใช้ไม่ได้ — รันทดสอบผ่าน Apps Script
   web editor แทนเสมอ
+- Python core ยังไม่มี PI-label normalizer (`PI1`→`PI-1`) แบบที่เพิ่งเพิ่มฝั่ง
+  GAS ใน F.4 — CK1024 ต้องการพอร์ตไปด้วยทีหลัง หลัง F.4 ปิดจบ เพื่อให้เป็น
+  มาตรฐานเดียวกันทั้งสองภาษา
+- `BUNDLE_gsheet.md`/`BUNDLE_python_core.md` **เลิกใช้แล้วตั้งแต่ 2026-07-29**
+  — แนบไฟล์จริงแทนในทุก session ถัดไป (ดูเหตุผลใน `DEPENDENCY_MAP.md` ท้ายไฟล์)
+- `GS_CrossCheck.gs`'s `deflectionToRows()` ไม่มี fallback note ตอนไม่มีจุด
+  สำรวจ (ต่างจาก `radiusToRows()` ที่มี) — พฤติกรรมปัจจุบันถูกต้องตามที่
+  อนุมัติไว้ตั้งแต่ Session E ไม่ต้องแก้ แต่ถ้าอนาคตอยากให้ UX สอดคล้องกัน
+  มากขึ้น เก็บไว้เป็นหัวข้อคุยแยกทีหลังได้
 
 ---
 
 ## 8. ข้อความเริ่ม session ใหม่ (ตัวอย่าง)
 
 ```
-นี่คือ PROJECT_STATE.md ล่าสุดของโปรเจกต์ SMT (แนบไฟล์) — ทำ Session F ต่อจาก
-ขั้น F.1 (ปรับ exportElementsToSheet/exportCrossCheckToSheet ให้ parameterize)
-ตามที่ยืนยันไว้แล้ว
+นี่คือ handoff สำหรับต่อ Session F.4 (แนบไฟล์ HANDOFF_CONTINUE_F4_20260729.md
+พร้อม PROJECT_STATE.md, CLAUDE.md, DEPENDENCY_MAP.md) — F.4 ทดสอบผ่านครบ +
+feat commit แล้ว (51f3818) ยังไม่ push และยังไม่ commit เอกสารสถานะ
+(DEPENDENCY_MAP.md/PROJECT_STATE.md)
+
+งานแรกของแชทใหม่: commit เอกสาร 2 ไฟล์ (docs commit) แล้ว push ทั้งหมด
+(feat 51f3818 + docs) ก่อนเริ่ม F.5
 ```

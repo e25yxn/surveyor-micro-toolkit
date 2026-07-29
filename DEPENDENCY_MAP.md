@@ -2,7 +2,10 @@
 
 Built by grepping literal `require\(` lines across `reference/*.gs` and
 `reference/gsheet/*.gs` on 2026-07-27 (not from memory — see raw grep output
-below the table). Scope: the 8 files bundled in `BUNDLE_gsheet.md`.
+below the table). Scope: originally the 8 files bundled in `BUNDLE_gsheet.md`
+(bundle file now deprecated as of Session F.4 — see note at end of file) plus
+`GS_DriveWalker.gs` (Session F.2), `GS_SheetExport.gs`/`GS_Pipeline.gs`
+(Session F.4).
 
 ## Why this file exists
 
@@ -42,6 +45,8 @@ the same Apps Script project; it does not imply any folder layout there.
 | `reference/gsheet/GS_ElementTable.gs` | `../FPMath.gs` | `reference/FPMath.gs` | FPMath |
 | `reference/gsheet/GS_CrossCheck.gs` | `../FPMath.gs`, `../WCB.gs`, `./GS_Alignment.gs` | `reference/FPMath.gs`, `reference/WCB.gs`, `reference/gsheet/GS_Alignment.gs` | FPMath, WCB, GS_Alignment |
 | `reference/gsheet/GS_DriveWalker.gs` | *(none — references `GS_ElementTable.HEADER`/`GS_CrossCheck.*_HEADER` directly as globals, not via `require()`; Apps-Script-only, no Node smoke test possible since it calls `DriveApp`/`SpreadsheetApp`)* | — | GS_ElementTable, GS_CrossCheck |
+| `reference/gsheet/GS_SheetExport.gs` | *(none — references `GS_ElementTable.HEADER`/`elementsToRows` and `GS_CrossCheck.*_HEADER`/`checkPoints`/`checkPiCurves`/`*ToRows` directly as globals, not via `require()`; Apps-Script-only, no Node smoke test possible since it calls `SpreadsheetApp`)* | — | GS_ElementTable, GS_CrossCheck |
+| `reference/gsheet/GS_Pipeline.gs` | *(none — calls `GS_TableSplitter.splitMixedAlignmentTable`/`GS_PiTableParser.parsePiTable`/`GS_AlignmentBuilder.buildFromPI` and `exportElementsToSheet`/`exportCrossCheckToSheet`/`exportIssuesToSheet` directly as globals, not via `require()`; Apps-Script-only, no Node smoke test possible since it calls `SpreadsheetApp`)* | — | GS_TableSplitter, GS_PiTableParser, GS_AlignmentBuilder, GS_SheetExport |
 
 Transitive closure (if you push file X, you need everything in its row plus
 that dependency's own row, recursively):
@@ -55,6 +60,8 @@ that dependency's own row, recursively):
 - **GS_ElementTable** — needs FPMath.
 - **GS_CrossCheck** — needs FPMath, WCB, GS_Alignment.
 - **GS_DriveWalker** — needs GS_ElementTable, GS_CrossCheck (and transitively FPMath, WCB, GS_Alignment).
+- **GS_SheetExport** — needs GS_ElementTable, GS_CrossCheck (and transitively FPMath, WCB, GS_Alignment). New in Session F.4 — moved from TestDrive.js.
+- **GS_Pipeline** — needs GS_TableSplitter, GS_PiTableParser, GS_AlignmentBuilder, GS_SheetExport (and transitively FPMath, WCB, GS_Alignment, GS_ElementTable, GS_CrossCheck). New in Session F.4 — the production orchestrator behind the web app's "Calculate" button.
 
 So a full working push (e.g. the `SMT_COGO_DEMO` / `HOR-ORR-04` pipeline) needs
 all 8 files together — there is no smaller subset that supports
@@ -66,6 +73,22 @@ the 8 files already confirmed present in `D:\MyClasp_SMT_DEMO\` as of
 GS_DriveWalker.gs is a 9th file needed only for the Drive-walking cascade
 feature (Session F.2+) — the core split→parse→build→export pipeline above
 doesn't need it.
+
+GS_SheetExport.gs and GS_Pipeline.gs (Session F.4) add 2 more files needed
+specifically for the web app's production "Calculate" button — the
+orchestrator (`runFullPipeline`) and the sheet-write helpers moved out of
+`TestDrive.js`. As of Session F.4's clasp push (2026-07-29) the clasp folder
+has 15 files total (11 .gs/.js library files + code.js + appsscript.json +
+Index.html + TestDrive.js).
+
+**Note (2026-07-29): `BUNDLE_gsheet.md`/`BUNDLE_python_core.md` are
+deprecated as of this session.** Going forward, attach the real `.gs`/`.py`
+files that changed for a given task instead of maintaining a hand-built
+bundle — bundles go stale silently (this map itself was one commit behind
+until now) and get auto-loaded into context in full regardless of whether
+a session needs them, costing tokens for no benefit. This file
+(`DEPENDENCY_MAP.md`) and `PROJECT_STATE.md`/`CLAUDE.md` stay as living docs
+since they're status/analysis, not copies of source.
 
 ## Raw grep output (source of truth for the table above)
 
