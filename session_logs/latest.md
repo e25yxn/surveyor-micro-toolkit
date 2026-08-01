@@ -1797,3 +1797,17 @@
   (แสดง friendly message + raw message ครบ) แต่ root cause ของ TypeError เอง
   (แถวไหนใน `.gs` ที่พยายามอ่าน `.n` จาก object undefined) ยังไม่ได้สืบ ยังไม่แก้
   — ยังไม่ push (รอ CK1024 ส่ง commit hash ให้ Claude (แชท) อนุมัติก่อน)
+
+## [2026-08-01] Push F.5 commit ขึ้น origin/main
+
+- ทำ: push commit `7bd4c3b` (F.5 ส่วน A error handling + ส่วน B deploy guide)
+  ขึ้น `origin/main` หลัง Claude (แชท) อนุมัติ hash แล้ว
+- คำสั่ง: `git push origin main`, `git log -1 --oneline` (ทั้ง local และ
+  `origin/main`) ตรวจยืนยันหลัง push
+- ผล: PASS — `a6bd9f6..7bd4c3b main -> main`, local และ origin/main ตรงกันที่
+  `7bd4c3b`
+- commit: `7bd4c3b` (push ไม่ใช่ commit ใหม่ — sync commit ที่มีอยู่แล้วไปยัง
+  remote)
+- หมายเหตุ: F.5 ส่วน A+B ปิดจบสมบูรณ์ทั้งโค้ด+เอกสาร+push — บั๊กค้าง TypeError
+  (อ่าน `.n` จาก undefined ตอนเลือก sheet/tab ว่าง) ยังไม่แก้ ยกไป session ถัดไป
+  ตามที่บันทึกไว้ใน entry ก่อนหน้า
