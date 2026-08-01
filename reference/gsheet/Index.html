@@ -45,6 +45,21 @@
       border-radius: 4px;
       display: none;
     }
+    .error-banner details {
+      margin-top: 6px;
+    }
+    .error-banner summary {
+      cursor: pointer;
+      font-size: 12px;
+      color: #b00020;
+    }
+    .error-banner .error-raw {
+      margin-top: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -95,10 +110,86 @@
       warningEl.style.display = 'none';
     }
 
+    // แต่ละแถวจับ pattern ของ raw error message จริงจากฝั่ง server (.gs)
+    // ไล่ทดสอบตามลำดับ ตัวแรกที่ match ชนะ ไม่ match เลยสักแถว = ใช้ catchall ท้ายสุด
+    var ERROR_MESSAGE_MAP = [
+      {
+        test: /^ไม่พบ tab "(.+)" ในไฟล์นี้$/,
+        friendly: function (m) {
+          return 'ไม่พบแท็บ (tab) ชื่อ "' + m[1] + '" ในไฟล์นี้แล้ว — ' +
+            'อาจถูกลบหรือเปลี่ยนชื่อไประหว่างที่หน้านี้เปิดอยู่ กรุณาเลือกไฟล์ใหม่อีกครั้ง';
+        }
+      },
+      {
+        test: /^invalid numeric cell: "(.*)"$/,
+        friendly: function (m) {
+          return 'พบข้อมูลตัวเลขที่อ่านไม่ได้ในตาราง ("' + m[1] + '") — ' +
+            'ตรวจสอบคอลัมน์ตัวเลข (เช่น RADIUS, DISTANCE, ANGLE) ว่ากรอกเป็นตัวเลขล้วนๆ ' +
+            'ไม่มีตัวอักษร, comma, หรือช่องว่างปน แล้วลองคำนวณใหม่';
+        }
+      },
+      {
+        test: /^PI "(.+?)" \(แถวที่ (\d+)\)[\s\S]*compound sub-row/,
+        friendly: function (m) {
+          return 'ข้อมูลขัดแย้งกันที่ ' + m[1] + ' (แถวที่ ' + m[2] + ' ในตาราง) — ' +
+            'มีการกรอกค่ารัศมีไว้ทั้งที่แถวหลักและแถวย่อย (compound) ระบบไม่แน่ใจว่าจะใช้ค่าไหน ' +
+            'กรุณาลบค่ารัศมีที่ซ้ำออกแถวใดแถวหนึ่งแล้วลองใหม่';
+        }
+      },
+      {
+        test: /อยู่นอกแนวเส้นทาง|ตกนอกทุก element/,
+        friendly: function () {
+          return 'จุดตรวจสอบบางจุดอยู่นอกช่วงแนวเส้นทาง (alignment) — ' +
+            'ตรวจสอบว่าค่า station ในตารางอยู่ในช่วง PC ถึง PT ของแนวนี้หรือไม่';
+        }
+      },
+      {
+        test: /scanRawRows_|vertexIndex/,
+        friendly: function () {
+          return 'เกิดข้อผิดพลาดภายในระบบระหว่างตรวจสอบไขว้ (cross-check) — ' +
+            'ไม่ใช่ปัญหาจากข้อมูลของท่าน กรุณาแจ้งผู้ดูแลระบบพร้อมข้อความรายละเอียดด้านล่าง';
+        }
+      },
+      {
+        test: /permission|Invalid argument/i,
+        friendly: function () {
+          return 'ไม่สามารถเข้าถึงไฟล์นี้ได้ — อาจเป็นเพราะยังไม่ได้รับสิทธิ์เข้าถึง หรือไฟล์' +
+            'อาจถูกลบ/ย้ายตำแหน่งไปแล้ว กรุณาตรวจสอบกับ CK1024';
+        }
+      }
+    ];
+
+    function getFriendlyMessage(rawMessage) {
+      for (var i = 0; i < ERROR_MESSAGE_MAP.length; i++) {
+        var m = ERROR_MESSAGE_MAP[i].test.exec(rawMessage);
+        if (m) return ERROR_MESSAGE_MAP[i].friendly(m);
+      }
+      return 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุแน่ชัด — กรุณาลองใหม่อีกครั้ง ' +
+        'หากยังไม่หายกรุณาแจ้งผู้ดูแลระบบพร้อมข้อความรายละเอียดด้านล่าง';
+    }
+
     function showError(err) {
       var banner = document.getElementById('errorBanner');
-      var message = (err && err.message) ? err.message : String(err);
-      banner.textContent = 'เกิดข้อผิดพลาด: ' + message;
+      var rawMessage = (err && err.message) ? err.message : String(err);
+      var friendlyMessage = getFriendlyMessage(rawMessage);
+
+      banner.textContent = '';
+
+      var friendlyEl = document.createElement('div');
+      friendlyEl.textContent = friendlyMessage;
+      banner.appendChild(friendlyEl);
+
+      var details = document.createElement('details');
+      var summary = document.createElement('summary');
+      summary.textContent = 'รายละเอียดทางเทคนิค (สำหรับแจ้งผู้ดูแลระบบ)';
+      details.appendChild(summary);
+
+      var rawEl = document.createElement('div');
+      rawEl.className = 'error-raw';
+      rawEl.textContent = rawMessage;
+      details.appendChild(rawEl);
+
+      banner.appendChild(details);
       banner.style.display = 'block';
     }
 

@@ -1681,3 +1681,119 @@
   F.4 (GS_Pipeline.gs/GS_SheetExport.gs/TestDrive.js/Index.html) และเอกสาร
   สถานะ 2 ไฟล์ (DEPENDENCY_MAP.md/PROJECT_STATE.md) หลังทดสอบผ่านครบ —
   CK1024 ไปทดสอบเองต่อ ไม่มีงานฝั่ง Claude Code ต่อในรอบนี้
+
+## [2026-07-29] Commit F.4 pipeline wiring — เฉพาะโค้ด 4 ไฟล์ (ยังไม่รวมเอกสารสถานะ)
+
+- ทำ: หลังทดสอบผ่าน Test deployments ครบ (HOR-ORR-04 + SettingOutTest_Part_2.csv
+  ยืนยันตามรายละเอียดในหัวข้อ commit message) เขียน commit message ผ่าน
+  bash heredoc ไปที่ `.git/smt_commit_msg.txt` (2 รอบ — รอบแรกพบว่าอ้างถึง
+  TestDrive.js ราวกับเป็นไฟล์ git-tracked ทั้งที่จริงเป็นไฟล์ clasp-folder
+  เท่านั้น ไม่เคย track ใน git ตั้งแต่แรก แก้บรรทัดนั้นแล้วเขียนทับใหม่ทั้งไฟล์
+  ด้วย heredoc ตามคำสั่งผู้ใช้ ไม่ใช้ Edit tool) ตรวจ `cat -A` ผ่านทั้ง 2 รอบ
+  (LF ล้วน ไม่มี CRLF ปน) — `git add` เฉพาะ 4 ไฟล์ตามคำสั่งชัดเจนของผู้ใช้
+  (`GS_Pipeline.gs`, `GS_SheetExport.gs`, `Index.html`, `session_logs/latest.md`)
+  ไม่แตะ `DEPENDENCY_MAP.md`/`PROJECT_STATE.md` (คนละ commit ตามที่สั่ง) —
+  ส่งผล `git status` + `git diff --cached --stat` ให้ Claude (แชท) ตรวจก่อน
+  commit จริง
+- คำสั่ง: heredoc เขียน `.git/smt_commit_msg.txt` (2 รอบ), `cat -A
+  .git/smt_commit_msg.txt`, `git add reference/gsheet/GS_Pipeline.gs
+  reference/gsheet/GS_SheetExport.gs reference/gsheet/Index.html
+  session_logs/latest.md`, `git status`, `git diff --cached --stat`,
+  `git commit -F .git/smt_commit_msg.txt`, `git log -1 --oneline`
+- ผล: PASS — commit `51f3818` (4 files changed, 294 insertions(+), 2
+  deletions(-))
+- commit: `51f3818`
+- หมายเหตุ: ยังไม่ push (ผู้ใช้ยังไม่สั่ง) — `DEPENDENCY_MAP.md`/
+  `PROJECT_STATE.md` (อนุมัติแล้วจาก Claude (แชท) ตาม entry 12:25) ยังรอ
+  commit แยกต่างหากตามคำสั่งผู้ใช้ ไม่รวมในรอบนี้
+
+## [2026-07-29] Docs commit — DEPENDENCY_MAP.md + PROJECT_STATE.md (หลัง Claude (แชท) อนุมัติไฟล์จริง)
+
+- ทำ: เขียนทับ `PROJECT_STATE.md` เต็มไฟล์ด้วย Write tool ตรงๆ (ไม่ผ่าน Edit)
+  ตามเนื้อหาที่ Claude (แชท) ร่างมา ส่ง `git diff PROJECT_STATE.md` ให้ตรวจ
+  ก่อน — CK1024 อัปโหลดไฟล์จริงกลับไปให้ Claude (แชท) ตรวจรอบสุดท้ายจนอนุมัติ
+  แล้ว จากนั้นเขียน commit message ผ่าน bash heredoc ไปที่
+  `.git/smt_commit_msg.txt` (3 รอบ — รอบแรก/สองไม่มีบรรทัดว่างคั่นระหว่าง
+  หัวข้อกับ bullet แรกจริง ทั้งที่เนื้อหาที่พิมพ์ดูเหมือนมี แก้ให้เขียนทับใหม่
+  จนรอบสามตรวจ `cat -A` เห็นบรรทัดว่าง (`$` โดดๆ) คั่นอยู่จริง) — `git add`
+  เฉพาะ 2 ไฟล์ (`DEPENDENCY_MAP.md`, `PROJECT_STATE.md`) ไม่แตะ
+  `session_logs/latest.md` ที่มี entry ค้างจากรอบก่อน — ส่งผล `git status` +
+  `git diff --cached --stat` ให้ Claude (แชท) ตรวจก่อน commit จริง
+- คำสั่ง: Write เขียนทับ `PROJECT_STATE.md`, `git diff PROJECT_STATE.md`,
+  heredoc เขียน `.git/smt_commit_msg.txt` (3 รอบ), `cat -A
+  .git/smt_commit_msg.txt`, `git add DEPENDENCY_MAP.md PROJECT_STATE.md`,
+  `git status`, `git diff --cached --stat`, `git commit -F
+  .git/smt_commit_msg.txt`, `git log -1 --oneline`
+- ผล: PASS — commit `0656528` (2 files changed, 88 insertions(+), 41
+  deletions(-))
+- commit: `0656528`
+- หมายเหตุ: local ahead ของ `origin/main` ตอนนี้ 2 commits (`51f3818` feat +
+  `0656528` docs) ยังไม่ push — `session_logs/latest.md` ยังมีการแก้ค้างอยู่
+  (entry บันทึกผล commit ก่อนหน้า + entry นี้เอง) ยังไม่ commit รอคำสั่งถัดไป
+
+## [2026-07-29] Commit ก้อนที่ 3 — เติม hash placeholder ของ docs commit เอง (0656528) ลง PROJECT_STATE.md
+
+- ทำ: เขียนทับ `PROJECT_STATE.md` เต็มไฟล์ด้วย Write tool ตรงๆ อีกรอบ (ไม่ผ่าน
+  Edit) เติม hash `0656528` แทน placeholder ที่ตอน commit `0656528` เอง
+  ยังไม่รู้ค่าจริง (เทคนิคเดียวกับที่เคยทำกับ `b6c7eac`→`2e0c340` ของ F.3) —
+  ส่ง `git diff PROJECT_STATE.md` ให้ตรวจก่อน จากนั้นเขียน commit message
+  ผ่าน bash heredoc ไปที่ `.git/smt_commit_msg.txt` (2 รอบ — รอบแรกไม่มี
+  บรรทัดว่างคั่น subject/body จริง แก้ให้เขียนทับใหม่) ตรวจ `cat -A` พบ
+  `M-BM-'6`/`M-bM-^@M-^T` (escape ของ `§`/em-dash) จึง `xxd` ตรวจ byte จริง
+  ยืนยันว่าเข้ารหัส UTF-8 ถูกต้องสมบูรณ์ (`§`=`c2 a7`, em-dash=`e2 80 94`) —
+  ไม่ใช่ไฟล์เพี้ยน แค่พฤติกรรมปกติของ `cat -A` กับไบต์ non-ASCII — `git add
+  PROJECT_STATE.md` แล้วส่งผลให้ Claude (แชท) ตรวจก่อน commit จริง
+- คำสั่ง: Write เขียนทับ `PROJECT_STATE.md`, `git add PROJECT_STATE.md`,
+  heredoc เขียน `.git/smt_commit_msg.txt` (2 รอบ), `cat -A
+  .git/smt_commit_msg.txt`, `xxd .git/smt_commit_msg.txt`, `git commit -F
+  .git/smt_commit_msg.txt`, `git log -3 --oneline`
+- ผล: PASS — commit `a6bd9f6` (1 file changed, 12 insertions(+), 12
+  deletions(-))
+- commit: `a6bd9f6`
+- หมายเหตุ: local ahead ของ `origin/main` ตอนนี้ 3 commits (`51f3818` feat,
+  `0656528` docs, `a6bd9f6` hash-fill) ยังไม่ push — รอคำสั่งถัดไป
+
+## [2026-07-29] Push F.4 ทั้ง 3 commit ขึ้น origin/main
+
+- ทำ: push commit ทั้ง 3 ก้อนของ Session F.4 (`51f3818` feat, `0656528` docs,
+  `a6bd9f6` hash-fill) ขึ้น `origin/main` ตามคำสั่งผู้ใช้โดยตรง
+- คำสั่ง: `git push origin main`
+- ผล: PASS — `2e0c340..a6bd9f6 main -> main`
+- commit: (push ไม่ใช่ commit ใหม่ — เป็นแค่ sync ของ 3 commit ที่มีอยู่แล้ว
+  ไปยัง remote)
+- หมายเหตุ: `origin/main` และ local `main` ตรงกันแล้วที่ `a6bd9f6` — F.4 ปิด
+  จบสมบูรณ์ทั้งโค้ด+เอกสาร+push ขั้นต่อไปคือ F.5 (Deploy web app จริง)
+
+## [2026-08-01] Session F.5 ส่วน A (error handling) + ส่วน B (deploy guide) — commit
+
+- ทำ: ทำตามแผนที่อนุมัติแล้ว (`session_logs/plan_20260729_1933.md`) ครบทั้ง 2
+  ส่วน — ส่วน A แก้ `reference/gsheet/Index.html` เพิ่มฟังก์ชัน pure
+  `getFriendlyMessage()` (ไล่ regex 8 เคสตามตาราง A.3 ของแผน เรียงจากเฉพาะเจาะจง
+  ไปหา catchall) และปรับ `showError()` ให้แสดงข้อความ friendly ก่อน ตามด้วย
+  `<details>` แบบพับเก็บป้ายกำกับ "รายละเอียดทางเทคนิค (สำหรับแจ้งผู้ดูแลระบบ)"
+  เก็บ raw error message เดิมไว้ครบทุกตัวอักษร (ไม่แตะไฟล์ `.gs` ใดๆ ตามแผน) —
+  ส่วน B สร้างไฟล์ใหม่ `docs/DEPLOY_GUIDE.md` คู่มือภาษาไทย 4 ขั้นตอน (ทำสำเนา →
+  deploy เป็น New deployment → ขอสิทธิ์เข้าถึง Google Sheet → เปิดใช้งาน) เน้น
+  เตือนเรื่อง "Who has access = Only myself" เป็นค่าเริ่มต้นเสมอ และห้ามใช้ Test
+  deployments
+- ทดสอบ: (1) คัดลอก `getFriendlyMessage()` ไปรันแยกด้วย Node ป้อน raw message
+  ครบทั้ง 8 เคสตามตาราง A.3 ของแผน — ผ่านครบ 8/8 ตรงกับข้อความที่ออกแบบไว้ (ลบ
+  scratchpad script ทิ้งหลังทดสอบผ่าน ไม่ commit) (2) รัน
+  `node reference/gsheet/smoke_test.js` ยืนยันไม่กระทบของเดิม ผ่าน 23/23 (3)
+  ทดสอบ error banner จริงในเบราว์เซอร์ — เจอ catchall case จริงระหว่างทดสอบ (ไม่
+  ตรง 8 เคสที่ออกแบบไว้ล่วงหน้า) banner แสดงข้อความ friendly ถูกต้อง +
+  รายละเอียดทางเทคนิคเก็บ raw message ไว้ครบใน `<details>` — CK1024 ตัดสินใจว่า
+  เพียงพอแล้วสำหรับ A.6 ข้อ 3 ไม่ต้องบังคับให้เกิด 2 เคสที่วางแผนไว้เดิม (tab not
+  found / permission) อีก
+- คำสั่ง: `node` (scratchpad script ทดสอบ 8 เคส), `node
+  reference/gsheet/smoke_test.js`, ทดสอบ manual banner ในเบราว์เซอร์จริง
+- ผล: PASS ทั้งหมด (8/8 mapping cases, 23/23 smoke test, banner จริงถูกต้อง)
+- commit: (placeholder — ทราบค่าจริงหลัง commit รอบนี้ จะเติมใน entry แยกภายหลัง
+  ถ้าจำเป็น เหมือนที่เคยทำกับ `PROJECT_STATE.md` ใน F.4)
+- หมายเหตุ: **บั๊กค้างพบระหว่างทดสอบ (บันทึกไว้ก่อนตามคำสั่ง CK1024 — ยังไม่แก้ ยก
+  ไป session ถัดไป)** — เกิด `TypeError: Cannot read properties of undefined
+  (reading 'n')` ตอนเลือก sheet/tab ที่ว่างเปล่าไม่มีข้อมูล ไม่เข้าเคสไหนใน 8
+  เคส raw→friendly ที่ออกแบบไว้ ตกไปที่ catchall ซึ่งทำงานถูกต้องตามที่ออกแบบ
+  (แสดง friendly message + raw message ครบ) แต่ root cause ของ TypeError เอง
+  (แถวไหนใน `.gs` ที่พยายามอ่าน `.n` จาก object undefined) ยังไม่ได้สืบ ยังไม่แก้
+  — ยังไม่ push (รอ CK1024 ส่ง commit hash ให้ Claude (แชท) อนุมัติก่อน)
