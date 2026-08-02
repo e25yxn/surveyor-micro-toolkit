@@ -1811,3 +1811,157 @@
 - หมายเหตุ: F.5 ส่วน A+B ปิดจบสมบูรณ์ทั้งโค้ด+เอกสาร+push — บั๊กค้าง TypeError
   (อ่าน `.n` จาก undefined ตอนเลือก sheet/tab ว่าง) ยังไม่แก้ ยกไป session ถัดไป
   ตามที่บันทึกไว้ใน entry ก่อนหน้า
+
+## [2026-08-02 08:00] F.6.1 — สืบ root cause บั๊ก TypeError "reading 'n'" (read-only)
+
+- ทำ: ไล่โค้ด `runFullPipeline()` (GS_Pipeline.gs) → `GS_TableSplitter
+  .splitMixedAlignmentTable` → `GS_PiTableParser.parsePiTable` →
+  `GS_AlignmentBuilder.buildFromPI` เพื่อหาจุดที่อ่าน `.n` จาก object
+  undefined เมื่อเลือก sheet/tab ที่ว่างเปล่า จากนั้นเขียน synthetic repro
+  script ชั่วคราว (`reference/gsheet/_repro_empty_sheet.js`, ลบทิ้งหลังยืนยัน
+  ผ่าน ไม่ commit) จำลอง sheet ว่าง 2 แบบ: (1) `[['']]` (blank cell เดียว
+  ตามที่ `getDataRange().getValues()` ของ Google Sheets คืนค่าจริงสำหรับชีตที่
+  ว่างสนิท) และ (2) มีแค่ header row ไม่มีข้อมูลเลย ป้อนทั้งสองแบบผ่าน pipeline
+  เดียวกันแบบ local (Node, `require()` ตรงไฟล์ .gs เหมือน smoke_test.js เดิม)
+  ยันได้ error message + stack trace ตรงกับที่เจอจริงทุกตัวอักษร
+- root cause: `GS_AlignmentBuilder.gs:131` — `buildFromPI(vertices)` เข้าถึง
+  `vertices[0].n` ทันทีโดยไม่เช็คว่า `vertices` ว่างก่อน เมื่อ sheet ว่างเปล่า
+  (ไม่มีแถวข้อมูล มีแค่ header หรือไม่มีอะไรเลย) `GS_PiTableParser.parsePiTable`
+  จะคืน `vertices = []` ถูกต้องแล้ว (ไม่ throw เพราะ loop `for r=1` ไม่มีรอบให้วน)
+  แต่ `buildFromPI` ไม่ได้เช็ค `N === 0` ก่อนเข้าถึง `vertices[0]` จึงได้
+  `undefined.n` → TypeError หลุดออกไปเป็น raw message ที่ `getFriendlyMessage()`
+  ใน Index.html ไม่มี pattern ไหนจับ (ตกไปที่ catchall ซึ่งทำงานถูกต้องอยู่แล้ว
+  แต่ผู้ใช้ไม่ได้ข้อความที่มีความหมาย)
+- คำสั่ง: `node reference/gsheet/_repro_empty_sheet.js` (สร้าง-รัน-ลบ script
+  ชั่วคราว, ไม่แตะไฟล์ `.gs` จริงเลยตามที่ตกลง read-only)
+- ผล: PASS — reproduce error message เดียวกันเป๊ะทั้ง 2 เคส
+  (`TypeError: Cannot read properties of undefined (reading 'n')` ที่
+  `GS_AlignmentBuilder.gs:131:33`)
+- commit: — (read-only investigation ไม่มีการแก้โค้ด)
+- หมายเหตุ: เสนอแนวทางแก้ 3 ข้อ (เช็ค `vertices.length === 0`, throw error
+  ภาษาไทยที่มีความหมาย, เพิ่ม/จับคู่ pattern ใน `ERROR_MESSAGE_MAP` ของ
+  Index.html) ให้ Claude (แชท) รีวิวก่อนตามวงจร Plan-Review-Approve — ยังไม่ลง
+  มือแก้โค้ดจริง
+
+## [2026-08-02 09:15] F.6.2 — แก้บั๊ก TypeError "reading 'n'" ตามแผน plan_20260802_0834.md
+
+- ทำ: แก้ 2 ไฟล์ตามแผนที่อนุมัติแล้ว ไม่มีอะไรนอกขอบเขต —
+  (1) `reference/gsheet/GS_AlignmentBuilder.gs:128-137` เพิ่ม guard
+  `if (N < 2) throw new Error(...)` ต้นฟังก์ชัน `buildFromPI()` ก่อนเข้าถึง
+  `vertices[0]` — throw ข้อความไทย "ไม่พบข้อมูล alignment ที่ครบถ้วนในตารางนี้ —
+  ต้องมีอย่างน้อยจุดเริ่ม (BP) และจุดจบ (EP) กรุณาตรวจสอบว่ากรอกข้อมูลครบหรือไม่"
+  (2) `reference/gsheet/Index.html` ERROR_MESSAGE_MAP เพิ่ม entry ใหม่ (index 1,
+  ต่อจาก pattern "ไม่พบ tab") จับข้อความข้างต้นด้วย regex
+  `/^ไม่พบข้อมูล alignment ที่ครบถ้วนในตารางนี้/` คืน friendly message ภาษาไทย
+  ที่แนะนำให้ตรวจสอบไฟล์/แท็บหรือกรอก BP/EP ให้ครบ — ตรวจแล้วว่า
+  `GS_Pipeline.gs:30` เรียก `buildFromPI` ตรงๆ ไม่มี try/catch ห่อระหว่างทาง
+  ข้อความ error เดินทางถึง client โดยไม่ถูกตัด/ต่อเพิ่มเลย (ตามที่ CK1024 ขอให้
+  เช็คเป็นพิเศษ)
+- คำสั่ง/ทดสอบ: (1) `node reference/gsheet/smoke_test.js` → 23/23 ผ่านเหมือนเดิม
+  ไม่ regression (2) script ชั่วคราว `_verify_f62_guard.js` (สร้าง-รัน-ลบ ไม่
+  commit) ทดสอบ `buildFromPI` 3 เคสตรงตามตาราง input→output ในแผน: N=0 throw,
+  N=1 throw (ข้อความเดียวกัน), N=2 ปกติไม่ throw ผ่านครบ 3/3 พร้อมทดสอบ
+  `getFriendlyMessage()` (ดึง ERROR_MESSAGE_MAP จริงจาก Index.html มา eval ตรงๆ
+  ไม่พิมพ์มือใหม่) ยืนยัน raw message ใหม่ map ไป entry index 1 ที่เพิ่ม ไม่ตกไป
+  catchall + regression check pattern "tab not found" เดิมยังตรง index 0
+  เหมือนเดิม (3) รัน end-to-end ผ่าน chain จริง (splitter→parser→builder,
+  inline node -e, ไม่แก้ไฟล์) ป้อน sheet ว่างสนิท `[['']]` และ header-only —
+  ทั้งคู่ throw ข้อความใหม่ตรงตามที่ออกแบบ ไม่ใช่ TypeError อีกต่อไป (4)
+  `python -m pytest -q` → 504 passed ไม่กระทบฝั่ง Python เลย (ไม่ได้แตะไฟล์
+  Python ตามขอบเขตแผน)
+- ผล: PASS ทั้งหมด — 23/23 smoke test, 504 passed pytest, 3/3 guard cases,
+  friendly-message mapping ถูกต้อง, end-to-end chain ยืนยันแล้ว
+- commit: — (ยังไม่ commit — รอ CK1024 อัปโหลดไฟล์จริงจากดิสก์ให้ Claude
+  (แชท) ตรวจก่อนตามที่สั่ง จะไม่ clasp push จนกว่าจะได้รับอนุมัติ)
+- หมายเหตุ: browser test จริง (ข้อ 4 ใน test plan เดิม — เลือก sheet/tab ว่าง
+  จริงแล้วดู banner) ยังไม่ได้ทำ เพราะ CK1024 สั่งให้หยุดรอตรวจไฟล์ก่อน
+  clasp push — ต้องรอ push ขึ้น Apps Script ก่อนถึงจะทดสอบจริงในเบราว์เซอร์ได้
+
+## [2026-08-02 09:30] F.6.2 — คัดลอกไฟล์ที่อนุมัติแล้วไปโฟลเดอร์ clasp
+
+- ทำ: คัดลอก 2 ไฟล์ที่ Claude (แชท) อนุมัติสุดท้ายแล้วจาก repo ไปยัง
+  `D:/MyClasp_SMT_DEMO/` เตรียม push (ยังไม่ push — รอ CK1024 รันเองในเทอร์มินัล
+  จริงตามขั้นตอน F.5 หลีกเลี่ยงปัญหา non-TTY):
+  `reference/gsheet/Index.html` → `D:/MyClasp_SMT_DEMO/Index.html`,
+  `reference/gsheet/GS_AlignmentBuilder.gs` → `D:/MyClasp_SMT_DEMO/GS_AlignmentBuilder.js`
+  (เปลี่ยนนามสกุลเป็น .js ตามที่ clasp ใช้อยู่แล้วในโฟลเดอร์นั้น)
+- คำสั่ง: `cp` ทั้งสองไฟล์ ตามด้วย `diff` เทียบต้นทาง-ปลายทางทั้งคู่
+- ผล: PASS — `diff` ว่างเปล่าทั้งสองคู่ (IDENTICAL) ยืนยันคัดลอกถูกต้อง
+  ไม่มีตัวอักษรตกหล่นหรือ encoding เพี้ยน
+- commit: — (ยังไม่ commit ใน repo หลัก — ยังไม่ clasp push ตามที่ CK1024 สั่งให้
+  รอรันเองในเทอร์มินัลจริง)
+- หมายเหตุ: ขั้นถัดไปรอ CK1024 รัน `clasp push` เองจากเทอร์มินัลจริงที่
+  `D:/MyClasp_SMT_DEMO/` แล้วทดสอบจริงในเบราว์เซอร์ (เลือก sheet/tab ว่างเปล่า
+  ดู banner ข้อความใหม่) ก่อนจะกลับมา commit ที่ repo หลัก
+
+## [2026-08-02] F.6.3 — สืบ prefix "Error: " ที่ทำให้ banner ยังเป็น catchall (read-only)
+
+- ทำ: CK1024 ทดสอบจริงในเบราว์เซอร์แล้วเจอ banner ยังเป็น catchall ทั้งที่
+  raw message ตรงกับ pattern index 1 ที่เพิ่งเพิ่มใน F.6.2 — สังเกตว่า raw
+  message มี "Error: " นำหน้า (Error: ไม่พบข้อมูล alignment...) ซึ่งไม่มี
+  ตอนทดสอบผ่าน Node ขอให้สืบ 2 เรื่องก่อนแก้: (1) grep ทุก pattern ใน
+  ERROR_MESSAGE_MAP (Index.html:115-168) ว่าใช้ ^ anchor กี่ตัว → พบ 4/7
+  ตัวมี ^ (tab not found, alignment ครบถ้วน, invalid numeric cell, PI
+  compound sub-row) — ทั้ง 4 ตัวตรงกับ pattern ที่จับ throw new Error(...)
+  ข้อความ custom ที่เขียนเอง ส่วน 3 ตัวที่ไม่มี anchor (อยู่นอกแนวเส้นทาง/
+  scanRawRows_/permission) เป็น substring search รอดจาก prefix โดยบังเอิญ
+  (2) grep catch\s*\( ทั้งโฟลเดอร์ reference/gsheet/ → ไม่เจอ try/catch
+  เลยสักจุดในทั้งสาย GS_Pipeline.gs → GS_TableSplitter → GS_PiTableParser
+  → GS_AlignmentBuilder → GS_Alignment/GS_CrossCheck ตัดสาเหตุจากโค้ด .gs
+  ที่เขียนเองออกได้ (ไม่ใช่บั๊กแบบ throw new Error(e) wrap ซ้ำ) เหลือ
+  สมมติฐานว่า prefix มาจาก runtime bridge ของ google.script.run เอง
+  (Google inject เข้ามา ไม่อยู่ใน repo) ตอน reconstruct Error object ฝั่ง
+  client — ยังไม่ยืนยันด้วยเบราว์เซอร์จริง เพราะ Chrome extension ไม่ได้
+  เชื่อมต่อในรอบนี้ (tabs_context_mcp ตอบว่า extension not connected)
+  เตรียม devtools snippet + 3 เคสทดสอบ (custom Error 2 แบบต่างข้อความ +
+  native GAS exception จากไฟล์ไม่มีสิทธิ์/fileId ปลอม) ให้ CK1024 ทดสอบเอง
+  แทน เสนอแนวทางแก้ 2 ทาง (A: strip prefix /^[A-Za-z]+:\s*/ ต้น
+  getFriendlyMessage() ก่อน match — แนะนำ, B: ถอด ^ ออกจาก 4 pattern)
+  รอผลทดสอบเบราว์เซอร์ยืนยัน format ก่อนเขียนแผนจริง
+- คำสั่ง: grep -n "ERROR_MESSAGE_MAP|withFailureHandler|showError|catch(",
+  อ่าน Index.html เต็มส่วน error handling, grep -rn "throw new Error",
+  grep -rn "catch\s*(" ทั้งโฟลเดอร์ reference/gsheet/, อ่าน GS_Pipeline.gs
+  เต็มไฟล์, tabs_context_mcp (ตรวจว่ามี Chrome connection ไหม — ไม่มี)
+- ผล: เสร็จเฉพาะข้อ 2 เต็มรูป (4/7 pattern มี ^) — ข้อ 1 (ยืนยัน prefix จริง
+  ในเบราว์เซอร์) ทำไม่ได้เพราะไม่มี Chrome connection ส่งต่อให้ CK1024
+  ทดสอบเองตาม snippet/เคสที่เตรียมไว้
+- commit: — (read-only investigation ไม่มีการแก้โค้ด)
+- หมายเหตุ: รอ CK1024 ทดสอบ 3 เคสในเบราว์เซอร์จริงแล้วส่งผล err.name/
+  err.message/err.toString() ดิบกลับมาให้ Claude (แชท) ตรวจก่อนจะเขียนแผน
+  แก้จริงตามวงจร Plan-Review-Approve
+
+## [2026-08-02 12:28] F.6.3 — implement (strip prefix + regression test), copy ไป clasp, ยืนยันเบราว์เซอร์จริงผ่านแล้ว
+
+- ทำ: implement แผน plan_20260802_1107.md ที่อนุมัติแล้ว (แก้จุดเดียวตามที่
+  Claude (แชท) ท้วงก่อน — extraction regex ต้อง anchor กับ indent จริง 4
+  ช่องว่าง ไม่ใช่เดาว่าไม่มี indent) — (1) ทดลอง extraction logic แยกต่างหาก
+  ก่อนด้วย inline node -e ยืนยันว่า regex /var ERROR_MESSAGE_MAP = \[[\s\S]*?
+  \n    \];/ กับ /function getFriendlyMessage\(rawMessage\) \{[\s\S]*?\n
+  \}/ จับช่วงถูกต้องจริงกับไฟล์จริง (54 บรรทัด, ERROR_MESSAGE_MAP.length=7,
+  reproduce บั๊กเดิมได้ตรงก่อนแก้) (2) แก้ reference/gsheet/Index.html —
+  เพิ่ม matchMessage = rawMessage.replace(/^[A-Za-z]+:\s*/, '') ต้น
+  getFriendlyMessage() ก่อนวนลูป ERROR_MESSAGE_MAP ไม่แตะ rawMessage ตัวเต็ม
+  ที่โชว์ใน "รายละเอียดทางเทคนิค" (3) สร้าง reference/gsheet/
+  test_error_message_map.js ไฟล์ทดสอบถาวรใหม่ (ไม่ใช่ scratch) ดึง
+  ERROR_MESSAGE_MAP/getFriendlyMessage จริงจาก Index.html มา eval ตรงๆ
+  ด้วย extraction regex ที่ยืนยันแล้ว ทดสอบ 7 เคสตามตารางในแผน (ครอบทั้ง
+  anchored/non-anchored pattern, มี/ไม่มี prefix, embedded-colon safety
+  ของ pattern invalid numeric cell) (4) copy Index.html ที่อนุมัติแล้วไป
+  D:/MyClasp_SMT_DEMO/Index.html, diff ยืนยัน IDENTICAL 2 รอบ (รอบแรกหลัง
+  copy, รอบสองก่อน CK1024 ทดสอบเบราว์เซอร์ กัน state เปลี่ยนระหว่างรอ)
+- คำสั่ง: node -e (extraction dry-run), node test_error_message_map.js,
+  node smoke_test.js, python -m pytest -q, cp Index.html ไป
+  D:/MyClasp_SMT_DEMO/, diff (2 รอบ)
+- ผล: PASS ทั้งหมด — extraction dry-run ถูกต้อง, test_error_message_map.js
+  8/8 (รวม sanity check ERROR_MESSAGE_MAP.length=7), smoke_test.js 23/23
+  ไม่ regression, pytest 504 passed ไม่กระทบฝั่ง Python, diff ทั้ง 2 รอบว่าง
+  เปล่า (IDENTICAL) — CK1024 รัน clasp push เองแล้ว hard-refresh เบราว์เซอร์
+  ทดสอบ Sheet4 (empty sheet เคสเดิมที่เจอบั๊ก) ซ้ำ: banner แสดง friendly
+  message ถูกต้องตามที่ออกแบบแล้ว ("ชีต/แท็บนี้ยังไม่มีข้อมูล alignment
+  ครบถ้วน...") ไม่ใช่ catchall อีกต่อไป — ยืนยันทั้ง F.6.2 (guard N<2 กัน
+  TypeError) และ F.6.3 (strip prefix กัน pattern miss) ทำงานร่วมกันถูกต้อง
+  ในสภาพแวดล้อมจริง
+- commit: (รอ — กำลังจะ commit รวม F.6.1+F.6.2+F.6.3 เป็นก้อนเดียวใน entry
+  ถัดไป เพราะ F.6.2 ใช้งานไม่ได้จริงจนกว่าจะมี F.6.3 มาแก้ prefix ด้วย)
+- หมายเหตุ: ขั้นต่อไปคือ git add เฉพาะไฟล์ที่เกี่ยวข้อง + commit
+  ผ่าน heredoc ตามมาตรฐาน แล้วส่ง hash ให้ Claude (แชท) อนุมัติก่อน push

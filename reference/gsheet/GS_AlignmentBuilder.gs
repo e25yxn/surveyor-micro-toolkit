@@ -128,6 +128,12 @@ var GS_AlignmentBuilder = (function () {
   function buildFromPI(vertices) {
     var els = [], control = [], issues = [];
     var N = vertices.length;
+    if (N < 2) {
+      throw new Error(
+        'ไม่พบข้อมูล alignment ที่ครบถ้วนในตารางนี้ — ต้องมีอย่างน้อยจุดเริ่ม ' +
+        '(BP) และจุดจบ (EP) กรุณาตรวจสอบว่ากรอกข้อมูลครบหรือไม่'
+      );
+    }
     var prev = { n: vertices[0].n, e: vertices[0].e, sta: vertices[0].sta };
     control.push({ name: 'BP', sta: prev.sta, n: prev.n, e: prev.e });
 

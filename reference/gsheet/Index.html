@@ -121,6 +121,14 @@
         }
       },
       {
+        test: /^ไม่พบข้อมูล alignment ที่ครบถ้วนในตารางนี้/,
+        friendly: function () {
+          return 'ชีต/แท็บนี้ยังไม่มีข้อมูล alignment ครบถ้วน — ตรวจสอบว่าเลือก ' +
+            'ไฟล์/แท็บถูกต้อง หรือกรอกข้อมูลจุดเริ่ม (BP) และจุดจบ (EP) ให้ครบก่อน ' +
+            'กดคำนวณ';
+        }
+      },
+      {
         test: /^invalid numeric cell: "(.*)"$/,
         friendly: function (m) {
           return 'พบข้อมูลตัวเลขที่อ่านไม่ได้ในตาราง ("' + m[1] + '") — ' +
@@ -160,8 +168,13 @@
     ];
 
     function getFriendlyMessage(rawMessage) {
+      // google.script.run เติม prefix ชื่อ error class (เช่น "Error: ") หน้า
+      // rawMessage เสมอเมื่อ exception เดินทางข้าม server->client boundary จริง
+      // (ไม่เกิดตอนเรียกฟังก์ชัน .gs ตรงๆ ผ่าน Node) — ตัดออกเฉพาะตอน match
+      // pattern เท่านั้น ไม่กระทบ rawMessage ตัวเต็มที่โชว์ใน "รายละเอียดทางเทคนิค"
+      var matchMessage = rawMessage.replace(/^[A-Za-z]+:\s*/, '');
       for (var i = 0; i < ERROR_MESSAGE_MAP.length; i++) {
-        var m = ERROR_MESSAGE_MAP[i].test.exec(rawMessage);
+        var m = ERROR_MESSAGE_MAP[i].test.exec(matchMessage);
         if (m) return ERROR_MESSAGE_MAP[i].friendly(m);
       }
       return 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุแน่ชัด — กรุณาลองใหม่อีกครั้ง ' +
