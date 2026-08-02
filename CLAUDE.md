@@ -46,6 +46,14 @@ SAFE - SMALL - STABLE - MODULAR.
 - Always add a roundtrip test where it applies (forward->inverse recovers input).
 - Run `pytest` (or `python dev_run_tests.py` if pytest is not installed yet).
 - Don't change public signatures of passing modules; add, don't break.
+- **Oracle correction exception**: ถ้าพบ defect จริงใน reference/*.gs เอง (ไม่ใช่แค่
+  python พอร์ตผิด) ผ่านการรีวิวอิสระ — Python ที่แก้แล้วเป็น oracle ใหม่สำหรับพฤติกรรมนั้น
+  reference/*.gs และ VBA ต้องตามแก้ทีหลัง ไม่ใช่กลับกัน ทุกครั้งที่ทำ: (1) บันทึกเหตุผล+
+  หลักฐานใน docs/extensions.md ตามความเข้มงวดเดียวกับ Extension policy ข้อ 3
+  (2) เพิ่ม dated entry ใน Known limits (3) golden fixture ที่ต้อง regenerate ให้ทำอย่าง
+  มีสติ+บันทึกเหตุผล ไม่ใช่แก้เงียบ (4) ต้องเพิ่ม test ใหม่เจาะจง edge case ที่เพิ่งพบ
+  ไม่ใช่แค่เช็ค test เดิมผ่าน (5) ระบุไว้ชัดว่า .gs/VBA ยัง divergence อยู่ รอ sync แยก
+  ต่างหาก ไม่ถือว่าปิดงานจนกว่าจะ sync
 
 ## Status
 All phases complete — 407/407 tests passing.
@@ -277,7 +285,7 @@ Claude Code ต้องทำสิ่งต่อไปนี้โดยอ�
 
 ---
 
-## ส่วนที่ 8 — Smoke test ก่อน push และ CLI naming
+## ส่วนที่ 8 — Smoke test, CLI naming, และ verify scripts
 
 ### Smoke test ก่อน push
 หลัง commit ทุกครั้งที่มีไฟล์ input จริง ต้องรัน smoke test ด้วยไฟล์จริงก่อน push เสมอ
@@ -286,23 +294,31 @@ Claude Code ต้องทำสิ่งต่อไปนี้โดยอ�
 - `station-to-coord`, `coord-to-station`, `cross-check`, `build`, `compare-drawing`, `fit-radius`
 - ห้ามใช้ตัวย่อ เช่น fwd, inv, xc
 
----
-
-## Model usage policy
-
-| งาน | model | mode |
-|-----|-------|------|
-| health check / log / git / audit | haiku | auto |
-| เขียน test / review / VBA module | sonnet | auto (ถ้าอนุมัติแล้ว) |
-| วางแผน (plan.md) | sonnet | plan → รอ Claude รีวิว |
-| พอร์ต algorithm ซับซ้อน | opus ชั่วคราว | plan → รอ Claude รีวิว |
+### Verify/scratch scripts (reproduce บั๊ก, before/after, ตรวจสมมติฐาน)
+- ห้ามฝัง script หลายบรรทัดใน `python -c "..."` — เปราะบางเวลาต้องโชว์ผ่าน
+  terminal/confirmation dialog (multi-line string ขาดหาย/พังได้ง่าย พิสูจน์แล้ว
+  2026-08-02)
+- ให้เขียนเป็นไฟล์ `.py` แยกต่างหากเสมอ เช่น `session_logs/tmp_verify_<เรื่อง>.py`
+  แล้วรันด้วย `python <ไฟล์นั้น>`
+- แสดง path ไฟล์ที่สร้างใน terminal ให้ชัดก่อนรัน เพื่อให้ตรวจไฟล์จริงได้ตรงๆ
+  ถ้าสงสัย ไม่ต้องอ่านจากคำสั่งยาวๆ บนหน้าจอ
+- Import ในสคริปต์ scratch ให้ใช้ `from smt....` เสมอ (ตรงกับที่ tests/ ใช้จริง เพราะ
+  แพ็กเกจติดตั้งแบบ editable `pip install -e .`) ห้ามใช้ `from src.smt....` —
+  ตอนรันเป็นไฟล์ `python <path>.py` (ต่างจาก `python -c`) Python ใส่โฟลเดอร์ของไฟล์
+  สคริปต์เข้า sys.path ไม่ใช่ project root ทำให้ `src.` หา module ไม่เจอ
+  (ModuleNotFoundError พิสูจน์แล้ว 2026-08-02 ดู tests/builders/test_alignment_builder.py:27-28)
 
 ---
 
 ## Extension policy
 
 1. ทุกฟีเจอร์ที่เกิน oracle ต้อง mark ด้วย comment `# EXTENSION: beyond oracle`
-2. ห้ามทำให้ test เดิมพัง
+2. ห้ามทำให้ test เดิมพังโดยไม่ตั้งใจ — ถ้าจำเป็นต้อง regenerate golden fixture
+   (tests/golden/tables.json, reference/tables.json) เพราะพิสูจน์แล้วว่าค่าเดิมผิด
+   (ดู Oracle correction exception ในหัวข้อ Oracle + testing) ให้ทำอย่างมีสติ:
+   บันทึกเหตุผล+ตัวอย่าง before/after ไว้ใน docs/extensions.md และ session_logs เสมอ
+   (แบบเดียวกับตอนแก้ COSINE 2026-07-05/07-11) — ห้าม regenerate เงียบๆ โดยไม่มีบันทึก
+   ว่าทำไมค่าถึงเปลี่ยน
 3. "ดีกว่า" ต้องพิสูจน์ด้วยเหตุผล + ที่มาคณิตศาสตร์/มาตรฐานวิศวกรรม
 4. งานปรับให้ตรง Civil 3D สำหรับ LandXML interop นับเป็น oracle อีกชั้นหนึ่ง แยกจาก reference .gs เดิม
    ต้องอ้างอิงไฟล์ Civil 3D ground truth จริงเสมอ ห้ามเดาสูตรจากความจำ
