@@ -207,7 +207,7 @@ smt fit-radius <pi_csv> <drawing_csv> [--fix PI1,PI2] [--tol 1e-6] [--max-iter 1
 ## Oracle Correction — build_alignment_from_pi Singular Deflection Guard
 
 **วันที่:** 2026-08-02
-**Commit:** `TBD` (เติมหลัง commit จริง)
+**Commit:** `454b55d`
 **ไฟล์:** `src/smt/builders/alignment_builder.py`
 **Tests:** `tests/builders/test_alignment_builder.py` class `TestNoCurvePI`
 (3 เคสใหม่: `test_collinear_pi_with_radius_no_error`,
