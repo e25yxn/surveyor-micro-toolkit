@@ -201,3 +201,109 @@ smt fit-radius <pi_csv> <drawing_csv> [--fix PI1,PI2] [--tol 1e-6] [--max-iter 1
 - ถ้าแบบให้ค่า 3 ทศนิยม: optimizer จะได้ R ที่ "แปลก" เล็กน้อย (เช่น 149.905 แทน 150)
   เพราะ compensate rounding — ใช้ R กลมๆ เดิมก็เพียงพอสำหรับงานส่วนใหญ่
 - IP (angle point, R=0) ถูก skip อัตโนมัติ ไม่ optimize
+
+---
+
+## Oracle Correction — build_alignment_from_pi Singular Deflection Guard
+
+**วันที่:** 2026-08-02
+**Commit:** `TBD` (เติมหลัง commit จริง)
+**ไฟล์:** `src/smt/builders/alignment_builder.py`
+**Tests:** `tests/builders/test_alignment_builder.py` class `TestNoCurvePI`
+(3 เคสใหม่: `test_collinear_pi_with_radius_no_error`,
+`test_reversal_pi_180deg_no_blowup`, `test_near_collinear_small_delta_still_solves`)
+**อ้างอิง:** `session_logs/review_src_smt_20260802.md` #1,
+`session_logs/plan_20260802_1904.md` + addendum
+
+### ประเภทงาน: Oracle correction exception (ไม่ใช่ Extension ปกติ)
+ต่างจาก EXT-001/002/003 ที่เป็นความสามารถใหม่ที่ oracle ไม่มี งานนี้แก้ **defect
+จริงในตัวสมการที่พอร์ตมาจาก oracle เอง** (สันนิษฐานว่า `reference/AlignmentBuilder.gs`
+มีการหารแบบเดียวกันไม่มี guard เพราะพอร์ตมาตรงๆ — ยังไม่ได้ตรวจ/แก้ไฟล์ .gs จริง
+ดูหัวข้อ "สถานะ .gs/VBA" ด้านล่าง) จึงไม่ใช้เลข EXT-00X ต่อ ตามกฎ "Oracle
+correction exception" ใน CLAUDE.md (เพิ่มเข้าไปพร้อมกันในรอบนี้)
+
+### Oracle limitation / defect ที่พบ
+`build_alignment_from_pi` แก้สมการ 2×2 หาจุดเริ่มโค้ง (TS/PC) ด้วย
+`d1 = (V.n·sin(az_out) − V.e·cos(az_out)) / sin(δ)` โดย **ไม่มี guard ใดๆ** ต่อ
+`sin(δ)` ที่เข้าใกล้ 0 — เกิดได้ 2 จุดเสมอ (δ ถูก normalize มาอยู่ใน `(−π, π]`
+แล้วจาก `calculate_angle_diff`):
+
+1. **δ≈0** (สามจุดเรียงเส้นตรงพอดี แต่ PI ยังระบุ R มาด้วย) → `ZeroDivisionError`
+   ดิบทันที (Python หาร 0.0/0.0 ตรงๆ ไม่ raise เป็น NaN แบบภาษาอื่น)
+2. **δ≈π** (มุมเบี่ยงหักกลับเกือบ 180°) → **ไม่ crash แต่เงียบสนิท** — geometry
+   ที่ได้ผิดมหาศาล (พิสูจน์จริงด้วย geometry ตัวอย่าง: station พุ่งไปเกือบ 4
+   พันล้านเมตร โดยไม่มี issue หรือ warning ใดๆ เลย) — อันตรายกว่ากรณีแรกมาก
+   เพราะผู้ใช้ไม่มีทางรู้ตัวว่า output ผิด
+
+### พิสูจน์ทางคณิตศาสตร์ (Extension policy ข้อ 3)
+เขียน `v_n, v_e` (end-displacement ของกลุ่มโค้งวงกลม) ในเทอมของ δ ได้
+`v_n = R sin(δ)`, `v_e = R(1−cos δ)` (สูตร chord มาตรฐาน) แทนใน d1:
+```
+d1 = R·sin(az_out) − R·[(1−cos δ)/sin δ]·cos(az_out)
+```
+
+**δ→0 (removable singularity):** `(1−cos δ)/sin δ → δ/2 → 0` ดังนั้น
+`d1 → R·sin(az_out)` — ค่าจำกัดเสมอทางคณิตศาสตร์ แต่ Python หาร 0.0/0.0 ตรงๆ
+ไม่ take limit ให้ — crash เฉพาะที่ δ เท่ากับ 0.0 ตรงเป๊ะ (float exact) ค่าใกล้ 0
+เพียงเล็กน้อย (δ~10⁻⁸) ยังคำนวณได้ปกติสมบูรณ์ (พิสูจน์จริงด้วย regression test)
+
+**δ→π (non-removable singularity):** ให้ `x = π−δ` (`x→0`), Taylor expansion
+รอบ π ให้ `d1 ≈ R·sin(az_out) − 2R·cos(az_out)/x` — พจน์ `1/x` พุ่งไม่จำกัดจริง
+**นี่คือ singularity เดียวกับสูตรมาตรฐานของ tangent length โค้งวงกลม**
+`T = R·tan(Δ/2)` ซึ่ง `tan(π/2)` ไม่นิยาม — อ้างอิงเดียวกับ EXT-001
+(*AASHTO A Policy on Geometric Design of Highways and Streets*, Green Book)
+โค้งที่มุมเบี่ยง 180° ไม่มีอยู่จริงในงานวิศวกรรมถนน (hairpin แคบสุดในภูเขาก็ยัง
+ต่ำกว่ามาก) — ไม่มีทางแก้สมการนี้ให้ได้ค่าที่สมเหตุสมผล
+
+### สิ่งที่แก้
+เพิ่ม guard ด้วย **2 เงื่อนไขอิสระ** (ไม่ใช่เงื่อนไขเดียว — ดูเหตุผลด้านล่าง)
+ก่อนถึงจุดหาร ถ้า trigger จะข้ามไปใช้เส้นทาง angle-point (tangent-tangent, ตั้งชื่อ
+control point ว่า `'IP'`) ที่มีอยู่แล้วจาก EXT-001 แทน พร้อม log คำเตือนใน
+`issues` (ไม่เงียบเหมือนเดิม):
+
+```python
+if subs and (
+    abs(math.sin(delta)) < fpmath.EPS                      # δ≈0
+    or abs(math.pi - abs(delta)) < _NEAR_PI_EPS             # δ≈π
+):
+```
+
+**ทำไมต้องแยก 2 เงื่อนไข ไม่ใช้ threshold เดียวร่วมกัน:** ลองแบบ threshold เดียว
+(`abs(sin(delta)) < fpmath.EPS`, EPS=1e-9) ครอบทั้งสองกรณีก่อน — ผ่าน regression
+test ของ δ≈0 (Case A/B) แต่ **ไม่ผ่าน** δ≈π (Case C จริง): `sin(δ)` ของ geometry
+ตัวอย่างที่ทำให้ station พุ่งเป็นพันล้านมีค่าจริง **1.9999999890696914×10⁻⁷**
+ใหญ่กว่า `fpmath.EPS`=1×10⁻⁹ ถึง ~200 เท่า — threshold แคบเกินไปสำหรับฝั่งนี้
+เพราะ `abs(sin(delta))` เป็นค่าเดียวที่แยกไม่ออกว่า δ ใกล้ 0 หรือใกล้ π (ทั้งคู่ทำ
+ให้ sin เข้าใกล้ 0 เหมือนกัน) ทั้งที่สอง singularity มี "รัศมีอันตราย" ต่างกันมาก
+ตามพิสูจน์ข้างต้น (removable vs non-removable) — ต้องวัด δ≈π ด้วยระยะห่างจาก π
+โดยตรง (`abs(math.pi - abs(delta))`) แยกเป็นเงื่อนไขที่สอง
+
+### ที่มาของ `_NEAR_PI_EPS = 1×10⁻⁴`
+ไม่ใช่ค่าที่เดาขึ้นมา — มาจาก noise floor จริงในงานสำรวจที่ CK1024 ยืนยันด้วย
+ไฟล์ Civil 3D ของตัวเอง: พิกัด input จากแบบปัดทศนิยม 3 ตำแหน่งตามธรรมเนียมงาน
+สำรวจ ทำให้เกิด rounding noise สะสมทั่วระบบ — เมื่อขยายทศนิยมพิกัดเป็น 15 ตำแหน่ง
+แล้วเช็คคู่จุด BP-PC ที่ควรเป็นจุดเดียวกันทางทฤษฎี พบว่าห่างกันจริง ~1×10⁻⁷ เมตร
+ทุกครั้งที่เช็ค (ไม่ใช่ครั้งเดียว) — นี่คือ noise floor จริงของระบบ
+
+`_NEAR_PI_EPS = 1×10⁻⁴` (~20 arcsec จาก π พอดี) อยู่เหนือ noise floor นี้ ~1,000
+เท่า (กันไม่ให้ noise ธรรมดาทำให้ curve จริงถูกเบี่ยงไป angle-point โดยไม่ตั้งใจ)
+และยังห่างจากมุมเบี่ยงของ hairpin โค้งจริงที่แคบที่สุดในงานวิศวกรรมถนน
+(~170-175°, เทียบเท่า ~0.087-0.17 rad จาก π) มาก — จึงไม่มีทางกิน design โค้งจริง
+ใดๆ เข้าไปในเส้นทาง angle-point โดยไม่ตั้งใจ ขณะที่ยังกว้างพอจับเคสจริงที่พบ
+(x≈2×10⁻⁷) ได้สบายๆ (ห่างจาก threshold ~500 เท่า)
+
+`fpmath.EPS` (1×10⁻⁹, generic — ไม่มีจุดประสงค์เฉพาะเจาะจงในโค้ดเบสก่อนหน้านี้)
+ยังใช้ร่วมสำหรับฝั่ง δ≈0 ตามเดิม เพราะ removable singularity ไม่ต้องการ
+threshold กว้าง — `_NEAR_PI_EPS` ประกาศแยกเป็นค่าคงที่ใหม่เฉพาะฝั่ง δ≈π เท่านั้น
+
+### Regression guarantee
+`pytest tests/builders/test_alignment_builder.py -v` → **69 passed** (66 เดิม +
+3 เคสใหม่: δ=0 พอดี มี R ระบุ, δ≈π มี R ระบุ, δ ใกล้ 0 มากแต่ไม่ trigger guard —
+ยืนยันว่า threshold ไม่กว้างเกินจนกิน legit curve) — `pytest -q` เต็มชุดยังไม่รัน
+ในขั้นตอนนี้ (รอตรวจก่อน commit)
+
+### สถานะ .gs/VBA — divergence ที่รู้ตัว ยังไม่ sync
+`reference/AlignmentBuilder.gs` และ `reference/vba/SMT_Alignment.bas` **ยังไม่ถูก
+แก้ตาม** — สันนิษฐานว่ามี division เดียวกันแบบไม่มี guard (พอร์ตมาจากที่เดียวกัน)
+แต่ยังไม่ได้ตรวจสอบ/ยืนยันจริง ถือเป็น known divergence ตามกฎ Oracle correction
+exception ข้อ 5 — งาน sync เป็นงานแยกต่างหาก ไม่ปิดจนกว่าจะ sync เสร็จ

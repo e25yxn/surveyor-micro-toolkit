@@ -332,6 +332,22 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
 # Public: builder
 # ---------------------------------------------------------------------------
 
+# Threshold for the delta≈π (180° reversal) branch of the singular-deflection
+# guard in build_alignment_from_pi (session_logs/plan_20260802_1904.md,
+# addendum). Deliberately much wider than fpmath.EPS (1e-9): the delta≈π
+# singularity is non-removable (d1 ~ 2R/(π−|delta|) as delta→π — see the plan),
+# so its "danger radius" in delta-space is far larger than the well-conditioned
+# delta≈0 case. 1e-4 rad (~20 arcsec off exact π) was set from a real-world
+# floor, not guessed: CK1024's own Civil 3D drawings round input coordinates to
+# 3 decimal places, and re-checking those same drawings at 15-decimal precision
+# shows BP/PC pairs that are meant to coincide sitting ~1e-7 m apart purely from
+# that rounding — 1e-4 rad sits ~1000x above that noise floor, while staying far
+# below the tightest real hairpin curves (~170-175° deflection, sin ≈ 0.087-0.17,
+# equivalent to ~0.09-0.17 rad off π) — see docs/extensions.md for the full
+# derivation.
+_NEAR_PI_EPS: float = 1e-4   # ~20 arcsec from exact pi
+
+
 def build_alignment_from_pi(vertices: list[dict[str, Any]]) -> BuildResult:
     """Build a horizontal alignment element list from a PI vertex polyline.
 
@@ -371,9 +387,36 @@ def build_alignment_from_pi(vertices: list[dict[str, Any]]) -> BuildResult:
         if issue:
             issues.append(f'PI#{v}: {issue}')
 
+        # EXTENSION: beyond oracle (Oracle correction exception, 2026-08-02, review
+        # session_logs/review_src_smt_20260802.md #1) — sin(delta)≈0 makes the 2x2
+        # tangent-intersection solve below singular in two distinct cases that need
+        # two independent checks, not one shared abs(sin(delta)) test (a single
+        # threshold on sin(delta) cannot tell "near 0" from "near π" apart, and the
+        # two singularities have very different danger radii — see the plan
+        # addendum): delta≈0 (collinear — a removable singularity: the analytic
+        # limit of d1 is finite, but Python's 0.0/0.0 division doesn't take limits,
+        # and the requested curve length R·|delta| is ≈0 anyway, so there is no real
+        # curve to place; fpmath.EPS is tight enough here since d1 stays
+        # well-conditioned all the way down to true float-zero) and delta≈π (180°
+        # reversal — a genuine, non-removable singularity: the same math as the
+        # standard circular-curve tangent-length formula T=R·tan(Δ/2), which is
+        # undefined at Δ=π; AASHTO Green Book, see EXT-001; d1 ~ 2R/(π−|delta|)
+        # diverges well before fpmath.EPS's radius, so this branch needs the much
+        # wider _NEAR_PI_EPS instead). Both fall back to the angle-point
+        # (tangent-tangent) path below instead of reaching the division. See
+        # docs/extensions.md and session_logs/plan_20260802_1904.md + its addendum.
+        if subs and (
+            abs(math.sin(delta)) < fpmath.EPS
+            or abs(math.pi - abs(delta)) < _NEAR_PI_EPS
+        ):
+            issues.append(
+                f'PI#{v}: มุมเบี่ยง {fpmath.rad_to_deg(delta):.6f}° ทำให้หาจุดเริ่มโค้งไม่ได้ '
+                '(sin(Δ)≈0 — เรียงเส้นตรงหรือหักกลับ 180°) ใช้ angle point (IP) แทนโค้งที่ระบุ'
+            )
+            subs = []
+
         # EXTENSION: beyond oracle — no-curve PI (angle point or collinear).
         # Emits a tangent element to the PI vertex, records it as 'IP', and continues.
-        # This also avoids ZeroDivisionError when det = sin(delta) = 0 (collinear case).
         if not subs:
             tan_len = wcb.calculate_distance_2d(prev_n, prev_e, vertex_n, vertex_e)
             sta_pi  = prev_sta + tan_len

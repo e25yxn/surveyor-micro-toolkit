@@ -135,6 +135,20 @@ All phases complete — 407/407 tests passing.
   session_logs/investigate_cosine_builder_mismatch_20260705.md,
   session_logs/investigate_build_curve_sub_elements_fix.md, docs/extensions.md EXT-003
 - spiral บวก compound ยังไม่รองรับ รอออกแบบ multicurve solver ก่อนตัดสินใจ
+- `build_alignment_from_pi` แก้แล้วเมื่อ 2026-08-02 (Oracle correction exception,
+  พบจาก session_logs/review_src_smt_20260802.md #1) — เดิมหารด้วย sin(delta)
+  ไม่มี guard: PI ที่เรียงเส้นตรงพอดี (delta=0, มี R ระบุ) ทำให้ ZeroDivisionError
+  crash ทันที ส่วน PI ที่หักกลับเกือบ 180° (delta≈π) ได้ geometry ขยะแบบเงียบ
+  (station พุ่งเป็นพันล้านเมตรโดยไม่มี issue เตือนเลย) ตอนนี้แก้ด้วย guard 2
+  เงื่อนไขอิสระ (ไม่ใช่ threshold เดียว — sin(delta) ค่าเดียวแยกไม่ออกว่าใกล้ 0
+  หรือใกล้ π): `fpmath.EPS`=1e-9 สำหรับ δ≈0 (removable singularity, ค่าเดิมพอ)
+  และ `_NEAR_PI_EPS`=1e-4 สำหรับ δ≈π (non-removable singularity เหมือนสูตร
+  tangent length มาตรฐาน T=R·tan(Δ/2) ที่ไม่นิยามที่ Δ=π ต้องการ threshold
+  กว้างกว่ามาก — ที่มาของ 1e-4 อ้างอิง noise floor จริงจาก Civil 3D ~1e-7m)
+  ทั้งสองกรณี fallback เป็น angle-point (IP) พร้อม log คำเตือน ดู
+  docs/extensions.md entry "Oracle Correction — build_alignment_from_pi
+  Singular Deflection Guard", session_logs/plan_20260802_1904.md + addendum —
+  `reference/AlignmentBuilder.gs`/VBA ยังไม่ sync ตาม (known divergence)
 
 ## Civil 3D Interop ground truth references
 - `smt-test1.xml` คือ Civil 3D export จริง 7 spiral types ที่ R=900 L=100

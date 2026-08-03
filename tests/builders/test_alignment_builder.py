@@ -656,6 +656,58 @@ class TestNoCurvePI:
                 f'Chain break E at boundary {i}→{i+1}'
             )
 
+    # ---- T-J: singular-deflection guard (review #1, session_logs/plan_20260802_1904.md) ----
+
+    def test_collinear_pi_with_radius_no_error(self):
+        # Same geometry as test_collinear_pi_no_error, but the PI carries an R
+        # value — before the fix this raised ZeroDivisionError (sin(delta)=0
+        # with a non-empty curve group); now it falls back to an angle point.
+        verts = [
+            {'n': 0.0,    'e': 0.0, 'sta': 0.0},
+            {'n': 500.0,  'e': 0.0, 'R': 200.0},   # collinear, R specified
+            {'n': 1000.0, 'e': 0.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'T']
+        assert [c.name for c in r.control] == ['BP', 'IP', 'EP']
+        assert math.isclose(r.control[1].sta, 500.0,  abs_tol=1e-9)
+        assert math.isclose(r.control[2].sta, 1000.0, abs_tol=1e-9)
+        assert len(r.issues) == 1
+        assert 'มุมเบี่ยง' in r.issues[0]
+
+    def test_reversal_pi_180deg_no_blowup(self):
+        # PI where the outgoing tangent nearly reverses the incoming one
+        # (delta≈π). Before the fix this produced a silent multi-billion-
+        # metre station blowup with zero issues logged (see
+        # session_logs/tmp_verify_case1_output.txt Case C); now it falls
+        # back to an angle point with a logged warning.
+        verts = [
+            {'n': 0.0,   'e': 0.0,      'sta': 0.0},
+            {'n': 500.0, 'e': 0.0,      'R': 200.0},
+            {'n': 0.0,   'e': 0.0001},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'T']
+        assert r.elements[-1].sta_end < 10000.0   # sane scale, not billions
+        assert len(r.issues) == 1
+        assert 'มุมเบี่ยง' in r.issues[0]
+
+    def test_near_collinear_small_delta_still_solves(self):
+        # delta is tiny (~2e-8 rad here) but larger than fpmath.EPS (1e-9) —
+        # this must NOT trigger the singular-deflection guard: a real (if
+        # very short) circular curve should still be built with no issues.
+        # Regression guard against the EPS threshold being set too wide (see
+        # session_logs/plan_20260802_1904.md Case B).
+        eps_offset = 500.0 * 1e-8
+        verts = [
+            {'n': 0.0,    'e': 0.0,        'sta': 0.0},
+            {'n': 500.0,  'e': eps_offset, 'R': 200.0},
+            {'n': 1000.0, 'e': 0.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'C', 'T']
+        assert r.issues == []
+
 
 # ---------------------------------------------------------------------------
 # Part 2 defensive edge-case tests
