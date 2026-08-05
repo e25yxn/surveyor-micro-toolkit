@@ -313,7 +313,7 @@ exception ข้อ 5 — งาน sync เป็นงานแยกต่า
 ## Oracle Correction — build_alignment_from_pi Curve-Overlap Direction Guard
 
 **วันที่:** 2026-08-05
-**Commit:** `TBD`
+**Commit:** `39df582`
 **ไฟล์:** `src/smt/builders/alignment_builder.py`, `src/smt/optimizer.py`
 **Tests:** `tests/builders/test_alignment_builder.py` class `TestCurveOverlapDetection`
 (7 เคสใหม่: `test_overlapping_curves_report_issue`,
