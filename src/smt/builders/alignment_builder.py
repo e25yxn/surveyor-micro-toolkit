@@ -50,6 +50,15 @@ class BuildResult(NamedTuple):
     elements: list[Element]
     control: list[ControlPoint]
     issues: list[str]
+    has_geometric_overlap: bool = False
+    """Strict (zero-tolerance) curve-overlap flag: True if ANY
+    tan_len_signed was negative, independent of TOL_METERS. `issues` only
+    warns past TOL_METERS (tolerates real-world coordinate-rounding noise,
+    see Oracle Correction entry in docs/extensions.md); this field exists
+    so callers that need a strict geometric-validity signal (e.g.
+    optimizer.py's fit_radius, which uses it as a hard search-space
+    constraint) are not silently affected by that user-facing noise
+    tolerance."""
 
 
 # ---------------------------------------------------------------------------
@@ -347,6 +356,18 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
 # derivation.
 _NEAR_PI_EPS: float = 1e-4   # ~20 arcsec from exact pi
 
+# Tolerance for the curve-overlap direction guard's tan_len_signed check
+# below (Oracle correction, session_logs/review_src_smt_20260802.md #2,
+# changed from threshold=A to B after real field data proved threshold=A
+# too strict). Real survey CSVs -- test_data/AL1_test_alignment_PI.csv
+# (PI#7/PI#8) and test_data/HOR_01N01.csv (PI#1/BP, PI#7/PI#8) -- produce
+# tan_len_signed in the -0.5mm to -1.6mm range from 3-decimal coordinate
+# rounding alone (same noise floor documented for _NEAR_PI_EPS above), not
+# genuine design overlaps. TOL_METERS=0.02 sits ~12x above the largest
+# observed noise (-1.6mm) while staying far below any engineering-meaningful
+# overlap (metre-scale). See docs/extensions.md for the full evidence.
+TOL_METERS: float = 0.02   # 2 cm
+
 
 def build_alignment_from_pi(vertices: list[dict[str, Any]]) -> BuildResult:
     """Build a horizontal alignment element list from a PI vertex polyline.
@@ -361,6 +382,7 @@ def build_alignment_from_pi(vertices: list[dict[str, Any]]) -> BuildResult:
     elements: list[Element] = []
     control:  list[ControlPoint] = []
     issues:   list[str] = []
+    has_geometric_overlap = False
     N = len(vertices)
 
     prev_n   = float(vertices[0]['n'])
@@ -442,6 +464,34 @@ def build_alignment_from_pi(vertices: list[dict[str, Any]]) -> BuildResult:
         # Tangent element: previous exit → curve start
         tan_len = wcb.calculate_distance_2d(prev_n, prev_e, curve_start_n, curve_start_e)
         sta_cs  = prev_sta + tan_len
+
+        # FIX (Oracle correction, session_logs/review_src_smt_20260802.md #2,
+        # session_logs/plan_20260804_2014.md): tan_len above is an unsigned
+        # distance (hypot) so a curve with too little tangent (overlapping the
+        # previous curve/BP) was never detected. prev and curve_start always
+        # lie on the same azimuth_in line by construction, so this dot product
+        # is a true signed tangent-leg length, not an approximation. Negative
+        # means curve_start sits BEHIND prev -> genuine overlap. No fallback
+        # fixes this (unlike EXT-001): the problem is the relationship between
+        # two curves, not the shape of one curve -- so we only append an issue
+        # and leave the geometry unchanged; the user must adjust R/Ls/PI
+        # spacing in the input. prev may be BP itself (v == 1), not only a
+        # prior PI -- confirmed possible in session_logs/
+        # tmp_verify_bug2_curve_overlap.py (PI#1 vs BP there is negative too).
+        dn = curve_start_n - prev_n
+        de = curve_start_e - prev_e
+        tan_len_signed = dn * math.cos(azimuth_in) + de * math.sin(azimuth_in)
+        if tan_len_signed < 0:
+            has_geometric_overlap = True
+        if tan_len_signed < -TOL_METERS:
+            prev_label = 'BP' if v == 1 else f'PI#{v - 1}'
+            issues.append(
+                f'PI#{v}: จุดเริ่มโค้ง (curve_start) อยู่หลังจุดจบของ {prev_label} '
+                f'ตามทิศทาง azimuth_in ({fpmath.rad_to_deg(azimuth_in):.4f}°) — '
+                f'โค้งซ้อนทับกัน (tan_len_signed = {tan_len_signed:.4f} m, ต้อง >= -{TOL_METERS:.2f} ม.) '
+                f'ตรวจสอบ R/Ls หรือระยะห่างระหว่าง {prev_label} และ PI#{v}'
+            )
+
         elements.append(make_element(
             'T', prev_sta, sta_cs, prev_n, prev_e, fpmath.rad_to_deg(azimuth_in), 0,
         ))
@@ -477,7 +527,8 @@ def build_alignment_from_pi(vertices: list[dict[str, Any]]) -> BuildResult:
     ))
     control.append(ControlPoint(name='EP', sta=prev_sta + ep_len, n=ep_n, e=ep_e))
 
-    return BuildResult(elements=elements, control=control, issues=issues)
+    return BuildResult(elements=elements, control=control, issues=issues,
+                        has_geometric_overlap=has_geometric_overlap)
 
 
 # ---------------------------------------------------------------------------

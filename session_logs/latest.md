@@ -1965,3 +1965,121 @@
   ถัดไป เพราะ F.6.2 ใช้งานไม่ได้จริงจนกว่าจะมี F.6.3 มาแก้ prefix ด้วย)
 - หมายเหตุ: ขั้นต่อไปคือ git add เฉพาะไฟล์ที่เกี่ยวข้อง + commit
   ผ่าน heredoc ตามมาตรฐาน แล้วส่ง hash ให้ Claude (แชท) อนุมัติก่อน push
+
+## [2026-08-02 12:48] ปิดจบ F.6.1-F.6.3 — commit + push แล้ว (F.6.1 root cause -> F.6.2 guard -> F.6.3 prefix strip)
+
+- ทำ: ปิดจบ F.6.1-F.6.3 (บั๊ก TypeError trilogy) สมบูรณ์ ทั้งโค้ด+เอกสาร+push —
+  F.6 โดยรวมยังไม่จบ ยังเหลือ B (ทดสอบหมวดข้อมูลอื่น) และ A+D (ทดสอบ deploy
+  guide+permission จากผู้ใช้ใหม่) ที่ CK1024 ตัดสินใจเลื่อนไปก่อนเพื่อทำ
+  Fable 5 review ของ src/smt/ ต่อ (ดู session ถัดไป) — สรุปเส้นทาง 3 ขั้นที่
+  เกี่ยวเนื่องกัน: (1) F.6.1 สืบ root cause TypeError "reading 'n'"
+  (buildFromPI ไม่เช็ค vertices ว่างก่อนเข้าถึง [0]) แบบ read-only ไม่แก้โค้ด
+  (2) F.6.2 แก้ guard N<2 ใน GS_AlignmentBuilder.gs + เพิ่ม pattern ใหม่ใน
+  ERROR_MESSAGE_MAP (Index.html) — ทดสอบผ่าน Node ครบ แต่พอ clasp push แล้ว
+  ทดสอบจริงในเบราว์เซอร์กลับพบว่ายังใช้งานไม่ได้จริง เพราะ google.script.run
+  เติม prefix "Error: " หน้า raw message ที่ Node จำลองไม่ได้ (3) F.6.3 พบ
+  ระหว่างทดสอบเบราว์เซอร์จริงว่า banner ยังเป็น catchall เพราะ prefix นี้ทำให้
+  pattern ที่มี ^ anchor พังหมด (4/7 pattern) — สืบแล้วแก้ด้วย strip prefix
+  ต้น getFriendlyMessage() พร้อมไฟล์ทดสอบถาวรใหม่ test_error_message_map.js
+  กันปัญหา "Node ผ่านแต่ของจริงพัง" ไม่ให้เกิดซ้ำ ทดสอบซ้ำในเบราว์เซอร์จริง
+  ยืนยันแล้วว่า F.6.2+F.6.3 ทำงานร่วมกันถูกต้อง (Sheet4 empty sheet ->
+  friendly banner ถูกต้อง ไม่ใช่ catchall)
+- คำสั่ง: (สรุปจากรายการ F.6.1/F.6.2/F.6.3 ด้านบนในไฟล์นี้) git add (6 ไฟล์
+  เจาะจง), heredoc เขียน .git/smt_commit_msg.txt, cat -A ตรวจ, git commit -F
+  .git/smt_commit_msg.txt, git log -1 --oneline, git push origin main,
+  git log -1 --oneline ทั้ง local และ origin/main
+- ผล: PASS ทั้งหมดตลอดทั้ง 3 ขั้น — buildFromPI guard 3/3,
+  test_error_message_map.js 8/8, smoke_test.js 23/23, pytest 504 passed,
+  live browser test ผ่านจริง 2 รอบ (F.6.2 เดี่ยวๆ ยังพัง, F.6.2+F.6.3 รวมกัน
+  ผ่าน) — push สำเร็จ `17a2625..8076529 main -> main` local และ origin/main
+  ตรงกันที่ `8076529`
+- commit: `8076529` (push แล้ว ไม่ใช่ commit ใหม่ในรายการนี้)
+- หมายเหตุ: F.6.1-F.6.3 ปิดสมบูรณ์ — F.6 โดยรวมยังไม่จบ (เหลือ B และ A+D ค้าง
+  ไว้ก่อน) — บทเรียนสำคัญที่ควรจำไว้ใช้ต่อ: test ผ่าน Node ไม่พอสำหรับโค้ดที่
+  ต้องเดินทางผ่าน google.script.run (มี prefix เติมที่ Node จำลองไม่ได้ถ้าไม่
+  ตั้งใจใส่) ต้องทดสอบเบราว์เซอร์จริงก่อนถือว่าปิดงานเสมอสำหรับ error-handling
+  ฝั่ง client
+
+## [2026-08-02] Comprehensive code review ของ src/smt/ ทั้งแพ็กเกจ
+- ทำ: อ่านครบทั้ง 16 ไฟล์ (~3,280 บรรทัด) ตรวจ 3 มิติ (บั๊ก / คุณภาพโค้ด /
+  security) เน้นพิเศษ 3 ฟังก์ชัน protected ที่ไม่เคยถูกตรวจอิสระ
+  แล้วเขียนรายงานสรุปเป็นไฟล์ — ไม่ได้แก้โค้ดใดๆ ตามคำสั่ง
+- คำสั่ง: Read ทุกไฟล์ใน src/smt/, grep หา eval/exec/pickle/subprocess
+  (ไม่พบ), เขียนรายงานลง session_logs/review_src_smt_20260802.md
+- ผล: PASS — พบ critical 0 / major 5 / minor 15 — จุดสำคัญสุดคือบั๊กแฝงใน
+  build_alignment_from_pi (หารด้วย sin(delta) ไม่มี guard, ไม่ตรวจโค้งซ้อนทับ)
+  และ parse_pi_table (compound sub-row รั่วข้าม vertex) ซึ่งทุก port
+  (VBA/GAS) สืบทอดไปด้วย
+- commit: ไม่มี (รอบนี้รายงานอย่างเดียว)
+- หมายเหตุ: รายงานฉบับเต็มอยู่ที่ session_logs/review_src_smt_20260802.md —
+  รอผู้ใช้ upload ให้ Claude (แชท) ตรวจก่อนตัดสินใจว่าจะแก้จุดไหน
+
+## [2026-08-03 09:00] Commit: singular-deflection guard fix
+- ทำ: เขียน commit message ผ่าน heredoc, ตรวจ cat -A, add เฉพาะ 4 ไฟล์
+  (src/smt/builders/alignment_builder.py, tests/builders/test_alignment_builder.py,
+  docs/extensions.md, CLAUDE.md) แล้ว commit
+- คำสั่ง: git commit -F .git/smt_commit_msg.txt
+- ผล: PASS (commit สำเร็จ, 4 files changed, 216 insertions(+), 1 deletion(-))
+- commit: 454b55d
+- หมายเหตุ: ยังไม่ push — session_logs/latest.md เองยังมีการแก้ค้างอยู่ (ไม่ได้รวมใน
+  commit นี้เพราะแผนระบุแค่ 4 ไฟล์)
+
+## [2026-08-03 09:10] Commit: fill in commit hash (docs)
+- ทำ: แก้ docs/extensions.md แทนที่ `TBD` ด้วย `454b55d` ใน entry Oracle
+  Correction — build_alignment_from_pi Singular Deflection Guard (บรรทัดเดียว)
+  commit แยกต่างหาก ไม่ amend commit เดิม
+- คำสั่ง: git commit -m "docs: fill in commit hash for Oracle Correction entry (454b55d)"
+- ผล: PASS (1 file changed, 1 insertion(+), 1 deletion(-))
+- commit: 52e9a87
+- หมายเหตุ: ยังไม่ push ทั้ง 3 commits (ccb29b9, 454b55d, 52e9a87) — รอตรวจรวมก่อน push
+
+## [2026-08-03 12:59] อัปเดตพิกัด PI7-PI11 (CK1024 แก้ใหม่) + rerun build/compare-drawing
+- ทำ: แก้ 5 แถว PI7-PI11 ใน test_data/tmp_test_alignment_PI.csv (N/E ใหม่)
+  และแถว PI ที่ตรงกัน 5 จุดใน test_data/tmp_test_alignment_drawing.csv
+  (STA และแถว TS/SC/CS/ST/PC/PT อื่นคงเดิมทั้งหมด ไม่แตะ)
+- คำสั่ง: ./.venv/Scripts/smt.exe build test_data/tmp_test_alignment_PI.csv --out-dir test_data/tmp_run
+  ./.venv/Scripts/smt.exe compare-drawing test_data/tmp_run/elements_output.csv test_data/tmp_test_alignment_drawing.csv
+- ผล: PASS — build ได้ 35 elements / 36 control points, compare-drawing ทุกแถว
+  ที่ไม่ใช่ HIP (PI) ขึ้น OK หมด gap สูงสุด ~1.8mm (TS ที่ STA 9296.152) ไม่มี
+  error สะสมเหมือนรอบก่อน
+- commit: (ยังไม่ commit — เป็นไฟล์ test_data/tmp_* สำหรับทดสอบ)
+- หมายเหตุ: ไม่มีอะไรผิดปกติ
+
+## [2026-08-05] ปิดงาน #2 (curve-overlap direction guard) — threshold A→B + docs
+- ทำ: reproduce บั๊ก #2 (curve-overlap ไม่ถูกตรวจจับ, session_logs/review_src_smt_20260802.md)
+  ด้วย tmp_verify_bug2_curve_overlap.py + tmp_verify_bug2_golden_pi_overlap.py, implement
+  threshold=A ตามแผน plan_20260804_2014.md (raw tan_len_signed < 0, ไม่มี tolerance) เพิ่ม
+  TestCurveOverlapDetection 7 เคสใหม่ — รันกับไฟล์จริง AL1_test_alignment_PI.csv และ
+  HOR_01N01.csv เจอ noise floor จริงจากพิกัดปัดทศนิยม 3 ตำแหน่ง (0.5-1.6mm) ทำให้
+  threshold=A false-positive จึงเปลี่ยนเป็น threshold=B (TOL_METERS=0.02) — ระหว่างทาง
+  พบว่า optimizer.py::fit_radius ผูก (couple) กับ built.issues เป็น hard constraint มาก่อน
+  โดยไม่รู้ตัว แก้ด้วยการเพิ่ม BuildResult.has_geometric_overlap (strict flag แยกจาก
+  issues) ให้ optimizer เช็คแทน แล้วเขียน docs/extensions.md entry ใหม่ "Oracle
+  Correction — build_alignment_from_pi Curve-Overlap Direction Guard" (ผ่าน multi-round
+  review กับ Claude แชท ก่อน save) + อัปเดต CLAUDE.md (Known limits bullet ใหม่ + Status
+  header 407→514)
+- คำสั่ง: pytest tests/builders/test_alignment_builder.py -q ,
+  pytest -q (เต็มชุด, รันหลายรอบระหว่างพัฒนา),
+  pytest tests/test_optimizer.py::TestRealData::test_gap_improves_and_r_stable -v ,
+  python session_logs/tmp_verify_bug2_curve_overlap.py ,
+  python session_logs/tmp_verify_bug2_golden_pi_overlap.py ,
+  python scratch script เรียก parse_pi_table + build_alignment_from_pi ตรงจาก
+  test_data/AL1_test_alignment_PI.csv และ test_data/HOR_01N01.csv (ไม่ใช่ผ่าน `smt build`
+  CLI — parse_pi_table อ่านคอมม่าคั่นหลักพันของ HOR_01N01.csv ไม่ได้ตรงๆ ต้อง strip เองใน
+  สคริปต์ทดสอบก่อน)
+- ผล: PASS — 514 passed (512 core + 2 tolerance boundary), รวม
+  test_gap_improves_and_r_stable ที่กลับมาผ่านหลังแก้ coupling
+- commit: ยังไม่ commit (จะมี entry แยกต่างหากทีหลังตอน commit จริงเกิดขึ้น)
+- หมายเหตุ: reference/AlignmentBuilder.gs:122-123 ยังไม่ sync ตาม (known divergence,
+  รอ sync แยกต่างหาก) — test_data/HOR_01N01.csv ในเครื่องจริงยังมีคอมม่าคั่นหลักพันอยู่
+  (ยังไม่ได้ clean ไฟล์จริง แค่ strip ชั่วคราวในสคริปต์ทดสอบเพื่อยืนยันค่าเท่านั้น) —
+  parse_pi_table ยังอ่านคอมม่าคั่นหลักพันแบบ Excel ("685,410.478") ไม่ได้เลย เป็น backlog
+  ใหม่ที่เพิ่งพบ ยังไม่ triage — ระหว่างทางยังสืบสวน #2b (EP-tangent branch,
+  alignment_builder.py "Final tangent: last curve exit -> EP") ที่สงสัยว่ามี
+  tangency-continuity bug แบบเดียวกับ #2 — สรุปว่าไม่ใช่บั๊กจริง (พิสูจน์ด้วย
+  การทดสอบข้าม 5 รูปแบบเรขาคณิต ได้ kink = 0.000000000° ทุกเคส เพราะ EP
+  กำหนด azimuth_out ที่ PI สุดท้ายโดยตรง ทำให้จุดจบโค้งอยู่บนเส้น PI->EP
+  เสมอโดยโครงสร้าง — หลักการ collinearity เดียวกับ #2 กลับด้าน) — ระหว่างนั้น
+  จับได้ว่าสคริปต์ verify ของตัวเองมีบั๊ก (เทียบ exit azimuth ของโค้งใหม่กับ
+  ค่าเก่าที่ค้างจากโค้งอื่นผิดคู่กัน) เป็นบทเรียนสำคัญเรื่องการเทียบค่าข้าม
+  การรันที่ input เปลี่ยน

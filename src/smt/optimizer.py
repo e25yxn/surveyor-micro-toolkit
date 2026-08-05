@@ -117,8 +117,15 @@ def fit_radius(
             built    = build_alignment_from_pi(vertices)
         except Exception:
             return 1e6 * max(len(active_pts), 1)
-        if built.issues:
-            return 1e6 * len(built.issues) + 1e6 * max(len(active_pts), 1)
+        if built.issues or built.has_geometric_overlap:
+            # has_geometric_overlap catches strict (zero-tolerance)
+            # direction reversals even when they're within TOL_METERS and
+            # so don't produce a warning in `issues` - the optimizer must
+            # not silently wander into those candidates even though a
+            # human reading the warning text would consider them
+            # noise-level and ignorable.
+            penalty_count = len(built.issues) if built.issues else 1
+            return 1e6 * penalty_count + 1e6 * max(len(active_pts), 1)
         total_sq = 0.0
         for dp in active_pts:
             try:

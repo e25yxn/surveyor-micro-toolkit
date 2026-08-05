@@ -709,6 +709,122 @@ class TestNoCurvePI:
         assert r.issues == []
 
 
+class TestCurveOverlapDetection:
+    """T-K: curve-overlap direction guard (review #2, session_logs/plan_20260804_2014.md)."""
+
+    def test_overlapping_curves_report_issue(self):
+        # Same geometry as session_logs/tmp_verify_bug2_curve_overlap.py:
+        # R=500 on both PIs is too large for the available tangent, so BOTH
+        # the PI#1-vs-BP leg and the PI#2-vs-PI#1 leg overlap -- two
+        # independent issues, not one (plan section 3, corrected after the
+        # first draft under-counted this to 1).
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0,   'R': 500.0},
+            {'n': 250.0, 'e': 80.0,  'R': 500.0},
+            {'n': 400.0, 'e': 150.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert len(r.issues) == 2
+        assert any('PI#1' in issue and 'BP' in issue for issue in r.issues)
+        assert any('PI#2' in issue and 'PI#1' in issue for issue in r.issues)
+        for issue in r.issues:
+            assert 'ซ้อนทับ' in issue
+
+    def test_overlapping_curves_geometry_unchanged(self):
+        # Same overlapping geometry as above -- the fix must not alter the
+        # actual element/control output at all (fallback = append-issue-only,
+        # plan section 1): only `issues` gains entries. Station values below
+        # were captured from the verified run in
+        # session_logs/tmp_verify_bug2_curve_overlap.py.
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0,   'R': 500.0},
+            {'n': 250.0, 'e': 80.0,  'R': 500.0},
+            {'n': 400.0, 'e': 150.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert [el.type for el in r.elements] == ['T', 'C', 'T', 'C', 'T']
+        assert [c.name for c in r.control] == ['BP', 'PC', 'PT', 'PC', 'PT', 'EP']
+        expected_sta = [0.0, 77.124, 583.222, 914.007, 1201.792, 1219.321]
+        for c, sta in zip(r.control, expected_sta):
+            assert math.isclose(c.sta, sta, abs_tol=1e-3)
+
+    def test_non_overlapping_close_curves_no_issue(self, result):
+        # Regression guard using the golden 9-PI fixture (module-scoped
+        # `result` fixture, already verified in
+        # session_logs/tmp_verify_bug2_golden_pi_overlap.py: all 9 real
+        # tan_len_signed values positive, ranging 214.5-519.6 m) -- confirms
+        # the new check does not false-positive on legitimate real geometry.
+        assert not any('ซ้อนทับ' in issue for issue in result.issues)
+
+    def test_barely_non_overlapping_curve_small_positive_margin(self):
+        # Threshold=A is "raw tan_len_signed < 0, no tolerance" (plan
+        # section 1) -- this exercises that boundary directly with a
+        # genuinely small but positive margin (~5 m, not hundreds), unlike
+        # the golden-fixture guard above. Geometry verified independently:
+        # tan_len_signed = 5.0002 m, issues = [].
+        verts = [
+            {'n': 0.0,     'e': 0.0,     'sta': 0.0},
+            {'n': 200.0,   'e': 0.0,     'R': 500.0},
+            {'n': 420.788, 'e': 203.107},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert not any('ซ้อนทับ' in issue for issue in r.issues)
+        assert [el.type for el in r.elements] == ['T', 'C', 'T']
+        assert r.has_geometric_overlap is False
+
+    def test_inside_tolerance_no_issue_but_overlap_flag_set(self):
+        # Real field data (AL1 PI7/PI8: -0.5mm, HOR_01N01: -1.3mm/-1.6mm) proved
+        # threshold=A too strict; TOL_METERS=0.02 tolerates this. Fixture
+        # verified independently: tan_len_signed = -0.010000169 m -- inside the
+        # tolerance band. `issues` stays clean (noise-level, ignorable to a
+        # human) while `has_geometric_overlap` still flags it strictly (used by
+        # optimizer.py's fit_radius as a hard constraint, unaffected by
+        # TOL_METERS).
+        verts = [
+            {'n': 0.0, 'e': 0.0, 'sta': 0.0},
+            {'n': 200.0, 'e': 0.0, 'R': 500.0},
+            {'n': 417.234245, 'e': 206.904043},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert r.issues == []
+        assert r.has_geometric_overlap is True
+
+    def test_past_tolerance_still_reports_issue(self):
+        # Same derivation, past the -0.02 boundary (tan_len_signed =
+        # -0.030000054 m) -- must still trigger a warning like threshold=A
+        # always did.
+        verts = [
+            {'n': 0.0, 'e': 0.0, 'sta': 0.0},
+            {'n': 200.0, 'e': 0.0, 'R': 500.0},
+            {'n': 417.219975, 'e': 206.919023},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert len(r.issues) == 1
+        assert 'ซ้อนทับ' in r.issues[0]
+        assert r.has_geometric_overlap is True
+
+    def test_bp_as_prev_label(self):
+        # Isolated single-curve overlap where prev is BP itself, not another
+        # PI -- deliberately reuses PI#1's exact geometry from
+        # tmp_verify_bug2_curve_overlap.py (same PI/EP coordinates) so the
+        # expected tan_len_signed (-77.124) is already independently
+        # verified, but with no second PI in this file at all -- isolates
+        # the BP-label branch from the PI-to-PI branch covered above.
+        verts = [
+            {'n': 0.0,   'e': 0.0,   'sta': 0.0},
+            {'n': 200.0, 'e': 0.0,   'R': 500.0},
+            {'n': 250.0, 'e': 80.0},
+        ]
+        r = ab.build_alignment_from_pi(verts)
+        assert len(r.issues) == 1
+        assert 'BP' in r.issues[0]
+        assert 'PI#0' not in r.issues[0]
+        parsed = float(r.issues[0].split('tan_len_signed = ')[1].split(' m')[0])
+        assert math.isclose(-77.1240, parsed, abs_tol=1e-3)
+
+
 # ---------------------------------------------------------------------------
 # Part 2 defensive edge-case tests
 # ---------------------------------------------------------------------------

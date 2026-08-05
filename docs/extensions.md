@@ -307,3 +307,165 @@ threshold กว้าง — `_NEAR_PI_EPS` ประกาศแยกเป�
 แก้ตาม** — สันนิษฐานว่ามี division เดียวกันแบบไม่มี guard (พอร์ตมาจากที่เดียวกัน)
 แต่ยังไม่ได้ตรวจสอบ/ยืนยันจริง ถือเป็น known divergence ตามกฎ Oracle correction
 exception ข้อ 5 — งาน sync เป็นงานแยกต่างหาก ไม่ปิดจนกว่าจะ sync เสร็จ
+
+---
+
+## Oracle Correction — build_alignment_from_pi Curve-Overlap Direction Guard
+
+**วันที่:** 2026-08-05
+**Commit:** `TBD`
+**ไฟล์:** `src/smt/builders/alignment_builder.py`, `src/smt/optimizer.py`
+**Tests:** `tests/builders/test_alignment_builder.py` class `TestCurveOverlapDetection`
+(7 เคสใหม่: `test_overlapping_curves_report_issue`,
+`test_overlapping_curves_geometry_unchanged`,
+`test_non_overlapping_close_curves_no_issue`,
+`test_barely_non_overlapping_curve_small_positive_margin`,
+`test_inside_tolerance_no_issue_but_overlap_flag_set`,
+`test_past_tolerance_still_reports_issue`, `test_bp_as_prev_label`),
+`tests/test_optimizer.py::TestRealData::test_gap_improves_and_r_stable`
+(regression กลับมา PASS หลังแก้ coupling)
+**อ้างอิง:** `session_logs/review_src_smt_20260802.md` #2,
+`session_logs/plan_20260804_2014.md`,
+`session_logs/tmp_verify_bug2_curve_overlap.py`,
+`session_logs/tmp_verify_bug2_golden_pi_overlap.py`
+
+### ประเภทงาน: Oracle correction exception (ไม่ใช่ Extension ปกติ)
+เหมือนกับ entry "Singular Deflection Guard" ก่อนหน้า — งานนี้แก้ **defect จริง
+ในตัวสมการที่พอร์ตมาจาก oracle เอง** ไม่ใช่ความสามารถใหม่ที่ oracle ไม่มี
+จึงไม่ใช้เลข EXT-00X ต่อ ตามกฎ "Oracle correction exception" ใน CLAUDE.md
+
+### Oracle limitation / defect ที่พบ
+`build_alignment_from_pi` วางตำแหน่ง tangent element ระหว่างจุดจบของ PI/BP
+ก่อนหน้า (`prev`) กับจุดเริ่มโค้งของ PI ปัจจุบัน (`curve_start` / TS/PC) ด้วย
+
+```python
+tan_len = wcb.calculate_distance_2d(prev_n, prev_e, curve_start_n, curve_start_e)
+sta_cs  = prev_sta + tan_len
+```
+
+`calculate_distance_2d` เป็น `math.hypot(...)` — **ระยะทางไม่มีเครื่องหมาย
+เสมอ** ดังนั้นถ้า PI สองตัวติดกันมี R/Ls ใหญ่จนโค้งซ้อนทับกัน (tangent ระหว่าง
+กลางไม่พอ) `curve_start` จะอยู่**ข้างหลัง** `prev` จริง (ในพิกัด N/E) แต่
+`tan_len` ที่คำนวณได้ยังเป็นบวกเสมอ → สร้าง tangent element ที่ "เดินหน้า"
+ทั้งที่เรขาคณิตจริงพับกลับ → chain ขาดต่อกันแบบเงียบสนิท **ไม่มีรายการใน
+`issues` เลย** จะเห็นบั๊กนี้ก็ต่อเมื่อผู้ใช้รัน check_chain เองแยกต่างหาก
+
+ยืนยันแล้วว่า `reference/AlignmentBuilder.gs:123`
+(`var tanLen = WCB.distance2D(prev.n, prev.e, curveStart.n, curveStart.e);`)
+มีบั๊กเดียวกันเป๊ะ — `WCB.distance2D` (`reference/WCB.gs:41-43`) คือ
+`Math.hypot(n2-n1, e2-e1)` ก็เป็น unsigned distance เหมือนกัน (พอร์ตมาจาก
+ที่เดียวกัน)
+
+**พิสูจน์ collinearity (ไม่ใช่การประมาณ):** `prev` และ `curve_start` อยู่บน
+เส้น `azimuth_in` เดียวกันโดยโครงสร้างเสมอ ดังนั้น dot product
+`(curve_start − prev) · (cos az_in, sin az_in)` คือระยะโปรเจกชันที่มี
+เครื่องหมายจริง ไม่ใช่ค่าประมาณ — component ตั้งฉากเป็น 0 เสมอ
+ยืนยันเชิงประจักษ์ด้วยเคส reproduce จริง
+(`session_logs/tmp_verify_bug2_curve_overlap.py`,
+BP(0,0)→PI1(200,0,R=500)→PI2(250,80,R=500)→EP(400,150)):
+`abs(tan_len) == abs(tan_len_signed)` ตรงเป๊ะทั้งสองจุด —
+**PI1 เทียบ BP: `tan_len_signed = −77.1240 m`**,
+**PI2 เทียบ PI1: `tan_len_signed = −330.7850 m`** — ทั้งคู่ติดลบ คือโค้งซ้อน
+ทับกันจริงทั้งสองจุด ไม่ใช่แค่จุดเดียว (พบระหว่างเขียนสคริปต์ reproduce เอง)
+
+### ประวัติ threshold A → B
+1. **เริ่มด้วย A** (ตามแผน `plan_20260804_2014.md` หัวข้อ 1): raw
+   `tan_len_signed < 0`, ไม่มี tolerance ใดๆ — เหตุผลตอนนั้นคือ "ตรงรายงานเป๊ะ
+   ไม่เดาค่าคงที่ใหม่ที่ไม่มีหลักฐาน" (หลีกเลี่ยงปัญหาเดียวกับ finding #17 ใน
+   review, ค่า tolerance ที่กระจัดกระจายไม่มีที่มา)
+2. รันจริงกับ `test_data/AL1_test_alignment_PI.csv` (ไฟล์จริงหลังแก้พิกัด
+   PI7-PI11) เจอ **PI#7/PI#8: `tan_len_signed = −0.0005 m` (0.5mm)** —
+   ติดลบจริงตาม threshold A แต่เป็น noise จากพิกัดที่ปัดทศนิยม 3 ตำแหน่งตาม
+   ธรรมเนียมงานสำรวจ ไม่ใช่โค้งซ้อนทับกันจริงในแบบ
+3. รันข้อมูลจริงชุดที่สอง `test_data/HOR_01N01.csv` เจอเพิ่ม
+   **PI#1/BP: `−0.0013 m`**, **PI#7/PI#8: `−0.0016 m`** — ยืนยัน pattern
+   เดียวกันซ้ำ (เกิดที่รอยต่อโค้งกลับทิศติดกันทั้งสองไฟล์) ไม่ใช่เหตุบังเอิญ
+   ไฟล์เดียว
+4. ตัดสินใจเปลี่ยนเป็น **B**: เพิ่ม `TOL_METERS = 0.02` (2 ซม.) เป็น module
+   constant (`src/smt/builders/alignment_builder.py`) — ~12 เท่าเหนือ noise
+   สูงสุดที่เจอจริง (−1.6mm) และยังต่ำกว่าโค้งซ้อนทับที่มีนัยสำคัญทางวิศวกรรม
+   (ระดับเมตร) มาก พร้อม comment อ้างอิงที่มาของค่าไว้ในโค้ดโดยตรง
+5. ข้อความ issue เปลี่ยนจาก `... ต้อง >= 0` เป็น
+   `... ต้อง >= -{TOL_METERS:.2f} ม.` — เงื่อนไข trigger issue เปลี่ยนจาก
+   `tan_len_signed < 0` เป็น `tan_len_signed < -TOL_METERS`
+
+**สถานะยืนยันจริง (ไม่ใช่คาดการณ์):** รันไฟล์จริงทั้งสองไฟล์ตรงๆ ผ่าน
+`build_alignment_from_pi` ที่แก้แล้ว — ทั้งคู่ได้ `issues == []` และ
+`has_geometric_overlap == True` (ตรงกับที่ TOL_METERS ควรทำ: เงียบสำหรับ
+noise ระดับ mm แต่ flag ภายในยังจับได้)
+
+### ผลข้างเคียงที่พบและแก้: fit_radius (EXT-002) coupling
+`optimizer.py::fit_radius` ใช้ `built.issues` (ไม่ว่าง = ไม่ผ่าน) เป็น hard
+validity constraint ของ objective function มาก่อน **โดยไม่รู้ตัวว่ามี
+coupling นี้อยู่** — เปลี่ยน threshold เป็น B แล้วรัน
+`tests/test_optimizer.py::TestRealData::test_gap_improves_and_r_stable`
+พังทันที: `ΔR` ที่เคยอยู่ต่ำกว่า 1m (เกณฑ์ test) กระโดดเป็น **18.6m** เพราะ
+overlap ระดับ mm ที่เคยถูก `issues` (threshold A) กันไว้เป็น hard constraint
+ตอนนี้ผ่านเงียบ (threshold B) ทำให้ optimizer เดินเข้าไปในพื้นที่ค้นหาที่มี
+overlap จริงระดับ mm ได้อย่างอิสระ แล้วลู่เข้าคำตอบที่ R เปลี่ยนมากผิดปกติ
+
+**วิธีแก้:** เพิ่ม field ใหม่ `BuildResult.has_geometric_overlap: bool` —
+strict (zero-tolerance), ตั้งจาก `tan_len_signed < 0` ตรงๆ ไม่ผ่าน
+`TOL_METERS` เลย แล้วเปลี่ยน `optimizer.py::fit_radius` ให้เช็ค
+`built.issues or built.has_geometric_overlap` แทนเช็ค `built.issues` เดี่ยวๆ
+
+**ทำไมต้องแยกสองสัญญาณนี้ออกจากกัน:**
+`issues` คือ **สัญญาณสำหรับผู้ใช้** (human-facing warning) — ต้องทน noise
+ระดับ mm จากพิกัดปัดเศษ ไม่งั้นผู้ใช้เจอ warning ที่ไม่มีความหมายทุกครั้งที่
+เปิดไฟล์จริง (ตามประวัติ threshold A→B ข้างบน) ส่วน `has_geometric_overlap`
+คือ **สัญญาณสำหรับ internal search constraint** — optimizer ต้องไม่เดินเข้า
+พื้นที่ที่โค้งซ้อนทับกันจริงแม้แต่ mm เดียว เพราะ objective function
+(sum of squared gaps) ไม่มีทางรู้ว่า geometry ที่ดู "gap น้อย" นั้นได้มาจาก
+โค้งที่พับทับตัวเองในพิกัดจริง — ผสมสองสัญญาณนี้เป็นตัวเดียวจะบังคับให้เลือก
+ระหว่าง "ผู้ใช้เจอ warning noise ทุกไฟล์" กับ "optimizer เดินเข้า overlap
+จริงได้อย่างอิสระ" ซึ่งทั้งคู่ไม่ใช่พฤติกรรมที่ต้องการ
+
+### Before/After
+
+**(ก) threshold A → B บนเคส PI1/PI2 เดิม** (จาก
+`tmp_verify_bug2_curve_overlap.py`) — overlap 77m/330m ใหญ่กว่า `TOL_METERS`
+(2ซม.) มาก จึงไม่เปลี่ยนพฤติกรรมเลย:
+
+| | threshold A | threshold B |
+| --- | --- | --- |
+| `issues` | 2 รายการ (PI#1 vs BP: −77.1240 m, PI#2 vs PI#1: −330.7850 m) | เหมือนเดิมทุกประการ — 2 รายการ ข้อความเปลี่ยนจาก "ต้อง >= 0" เป็น "ต้อง >= -0.02 ม." เท่านั้น |
+| `has_geometric_overlap` | (field ยังไม่มีอยู่ในตอนนั้น) | `True` |
+| `elements`/`control` | เหมือนเดิม (fallback = append-issue-only) | เหมือนเดิม ไม่เปลี่ยน |
+
+**(ข) `has_geometric_overlap` บนเคส AL1 จริง**
+(`test_data/AL1_test_alignment_PI.csv`, PI#7/PI#8 = −0.5mm) — ยืนยันจริงด้วย
+`build_alignment_from_pi` รันตรงจากไฟล์:
+
+| ค่า | ผลจริง |
+| --- | --- |
+| `issues` | `[]` (ว่างเปล่า — noise ระดับ mm ไม่ trigger threshold B) |
+| `has_geometric_overlap` | `True` (strict flag ยังจับได้ — ใช้เป็น internal constraint ใน `fit_radius` ได้ต่อ) |
+
+(ยืนยันซ้ำด้วย `test_data/HOR_01N01.csv` เช่นกัน — `issues == []`,
+`has_geometric_overlap == True`)
+
+### Regression guarantee
+- `pytest tests/builders/test_alignment_builder.py -q` → **76 passed**
+  (69 เดิม + 7 เคสใหม่ของ `TestCurveOverlapDetection`, รวม boundary เคส
+  ข้าม/ไม่ข้าม `TOL_METERS`)
+- `pytest -q` เต็มชุด → **514 passed**
+- `pytest tests/test_optimizer.py::TestRealData::test_gap_improves_and_r_stable -v`
+  → **PASSED** (กลับมาผ่านหลังแก้ coupling ด้วย `has_geometric_overlap` —
+  ยืนยันแล้วว่าไฟล์ `ramp01n01_SO.csv`/`r01n01_so_crosscheck.csv` มีอยู่จริง
+  ทำให้ test นี้รันจริง ไม่ได้ถูก skip)
+
+### สถานะ .gs/VBA — divergence ที่รู้ตัว ยังไม่ sync
+- **`reference/AlignmentBuilder.gs:122-123`** — ยืนยันแล้วว่ามีบั๊กเดียวกัน
+  เป๊ะ (unsigned distance ล้วนๆ, ไม่มี `tan_len_signed`/`TOL_METERS`/
+  `has_geometric_overlap` เลย) — **ยังไม่แก้ตามในรอบนี้** — known divergence
+  ตาม Oracle correction exception ข้อ 5 งาน sync เป็นงานแยกต่างหาก ไม่ปิดจน
+  กว่าจะ sync เสร็จ
+- **`reference/AlignmentBuilder.gs:145`** (`endLen` — EP-tangent สุดท้ายจาก
+  exit ของโค้งสุดท้ายไปยัง EP) ก็ใช้ `WCB.distance2D` แบบ unsigned เหมือนกัน
+  ตรงกับ Python `alignment_builder.py` (`ep_len`) — **ตรวจสอบเพิ่มเติมแล้วว่า
+  ไม่ใช่บั๊ก (#2b, 2026-08-05):** ยืนยันด้วยการทดสอบว่า kink (มุมหักที่จุดต่อ
+  EP) เท่ากับ `0.000000000°` ในทุกเคสที่ทดสอบ — ประเด็นนี้ปิดแล้ว ไม่ใช่
+  known divergence ที่ต้องรอ sync
+- **VBA (`reference/vba/`)** — `build_alignment_from_pi`/`buildFromPI` ไม่มี
+  VBA port เลย (ตาราง "VBA Engine map" ใน CLAUDE.md ไม่มี AlignmentBuilder.gs
+  อยู่) — ไม่มีโค้ด VBA ที่ต้องพิจารณา divergence สำหรับบั๊กนี้

@@ -56,7 +56,7 @@ SAFE - SMALL - STABLE - MODULAR.
   ต่างหาก ไม่ถือว่าปิดงานจนกว่าจะ sync
 
 ## Status
-All phases complete — 407/407 tests passing.
+All phases complete — 514/514 tests passing.
 - Core engine: 9 modules ported and validated against oracle
 - CLI: `smt build` / `smt station-to-coord` / `smt coord-to-station` /
        `smt cross-check` / `smt compare-drawing` / `smt fit-radius` complete
@@ -149,6 +149,13 @@ All phases complete — 407/407 tests passing.
   docs/extensions.md entry "Oracle Correction — build_alignment_from_pi
   Singular Deflection Guard", session_logs/plan_20260802_1904.md + addendum —
   `reference/AlignmentBuilder.gs`/VBA ยังไม่ sync ตาม (known divergence)
+- `build_alignment_from_pi` แก้เพิ่มอีกรอบเมื่อ 2026-08-05 (Oracle correction
+  exception #2, session_logs/review_src_smt_20260802.md) — unsigned distance เดิม
+  ทำให้ PI ที่โค้งซ้อนทับกันไม่ถูกตรวจจับ แก้ด้วย signed `tan_len_signed`
+  (`TOL_METERS=0.02`) + `BuildResult.has_geometric_overlap` (strict flag แยกให้
+  optimizer.py ใช้ต่างจาก `issues`) ดู docs/extensions.md entry "Oracle
+  Correction — build_alignment_from_pi Curve-Overlap Direction Guard" —
+  `reference/AlignmentBuilder.gs` ยังไม่ sync ตาม (known divergence)
 
 ## Civil 3D Interop ground truth references
 - `smt-test1.xml` คือ Civil 3D export จริง 7 spiral types ที่ R=900 L=100
