@@ -2083,3 +2083,34 @@
   จับได้ว่าสคริปต์ verify ของตัวเองมีบั๊ก (เทียบ exit azimuth ของโค้งใหม่กับ
   ค่าเก่าที่ค้างจากโค้งอื่นผิดคู่กัน) เป็นบทเรียนสำคัญเรื่องการเทียบค่าข้าม
   การรันที่ input เปลี่ยน
+  
+## [2026-08-07] ปิดงาน #3 (parse_pi_table orphan compound-sub-row guard) — code + tests + docs
+- ทำ: reproduce บั๊ก #3 (compound_arcs รั่วข้าม vertex boundary,
+  session_logs/review_src_smt_20260802.md #3) ด้วย 5 เคส: orphan sub-row ก่อน PI ตัวแรก,
+  orphan sub-row หลัง EP, sub-row แทรกกลาง (พิสูจน์ว่านอกสโคป — เป็นความกำกวมของฟอร์แมตเอง
+  ไม่ใช่บั๊กนี้), orphan arc ติดกันหลายบรรทัด (เช็ค error อ้างเลขบรรทัดแรกสุด), แถวว่างจริง
+  (regression guard) — ยืนยัน reference/gsheet/GS_PiTableParser.gs มี defect เดียวกันเป๊ะด้วย
+  การรันผ่าน Node จริง (Oracle correction exception ข้อ 1) VBA ไม่มีพอร์ต parse_pi_table เลย
+  เขียนแผน session_logs/plan_20260807_1904.md ผ่าน multi-round review กับ Claude แชทก่อน
+  implement — แก้ _flush_pending() เพิ่ม compound_arcs_first_line เช็ค pending_pi is None
+  and compound_arcs แล้ว raise ValueError แทนปล่อยผ่านเงียบ (จุดแก้เดียวครอบคลุมทั้งสอง
+  สถานการณ์เพราะ _flush_pending ถูกเรียกทั้งกลางลูปและท้ายไฟล์) เพิ่ม TestParsePiTable 3
+  เคสใหม่ (test_orphan_compound_arc_before_first_pi_raises,
+  test_orphan_compound_arc_after_ep_raises,
+  test_orphan_compound_arc_multiline_reports_first_line) เขียน docs/extensions.md entry
+  ใหม่ "Oracle Correction — parse_pi_table Orphan Compound-Sub-Row Guard" + อัปเดต
+  CLAUDE.md (Known limits bullet ใหม่ + Status header 514→517)
+- คำสั่ง: pytest tests/builders/test_alignment_builder.py::TestParsePiTable -v ,
+  pytest -q (เต็มชุด, รันหลายรอบระหว่างพัฒนา), python -c "import ast; ast.parse(...)"
+  ตรวจ syntax หลังแก้ test file, wc -l / cksum ตรวจ CLAUDE.md และ docs/extensions.md
+  หลัง replace ทั้งไฟล์
+- ผล: PASS — 517 passed (514 เดิม + 3 ใหม่), TestParsePiTable 16 passed (13 เดิม + 3 ใหม่)
+- commit: ยังไม่ commit (จะมี entry แยกต่างหากทีหลังตอน commit จริงเกิดขึ้น)
+- หมายเหตุ: reference/gsheet/GS_PiTableParser.gs ยังไม่ sync ตาม (known divergence, รอ
+  sync แยกต่างหาก) — ระหว่างทางเจอปัญหา terminal-relay ทำให้ diff ของเทสใหม่พิมพ์ผิดซ้ำ
+  หลายรอบ (ขาด ":" ท้าย def หนึ่งบรรทัด สลับหาย/มีหลายรอบ) แก้ด้วยการขอดูบรรทัดเดียวแยก
+  แทน diff เต็ม — ตอนแก้ CLAUDE.md/docs/extensions.md รอบแรก เนื้อหาไฟล์คำแนะนำที่ Claude
+  แชทส่งให้ถูก paste ทับเป็นเนื้อหาจริงในไฟล์โดยตรงแทนที่จะถูกนำไปใช้แก้ไข ตรวจพบด้วย
+  wc -l ที่ไม่ตรงคาด (380 บรรทัด แทนที่จะเป็น 355) แล้วแก้ด้วยการส่งไฟล์ที่แก้สมบูรณ์แล้ว
+  ให้แทน เป็นบทเรียนว่าไฟล์ "คำแนะนำการแก้ไข" กับ "เนื้อหาที่จะ paste ตรงๆ" ต้องแยกให้
+  ชัดกว่านี้ในรอบหน้า

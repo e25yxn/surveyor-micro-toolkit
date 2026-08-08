@@ -1063,3 +1063,36 @@ class TestParsePiTable:
         pi = verts[1]
         assert pi['R'] == 300.0
         assert 'compound' not in pi
+
+    def test_orphan_compound_arc_before_first_pi_raises(self):
+        # Regression test for review finding #3 (session_logs/review_src_smt_20260802.md).
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '', '', '', '', '', ''],
+            ['',   '',     '',     '',  '150', '', '', '', '', '30'],
+            ['PI', '1100', '2100', '',  '', '', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '', '', '', '', '', ''],
+        )
+        with pytest.raises(ValueError, match='ไม่มี PI ก่อนหน้าให้ผูก'):
+            ab.parse_pi_table(rows)
+
+    def test_orphan_compound_arc_after_ep_raises(self):
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '', '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '300', '', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '', '', '', '', '', ''],
+            ['',   '',     '',     '',  '999', '', '', '', '', ''],
+        )
+        with pytest.raises(ValueError, match='ไม่มี PI ก่อนหน้าให้ผูก'):
+            ab.parse_pi_table(rows)
+
+    def test_orphan_compound_arc_multiline_reports_first_line(self):
+        # Error must cite the FIRST offending line, not the last.
+        rows = _rows(
+            ['BP', '1000', '2000', '0', '', '', '', '', '', ''],
+            ['',   '',     '',     '',  '150', '', '', '', '', ''],
+            ['',   '',     '',     '',  '200', '', '', '', '', ''],
+            ['PI', '1100', '2100', '',  '', '', '', '', '', ''],
+            ['EP', '1200', '2200', '',  '', '', '', '', '', ''],
+        )
+        with pytest.raises(ValueError, match='แถวที่ 3'):
+            ab.parse_pi_table(rows)

@@ -469,3 +469,122 @@ strict (zero-tolerance), ตั้งจาก `tan_len_signed < 0` ตรงๆ
 - **VBA (`reference/vba/`)** — `build_alignment_from_pi`/`buildFromPI` ไม่มี
   VBA port เลย (ตาราง "VBA Engine map" ใน CLAUDE.md ไม่มี AlignmentBuilder.gs
   อยู่) — ไม่มีโค้ด VBA ที่ต้องพิจารณา divergence สำหรับบั๊กนี้
+
+## Oracle Correction — parse_pi_table Orphan Compound-Sub-Row Guard
+
+**วันที่:** 2026-08-07
+**Commit:** (ยังไม่ commit — จะเติมหลัง commit ตามแบบแผนเดิม)
+**ไฟล์:** `src/smt/builders/alignment_builder.py`
+**Tests:** `tests/builders/test_alignment_builder.py` class `TestParsePiTable`
+(3 เคสใหม่: `test_orphan_compound_arc_before_first_pi_raises`,
+`test_orphan_compound_arc_after_ep_raises`,
+`test_orphan_compound_arc_multiline_reports_first_line`)
+**อ้างอิง:** `session_logs/review_src_smt_20260802.md` #3,
+`session_logs/plan_20260807_1904.md`
+
+### ประเภทงาน: Oracle correction exception (ไม่ใช่ Extension ปกติ)
+เหมือนกับ entry "Singular Deflection Guard" และ "Curve-Overlap Direction Guard"
+ก่อนหน้า — งานนี้แก้ **defect จริงในตัวฟังก์ชันที่พอร์ตมาจาก oracle เอง**
+ไม่ใช่ความสามารถใหม่ที่ oracle ไม่มี จึงไม่ใช้เลข EXT-00X ต่อ ตามกฎ
+"Oracle correction exception" ใน CLAUDE.md
+
+### Oracle limitation / defect ที่พบ
+`parse_pi_table` เก็บ compound sub-row (แถวที่ POINT ว่างแต่ RADIUS มีค่า)
+ไว้ในตัวแปร `compound_arcs` ระหว่างรอ flush เข้ากับ PI ที่กำลัง pending อยู่:
+
+```python
+def _flush_pending() -> None:
+    nonlocal pending_pi
+    if pending_pi is None:
+        return
+    if compound_arcs:
+        ...
+```
+
+เมื่อ `_flush_pending()` ถูกเรียกตอน `pending_pi is None` (คือยังไม่เจอ PI
+ใดๆ เลย หรืออยู่หลัง EP ที่ไม่ set pending_pi) ฟังก์ชัน `return` ทันทีโดย
+**ไม่เคลียร์ `compound_arcs`** — ทำให้ arc ที่ค้างอยู่:
+1. รั่วไปเกาะ PI ตัวถัดไปที่ไม่เกี่ยวข้อง (ถ้า orphan sub-row อยู่ก่อน PI
+   ตัวแรก) กลายเป็น compound curve ผิดตัวแบบเงียบ
+2. หายไปเงียบๆ โดยไม่มี error ใดๆ (ถ้า orphan sub-row อยู่หลัง EP)
+
+ยืนยันแล้วว่า `reference/gsheet/GS_PiTableParser.gs` มีบั๊กเดียวกันเป๊ะ —
+`flushPending_()` มี `if (pendingPi === null) return;` เหมือนกันบรรทัดต่อ
+บรรทัด (พอร์ตแบบ mirror ตรงๆ) ยืนยันด้วยการรันสถานการณ์เดียวกันผ่าน Node
+จริงกับไฟล์ `.gs` นี้ตรงๆ ได้ผลลัพธ์ตรงกัน
+
+VBA (`reference/vba/`) ไม่มีพอร์ต `parse_pi_table` เลย (เหมือนกรณี #2
+`build_alignment_from_pi`) — ไม่มีโค้ด VBA ที่ต้องพิจารณา divergence สำหรับ
+บั๊กนี้
+
+### ขอบเขต
+เฉพาะ orphan sub-row ก่อน PI ตัวแรก / หลัง EP เท่านั้น — กรณี sub-row แทรก
+กลางหลัง PI ที่มี compound arc ถูกต้องอยู่แล้วไม่เข้าข่ายบั๊กนี้ เพราะแยกไม่
+ออกจากโค้ง compound หลายส่วนที่ตั้งใจจริงในฟอร์แมต ถือเป็นความกำกวมของ
+ฟอร์แมตเอง ไม่ใช่บั๊ก parsing
+
+### วิธีแก้
+เพิ่มตัวแปร `compound_arcs_first_line: int = 0` เก็บเลขบรรทัดของ arc ตัวแรก
+ในแต่ละกลุ่ม แล้วใน `_flush_pending()` ก่อน `return` เดิมตอน
+`pending_pi is None` ให้เช็ค `if compound_arcs:` — ถ้ามี arc ค้างอยู่ raise
+`ValueError` ระบุเลขบรรทัดของ arc ตัวแรกที่พบปัญหา แทนที่จะปล่อยผ่านเงียบๆ
+จุดแก้เดียวใน `_flush_pending()` ครอบคลุมทั้งสองสถานการณ์ (ก่อน PI ตัวแรก /
+หลัง EP) เพราะฟังก์ชันนี้ถูกเรียกทั้งกลางลูป (ก่อนแถวชื่อถัดไป) และท้ายไฟล์
+เหมือนกัน
+
+### Before/After
+
+**ตัวอย่าง 1 — orphan sub-row ก่อน PI ตัวแรก:**
+```
+POINT,N,E,STA,R,LS,DELTA
+,,,,150,,10
+BP,0,0,0,,,
+PI1,100,100,,300,,
+```
+
+| | เดิม | ใหม่ |
+| --- | --- | --- |
+| ผลลัพธ์ | `compound_arcs=[{R:150,delta:10}]` ค้างจาก orphan แล้วไปรวมกับ arc ของ PI1 แบบผิดๆ | `raise ValueError` ทันทีที่เจอ BP: "compound sub-row (แถวที่ 2) มีค่า RADIUS แต่ไม่มี PI ก่อนหน้าให้ผูก ..." |
+| error | ไม่มี | มี ระบุเลขบรรทัดชัดเจน |
+
+**ตัวอย่าง 2 — orphan sub-row หลัง EP:**
+```
+POINT,N,E,STA,R,LS,DELTA
+BP,0,0,0,,,
+PI1,100,100,,300,,
+EP,200,200,,,,
+,,,,150,,10
+```
+
+| | เดิม | ใหม่ |
+| --- | --- | --- |
+| ผลลัพธ์ | คืน vertices 3 ตัว (BP,PI1,EP) เฉยๆ ข้อมูล R=150 หายไปเงียบๆ | `raise ValueError` ตอน `_flush_pending()` เรียกครั้งสุดท้าย: "compound sub-row (แถวที่ 5) มีค่า RADIUS แต่ไม่มี PI ก่อนหน้าให้ผูก ..." |
+
+**ตัวอย่าง 3 — control, format ถูกต้อง (ไม่พังทั้งเดิมและใหม่):**
+```
+POINT,N,E,STA,R,LS,DELTA
+BP,0,0,0,,,
+PI1,100,100,,,,
+,,,,300,,15
+,,,,150,,
+EP,200,200,,,,
+```
+
+เหมือนกันทุกประการทั้งก่อน/หลังแก้ — PI1 ได้ `compound=[{R:300,delta:15},{R:150}]`
+ไม่มี error เพราะ `pending_pi` ไม่ใช่ `None` ตอน flush ในกรณีนี้ (ยืนยันด้วย
+เทสเดิมที่มีอยู่แล้ว `test_compound`/`test_pi_radius_zero_with_compound_still_works`
+ไม่ต้องเพิ่มเทสซ้ำ)
+
+### Regression guarantee
+- `pytest tests/builders/test_alignment_builder.py::TestParsePiTable -v` →
+  **16 passed** (13 เดิม + 3 เคสใหม่ของ orphan-arc guard)
+- `pytest -q` เต็มชุด → **517 passed** (514 เดิม + 3 ใหม่)
+
+### สถานะ .gs — divergence ที่รู้ตัว ยังไม่ sync
+- **`reference/gsheet/GS_PiTableParser.gs`** — ยืนยันแล้วว่ามีบั๊กเดียวกันเป๊ะ
+  (`flushPending_()` ไม่เคลียร์ `compoundArcs` ตอน `pendingPi === null`
+  เหมือนกัน) — **ยังไม่แก้ตามในรอบนี้** — known divergence ตาม Oracle
+  correction exception ข้อ 5 งาน sync เป็นงานแยกต่างหาก ไม่ปิดจนกว่าจะ sync
+  เสร็จ
+- **VBA (`reference/vba/`)** — ไม่มีพอร์ต `parse_pi_table` เลย — ไม่มีโค้ด
+  VBA ที่ต้องพิจารณา divergence สำหรับบั๊กนี้

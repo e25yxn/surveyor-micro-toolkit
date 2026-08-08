@@ -56,7 +56,7 @@ SAFE - SMALL - STABLE - MODULAR.
   ต่างหาก ไม่ถือว่าปิดงานจนกว่าจะ sync
 
 ## Status
-All phases complete — 514/514 tests passing.
+All phases complete — 517/517 tests passing.
 - Core engine: 9 modules ported and validated against oracle
 - CLI: `smt build` / `smt station-to-coord` / `smt coord-to-station` /
        `smt cross-check` / `smt compare-drawing` / `smt fit-radius` complete
@@ -156,6 +156,14 @@ All phases complete — 514/514 tests passing.
   optimizer.py ใช้ต่างจาก `issues`) ดู docs/extensions.md entry "Oracle
   Correction — build_alignment_from_pi Curve-Overlap Direction Guard" —
   `reference/AlignmentBuilder.gs` ยังไม่ sync ตาม (known divergence)
+- `parse_pi_table` แก้เพิ่มอีกรอบเมื่อ 2026-08-07 (Oracle correction exception
+  #3, session_logs/review_src_smt_20260802.md) — `_flush_pending` ไม่เคลียร์
+  `compound_arcs` เมื่อ `pending_pi is None` ทำให้ orphan compound sub-row
+  (ก่อน PI ตัวแรก หรือหลัง EP) รั่วไปเกาะ PI อื่นแบบเงียบ หรือหายไปเงียบๆ
+  แก้ด้วยการ raise ValueError ระบุเลขบรรทัดของ arc ตัวแรกที่พบปัญหา ดู
+  docs/extensions.md entry "Oracle Correction — parse_pi_table Orphan
+  Compound-Sub-Row Guard" — `reference/gsheet/GS_PiTableParser.gs` ยังไม่
+  sync ตาม (known divergence)
 
 ## Civil 3D Interop ground truth references
 - `smt-test1.xml` คือ Civil 3D export จริง 7 spiral types ที่ R=900 L=100

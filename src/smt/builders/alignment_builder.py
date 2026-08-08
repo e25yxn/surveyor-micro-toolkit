@@ -257,10 +257,18 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
     pending_pi_label: str = ''
     pending_pi_line: int = 0
     compound_arcs: list[dict[str, Any]] = []
+    compound_arcs_first_line: int = 0
 
     def _flush_pending() -> None:
         nonlocal pending_pi
         if pending_pi is None:
+            if compound_arcs:
+                raise ValueError(
+                    f'compound sub-row (แถวที่ {compound_arcs_first_line}) มีค่า RADIUS '
+                    'แต่ไม่มี PI ก่อนหน้าให้ผูก (อยู่ก่อน PI ตัวแรก ก่อน BP, '
+                    'หรืออยู่หลัง EP) '
+                    'ตรวจสอบลำดับแถวในไฟล์ว่าไม่มีแถวตกหล่นหรือเรียงผิดที่'
+                )
             return
         if compound_arcs:
             if 'R' in pending_pi:
@@ -288,6 +296,8 @@ def parse_pi_table(rows: list[Any]) -> list[dict[str, Any]]:
             r_raw = _g(row, 'radius')
             if not r_raw:
                 continue
+            if not compound_arcs:
+                compound_arcs_first_line = line_no
             arc: dict[str, Any] = {'R': float(r_raw)}
             delta_raw = _g(row, 'delta')
             if delta_raw:
