@@ -473,7 +473,7 @@ strict (zero-tolerance), ตั้งจาก `tan_len_signed < 0` ตรงๆ
 ## Oracle Correction — parse_pi_table Orphan Compound-Sub-Row Guard
 
 **วันที่:** 2026-08-07
-**Commit:** (ยังไม่ commit — จะเติมหลัง commit ตามแบบแผนเดิม)
+**Commit:** `795f36b`
 **ไฟล์:** `src/smt/builders/alignment_builder.py`
 **Tests:** `tests/builders/test_alignment_builder.py` class `TestParsePiTable`
 (3 เคสใหม่: `test_orphan_compound_arc_before_first_pi_raises`,
