@@ -549,6 +549,7 @@ def check_against_drawing(
     control: list[ControlPoint],
     drawing: list[dict[str, Any]],
     tolerance: float = 0.05,
+    max_sta_distance: float | None = 10.0,
 ) -> list[dict[str, Any]]:
     """Cross-check computed control points against drawn / surveyed coordinates.
 
@@ -556,9 +557,31 @@ def check_against_drawing(
     (filtered by name when drawing entry has a non-empty 'name' key), then
     computes the 2-D spatial gap.
 
+    FIX (Oracle correction, session_logs/review_src_smt_20260802.md #4,
+    session_logs/plan_<TBD>.md): check_against_drawing has no port in
+    reference/gsheet/ or reference/vba/ at all -- the function those mirror
+    is check.py::check_horizontal(), a different algorithm (evaluates the
+    alignment directly at the drawing station instead of searching a control
+    list). Condition (1) of the Oracle correction exception is therefore N/A
+    here: there is no oracle implementation of this specific matching
+    algorithm to diverge from. Previously a drawing point with no matching
+    name (best is None) was silently dropped with `continue`, and
+    closest-by-station matching had no distance ceiling, so a point far from
+    every control point still got matched and reported as a confusing FAIL.
+    Both are now reported as an explicit row (ok=False, note explains why)
+    instead of vanishing or misleadingly failing.
+
     drawing entries: {'name' (optional), 'sta', 'n', 'e'}.
-    Returns list of dicts: {name, sta_calc, sta_draw, gap_m, ok}.
-    ok is True when gap_m ≤ tolerance.
+    Returns list of dicts: {name, sta_calc, sta_draw, gap_m, ok, note}.
+    ok is True when gap_m ≤ tolerance. sta_calc/gap_m are None and ok is
+    False when no matching control point was found (name mismatch, or the
+    closest candidate exceeds max_sta_distance when that is set); note then
+    explains why. note is '' for a normal matched row.
+    max_sta_distance defaults to 10.0m (typical field/setting-out tolerance
+    is at most a few metres; a genuine match should never be this far off by
+    station -- 10m safely separates real deviations from name typos/mismatches
+    that would otherwise land on an unrelated control point far away). Pass
+    None to disable the ceiling entirely (restores pre-fix matching).
     """
     report: list[dict[str, Any]] = []
     for d in drawing:
@@ -574,6 +597,27 @@ def check_against_drawing(
                 best_d = dist
                 best = c
         if best is None:
+            report.append({
+                'name':     d_name,
+                'sta_calc': None,
+                'sta_draw': d_sta,
+                'gap_m':    None,
+                'ok':       False,
+                'note':     'ไม่พบจุดควบคุมที่ชื่อตรงกัน',
+            })
+            continue
+        if max_sta_distance is not None and best_d > max_sta_distance:
+            report.append({
+                'name':     d_name or best.name,
+                'sta_calc': None,
+                'sta_draw': d_sta,
+                'gap_m':    None,
+                'ok':       False,
+                'note': (
+                    f'จุดควบคุมที่ใกล้สุด ({best.name}) ห่างตามสถานี '
+                    f'{best_d:.3f} ม. เกินเพดาน {max_sta_distance:.3f} ม.'
+                ),
+            })
             continue
         gap = math.hypot(best.n - float(d['n']), best.e - float(d['e']))
         report.append({
@@ -582,5 +626,6 @@ def check_against_drawing(
             'sta_draw': d_sta,
             'gap_m':    gap,
             'ok':       gap <= tolerance,
+            'note':     '',
         })
     return report

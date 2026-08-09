@@ -25,6 +25,7 @@ import pytest
 from smt import alignment as al
 from smt import vertical as vt
 from smt import check as ck
+from smt.builders.alignment_builder import ControlPoint
 
 _GOLDEN = Path(__file__).parent / 'golden' / 'tables.json'
 
@@ -226,3 +227,67 @@ class TestBulkCrossCheck:
         fp = [{'name': 'FAR', 'n': 1000.0, 'e': 1000.0, 'z': 85.0, 'disc': 0.0}]
         with pytest.raises(ValueError):
             ck.bulk_cross_check(tangent_elements, fp)
+
+
+# ---------------------------------------------------------------------------
+# normalize_ip_names / add_pcc_control_points (session_logs/review_src_smt_20260802.md
+# #4 follow-up adapters)
+# ---------------------------------------------------------------------------
+
+def test_normalize_ip_names_strips_number() -> None:
+    drawing = [
+        {'name': 'IP1', 'sta': 100.0, 'n': 0.0, 'e': 0.0},
+        {'name': 'IP2', 'sta': 200.0, 'n': 0.0, 'e': 0.0},
+        {'name': 'IP10', 'sta': 300.0, 'n': 0.0, 'e': 0.0},
+    ]
+    out = ck.normalize_ip_names(drawing)
+    assert [d['name'] for d in out] == ['IP', 'IP', 'IP']
+
+
+def test_normalize_ip_names_leaves_others_unchanged() -> None:
+    drawing = [
+        {'name': 'PC', 'sta': 100.0, 'n': 0.0, 'e': 0.0},
+        {'name': 'IP', 'sta': 200.0, 'n': 0.0, 'e': 0.0},   # already bare
+        {'name': 'PI1', 'sta': 300.0, 'n': 0.0, 'e': 0.0},  # curve PI, not IP
+    ]
+    out = ck.normalize_ip_names(drawing)
+    assert [d['name'] for d in out] == ['PC', 'IP', 'PI1']
+
+
+def test_normalize_ip_names_does_not_mutate_input() -> None:
+    drawing = [{'name': 'IP1', 'sta': 100.0, 'n': 0.0, 'e': 0.0}]
+    ck.normalize_ip_names(drawing)
+    assert drawing[0]['name'] == 'IP1'
+
+
+def test_add_pcc_control_points_inserts_at_coincident_pair() -> None:
+    control = [
+        ControlPoint(name='PT', sta=100.000, n=10.0, e=20.0),
+        ControlPoint(name='PC', sta=100.004, n=10.0, e=20.0),
+    ]
+    out = ck.add_pcc_control_points(control)
+    assert len(out) == 3
+    pcc = out[-1]
+    assert pcc.name == 'PCC'
+    assert pcc.sta == pytest.approx(100.002)
+    assert pcc.n == 10.0 and pcc.e == 20.0
+
+
+def test_add_pcc_control_points_ignores_distant_pt_pc() -> None:
+    # A genuine PT...PC with a real tangent between them (not a compound
+    # junction) must not spawn a synthetic PCC.
+    control = [
+        ControlPoint(name='PT', sta=100.0, n=0.0, e=0.0),
+        ControlPoint(name='PC', sta=250.0, n=0.0, e=0.0),
+    ]
+    out = ck.add_pcc_control_points(control)
+    assert len(out) == 2
+
+
+def test_add_pcc_control_points_does_not_mutate_input() -> None:
+    control = [
+        ControlPoint(name='PT', sta=100.000, n=0.0, e=0.0),
+        ControlPoint(name='PC', sta=100.001, n=0.0, e=0.0),
+    ]
+    ck.add_pcc_control_points(control)
+    assert len(control) == 2

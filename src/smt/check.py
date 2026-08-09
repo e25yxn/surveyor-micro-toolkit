@@ -19,10 +19,12 @@ Depends on: alignment, vertical.
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, NamedTuple
 
 from . import alignment as al
 from . import vertical as vt
+from .builders.alignment_builder import ControlPoint
 
 # ---------------------------------------------------------------------------
 # Result types
@@ -215,3 +217,66 @@ def check_vertical(
             is_ok=abs(delta_elevation) <= tol,
         ))
     return results
+
+
+# ---------------------------------------------------------------------------
+# check_against_drawing naming adapters (session_logs/review_src_smt_20260802.md
+# #4 follow-up) - AL1_test_alignment_drawing.csv uses numbered angle-point
+# labels (IP1, IP2, ...) and a single 'PCC' label for a compound-curve
+# junction, neither of which appears in build_alignment_from_pi's control
+# output by that exact name (control uses bare 'IP', and a coincident PT+PC
+# pair rather than 'PCC'). These are adapters in front of
+# check_against_drawing, per the standing protected-function rule - neither
+# check_against_drawing nor build_alignment_from_pi is modified.
+# ---------------------------------------------------------------------------
+
+_IP_NUMBERED_RE = re.compile(r'^IP[-\s]?\d+$')
+
+
+def normalize_ip_names(drawing: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rename numbered angle-point labels (IP1, IP2, ...) to the bare 'IP'
+    used by build_alignment_from_pi's control output, so check_against_drawing
+    can match them by name.
+
+    Only entries whose 'name' matches IP<number> (optionally with a space or
+    hyphen before the number) are renamed; everything else, including a
+    drawing entry already named plain 'IP', passes through unchanged.
+    Returns a new list - the input is not mutated.
+    """
+    out: list[dict[str, Any]] = []
+    for d in drawing:
+        name = str(d.get('name') or '').strip()
+        if _IP_NUMBERED_RE.match(name):
+            d = {**d, 'name': 'IP'}
+        out.append(d)
+    return out
+
+
+def add_pcc_control_points(
+    control: list[ControlPoint],
+    sta_tolerance: float = 0.01,
+) -> list[ControlPoint]:
+    """Add a synthetic 'PCC' control point wherever a PT is immediately
+    followed by a PC at (essentially) the same station - the point of
+    compound curve, where two circular arcs in a compound-curve group meet.
+
+    Coordinates of the synthetic PCC point are the midpoint of the
+    coincident PT/PC pair. sta_tolerance (default 0.01 m) bounds how close
+    the pair's stations must be to be treated as coincident, so a genuine
+    PT followed much later by an unrelated PC's is left alone. Returns a
+    new list (original entries unchanged, PCC entries appended) - the input
+    is not mutated.
+    """
+    out: list[ControlPoint] = list(control)
+    new_points: list[ControlPoint] = []
+    for i in range(len(control) - 1):
+        a, b = control[i], control[i + 1]
+        if a.name == 'PT' and b.name == 'PC' and abs(a.sta - b.sta) <= sta_tolerance:
+            new_points.append(ControlPoint(
+                name='PCC',
+                sta=(a.sta + b.sta) / 2,
+                n=(a.n + b.n) / 2,
+                e=(a.e + b.e) / 2,
+            ))
+    out.extend(new_points)
+    return out

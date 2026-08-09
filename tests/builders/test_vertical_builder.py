@@ -156,7 +156,8 @@ def test_check_against_drawing_fail_on_large_error(result: vb.VerticalBuildResul
 def test_check_against_drawing_report_fields(result: vb.VerticalBuildResult) -> None:
     drawing = [{'name': 'BVP', 'sta': 0, 'elev': 100}]
     report = vb.check_against_drawing(result.control, drawing)
-    assert set(report[0].keys()) == {'name', 'sta', 'd_sta', 'd_elev', 'ok'}
+    assert set(report[0].keys()) == {'name', 'sta', 'd_sta', 'd_elev', 'ok', 'note'}
+    assert report[0]['note'] == ''
 
 
 # ---------------------------------------------------------------------------
@@ -241,12 +242,28 @@ class TestDefensiveVerticalBuilder:
         report = vb.check_against_drawing(result.control, [])
         assert report == []
 
-    def test_check_against_drawing_unknown_name_is_skipped(self, result) -> None:
-        # 'XYZ' matches no control name → entry skipped, only 'BVP' reported
+    def test_check_against_drawing_unknown_name_reports_no_match_row(self, result) -> None:
+        # Regression test for review finding #4 (session_logs/review_src_smt_20260802.md).
+        # 'XYZ' matches no control name -> reported as an explicit no-match
+        # row instead of vanishing; 'BVP' still matches and reports normally.
         drawing = [
             {'name': 'BVP', 'sta': 0,    'elev': 100},
             {'name': 'XYZ', 'sta': 0,    'elev': 100},
         ]
         report = vb.check_against_drawing(result.control, drawing)
-        assert len(report) == 1
+        assert len(report) == 2
         assert report[0]['name'] == 'BVP'
+        assert report[0]['ok'] is True
+        assert report[0]['note'] == ''
+        assert report[1]['name'] == 'XYZ'
+        assert report[1]['ok'] is False
+        assert report[1]['sta'] is None
+        assert report[1]['note'] != ''
+
+    def test_check_against_drawing_max_sta_distance_rejects_far_match(self, result) -> None:
+        drawing = [{'name': '', 'sta': 2500.0, 'elev': 102.0}]
+        report = vb.check_against_drawing(result.control, drawing, max_sta_distance=50.0)
+        assert len(report) == 1
+        assert report[0]['ok'] is False
+        assert report[0]['d_sta'] is None
+        assert report[0]['note'] != ''

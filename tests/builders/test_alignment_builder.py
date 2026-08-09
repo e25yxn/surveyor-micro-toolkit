@@ -876,22 +876,81 @@ class TestDefensiveBuilder:
         assert [el.type for el in r1.elements] == [el.type for el in r2.elements]
         assert r1.issues == r2.issues == []
 
-    def test_check_against_drawing_empty_control_gives_empty_report(self):
-        # No control points → every drawing entry has best=None → skipped → []
+    def test_check_against_drawing_empty_control_reports_no_match_row(self):
+        # Regression test for review finding #4 (session_logs/review_src_smt_20260802.md).
+        # No control points -> every drawing entry has best=None -> now reported
+        # as an explicit no-match row instead of vanishing silently.
         drawing = [{'name': 'PC', 'sta': 100.0, 'n': 0.0, 'e': 0.0}]
         report = ab.check_against_drawing([], drawing)
-        assert report == []
+        assert len(report) == 1
+        row = report[0]
+        assert row['ok'] is False
+        assert row['sta_calc'] is None
+        assert row['gap_m'] is None
+        assert row['note'] != ''
 
-    def test_check_against_drawing_unknown_name_is_skipped(self):
-        # 'XYZ' does not match any control name → entry skipped, only 'PC' reported
+    def test_check_against_drawing_unknown_name_reports_no_match_row(self):
+        # 'XYZ' matches no control name -> reported as an explicit no-match
+        # row (not skipped); 'PC' still matches and reports normally.
         ctrl = [ab.ControlPoint(name='PC', sta=100.0, n=10.0, e=0.0)]
         drawing = [
             {'name': 'PC',  'sta': 100.0, 'n': 10.0, 'e': 0.0},
             {'name': 'XYZ', 'sta': 100.0, 'n': 10.0, 'e': 0.0},
         ]
         report = ab.check_against_drawing(ctrl, drawing)
-        assert len(report) == 1
+        assert len(report) == 2
         assert report[0]['name'] == 'PC'
+        assert report[0]['ok'] is True
+        assert report[0]['note'] == ''
+        assert report[1]['name'] == 'XYZ'
+        assert report[1]['ok'] is False
+        assert report[1]['sta_calc'] is None
+        assert report[1]['note'] != ''
+
+    def test_check_against_drawing_max_sta_distance_rejects_far_match(self):
+        # Closest-by-station candidate is farther than max_sta_distance ->
+        # treated as no-match instead of a confusing distant FAIL.
+        ctrl = [
+            ab.ControlPoint(name='BP', sta=0.0,   n=1000.0, e=2000.0),
+            ab.ControlPoint(name='EP', sta=600.0, n=1600.0, e=2000.0),
+        ]
+        drawing = [{'name': '', 'sta': 300.0, 'n': 1300.0, 'e': 2050.0}]
+        report = ab.check_against_drawing(ctrl, drawing, max_sta_distance=50.0)
+        assert len(report) == 1
+        assert report[0]['ok'] is False
+        assert report[0]['gap_m'] is None
+        assert report[0]['note'] != ''
+
+    def test_check_against_drawing_max_sta_distance_boundary_is_inclusive(self):
+        # Distance exactly equal to max_sta_distance still counts as matched.
+        ctrl = [ab.ControlPoint(name='PC', sta=100.0, n=0.0, e=0.0)]
+        drawing = [{'name': '', 'sta': 150.0, 'n': 0.0, 'e': 0.0}]  # 50m away
+        report = ab.check_against_drawing(ctrl, drawing, max_sta_distance=50.0)
+        assert len(report) == 1
+        assert report[0]['sta_calc'] == 100.0
+        assert report[0]['note'] == ''
+
+    def test_check_against_drawing_default_ceiling_rejects_far_match(self):
+        # max_sta_distance defaults to 10.0m -- a far-away point is rejected
+        # even without the caller passing anything explicitly.
+        ctrl = [ab.ControlPoint(name='BP', sta=0.0, n=1000.0, e=2000.0)]
+        drawing = [{'name': '', 'sta': 300.0, 'n': 1300.0, 'e': 2050.0}]
+        report = ab.check_against_drawing(ctrl, drawing)
+        assert len(report) == 1
+        assert report[0]['sta_calc'] is None
+        assert report[0]['ok'] is False
+        assert report[0]['note'] != ''
+
+    def test_check_against_drawing_max_sta_distance_none_disables_ceiling(self):
+        # Explicitly passing None restores pre-fix matching (no ceiling) -
+        # still matches a far-away point, only the schema (note key) is new.
+        ctrl = [ab.ControlPoint(name='BP', sta=0.0, n=1000.0, e=2000.0)]
+        drawing = [{'name': '', 'sta': 300.0, 'n': 1300.0, 'e': 2050.0}]
+        report = ab.check_against_drawing(ctrl, drawing, max_sta_distance=None)
+        assert len(report) == 1
+        assert report[0]['sta_calc'] == 0.0
+        assert report[0]['ok'] is False   # gap far exceeds tolerance
+        assert report[0]['note'] == ''    # matched, just failed tolerance - not a "no match"
 
 
 # ---------------------------------------------------------------------------

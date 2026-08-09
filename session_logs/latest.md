@@ -2114,3 +2114,37 @@
   wc -l ที่ไม่ตรงคาด (380 บรรทัด แทนที่จะเป็น 355) แล้วแก้ด้วยการส่งไฟล์ที่แก้สมบูรณ์แล้ว
   ให้แทน เป็นบทเรียนว่าไฟล์ "คำแนะนำการแก้ไข" กับ "เนื้อหาที่จะ paste ตรงๆ" ต้องแยกให้
   ชัดกว่านี้ในรอบหน้า
+## [2026-08-09] ปิดงาน #4 (check_against_drawing no-match reporting + station-distance ceiling) + EXT-004 (IP/PCC naming adapters) — code + tests + docs
+- ทำ: ยืนยัน check_against_drawing (alignment_builder.py, vertical_builder.py) ไม่มี
+  พอร์ตใน reference/gsheet หรือ reference/vba เลย (ต่างจาก #1-#3) — ฟังก์ชันที่
+  GS_CrossCheck.gs::checkPoints() mirror จริงคือ check.py::check_horizontal()
+  คนละอัลกอริทึม ไม่มีบั๊กนี้ — เงื่อนไข Oracle correction ข้อ 1 จึงเป็น N/A แก้
+  best is None -> continue (หายเงียบ) ให้รายงานแถว no-match ชัดเจนแทน (schema
+  สม่ำเสมอทุกแถว มี note key เสมอ) เพิ่ม max_sta_distance (default 10.0m ตามที่
+  CK1024 กำหนดจากประสบการณ์หน้างานจริง) กันจับคู่ไกลเกินจริงแบบสับสน รันจริงกับ
+  AL1_test_alignment_drawing.csv พบ 33% ของแถว (15/45) เป็น no-match ที่เคยหาย
+  เงียบมาตลอด — 11 แถว (PI1-PI11) ถูกต้องอยู่แล้ว (PI ไม่ใช่จุดบนเส้นทางจริง)
+  แต่ 4 แถว (IP1, IP2, PCC×2) มีจุดจริงตรงตำแหน่งใน control แค่ชื่อไม่ตรง
+  convention — เพิ่ม check.py::normalize_ip_names()/add_pcc_control_points()
+  (EXT-004, adapter ใหม่ล้วนๆ ไม่แตะ protected function) แก้ปัญหานี้ที่ต้นตอ
+  เขียนแผน session_logs/plan_20260809_check_against_drawing.md ผ่าน multi-round
+  review กับ Claude แชทก่อน implement (รวมวิเคราะห์ข้อดี/ข้อเสียของแนวทาง
+  fallback แบบกว้างที่ถูกปฏิเสธเพราะจะสร้างปัญหาแบบเดียวกับที่กำลังแก้)
+  แก้ทั้ง 2 ไฟล์ builders + เพิ่ม/แก้เทส 11 เคสสุทธิ (5 ใหม่ + แก้ไข 2 เดิมใน
+  alignment_builder, 2 ใหม่ + แก้ไข 1 เดิมใน vertical_builder) + เพิ่ม
+  check.py 2 ฟังก์ชันใหม่ + เทส 6 เคสใน test_check.py
+- คำสั่ง: pytest tests/builders/test_alignment_builder.py::TestDefensiveBuilder -v,
+  pytest tests/builders/test_vertical_builder.py -v -k check_against_drawing,
+  pytest tests/test_check.py -v, pytest -q (เต็มชุด, รันหลายรอบระหว่างพัฒนา),
+  python -c "import ast; ast.parse(...)" ตรวจ syntax หลังแก้ check.py/test_check.py,
+  grep เจาะจงหลายจุดยืนยันเนื้อหาไฟล์จริงหลัง save (mechanical check แทนการ
+  พิมพ์ diff ซ้ำ หลังเจอ terminal-relay ตัดคำซ้ำหลายรอบ)
+- ผล: PASS — 528 passed (517 เดิม + สุทธิ 11 ใหม่), รันจริงกับ AL1 ผ่าน adapter
+  ทั้งสอง: 34 matched (จาก 30), 11 no-match (จาก 15, เหลือแค่ PI1-PI11 ที่ถูกต้อง)
+- commit: ยังไม่ commit (จะมี entry แยกต่างหากทีหลังตอน commit จริงเกิดขึ้น)
+- หมายเหตุ: ไม่มี .gs/VBA divergence ต้อง track สำหรับทั้ง #4 และ EXT-004 (ไม่มี
+  พอร์ตเลยทั้งคู่) — ระหว่างทางเจอ terminal-relay ตัดคำ/บรรทัดซ้ำหลายรอบ (คอมเมนต์
+  ท้ายบรรทัด, ชื่อฟังก์ชัน, ค่าพารามิเตอร์) รุนแรงกว่า #3 เพราะ diff ยาวและซับซ้อน
+  กว่า แก้ด้วยการเปลี่ยนวิธีตรวจเป็น apply-แล้ว-mechanical-grep-check แทนการขอดู
+  diff text ซ้ำ (ซึ่งพิสูจน์แล้วว่าพิมพ์ผิดจุดใหม่ไปเรื่อยๆ ไม่ช่วยอะไรเพิ่ม) —
+  เป็นวิธีที่ควรใช้ตั้งแต่ diff แรกๆ ของไฟล์ที่มีโค้ด+ภาษาไทยปนกันยาวๆ ในรอบหน้า

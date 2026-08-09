@@ -588,3 +588,144 @@ EP,200,200,,,,
   เสร็จ
 - **VBA (`reference/vba/`)** — ไม่มีพอร์ต `parse_pi_table` เลย — ไม่มีโค้ด
   VBA ที่ต้องพิจารณา divergence สำหรับบั๊กนี้
+
+## Oracle Correction — check_against_drawing No-Match Reporting + Station-Distance Ceiling
+
+**วันที่:** 2026-08-09
+**Commit:** (ยังไม่ commit — จะเติมหลัง commit ตามแบบแผนเดิม)
+**ไฟล์:** `src/smt/builders/alignment_builder.py`, `src/smt/builders/vertical_builder.py`
+**Tests:** `tests/builders/test_alignment_builder.py` class `TestDefensiveBuilder`
+(5 เคสใหม่), `tests/builders/test_vertical_builder.py` (`test_check_against_drawing_report_fields`
+แก้ไข + class `TestDefensiveVerticalBuilder` 2 เคสใหม่)
+**อ้างอิง:** `session_logs/review_src_smt_20260802.md` #4,
+`session_logs/plan_20260809_check_against_drawing.md`
+
+### ประเภทงาน: Oracle correction exception — เงื่อนไขข้อ (1) เป็น N/A
+
+ต่างจาก entry ก่อนหน้า (#1/#2/#3) ที่พิสูจน์ว่า `.gs` มี defect เดียวกัน —
+`check_against_drawing` **ไม่มีพอร์ตใน `reference/gsheet/` หรือ `reference/vba/`
+เลยสักที่** ฟังก์ชันที่ `GS_CrossCheck.gs::checkPoints()` mirror จริงคือ
+`check.py::check_horizontal()` (คนละฟังก์ชัน คนละอัลกอริทึม — คำนวณตำแหน่ง
+ณ สถานีที่ drawing ระบุโดยตรง ไม่ค้นหาจุดใกล้สุด จึงไม่มีบั๊กนี้เลย) เงื่อนไข
+ข้อ (1) ("พิสูจน์ว่า oracle มี defect เดียวกัน") จึงเป็น N/A ในความหมายที่
+ปลอดภัยกว่าเดิม — ไม่มี oracle ให้ขัดตั้งแต่แรก จึงไม่มีความเสี่ยงขัดกับ
+พฤติกรรมที่เคย verify ไว้ ยังต้องผ่านเงื่อนไขที่เหลือ (proof เชิงตรรกะ,
+เทส, เอกสาร, tracking) เหมือนเดิม
+
+### Oracle limitation / defect ที่พบ
+
+`check_against_drawing` (ทั้งสองไฟล์) มี 2 จุดที่พฤติกรรมเดิมอันตราย:
+
+1. drawing point ที่ชื่อไม่ match control point ใดเลย → `best is None` →
+   `continue` **เงียบ ไม่มีแถวในรายงานเลย** — เครื่องมือ verify ที่ข้ามจุด
+   ตรวจไม่ได้แบบเงียบอันตรายที่สุด เพราะรายงานที่เหลือดูผ่านหมด ผู้ใช้เข้าใจ
+   ว่าตรวจครบ
+2. การจับคู่ closest-by-station **ไม่มีเพดานระยะ** — จุดที่ห่างจาก control
+   ที่ใกล้สุดเป็นร้อย/พันเมตร ก็ยังถูกจับคู่แล้วรายงาน FAIL ที่ชวนสับสน
+   แทนที่จะบอกว่า "ไม่มีคู่"
+
+รันจริงกับ `test_data/AL1_test_alignment_drawing.csv` (45 แถว) ก่อนแก้:
+30 matched, 15 no-match — **ทั้ง 15 แถวหายไปเงียบๆ ไม่มีร่องรอยในรายงานเลย**
+
+### ขอบเขต
+
+แก้ 2 จุดในฟังก์ชันเดียวกัน ทำกับทั้ง 2 ไฟล์ (โครงสร้างเหมือนกัน):
+1. แทนที่ `if best is None: continue` ด้วยการ append แถว no-match ที่มี
+   schema เดียวกับแถวปกติทุกประการ (`note` เป็น key เสมอทุกแถว — ปกติ `''`,
+   ไม่พบ/ไกลเกินเป็นข้อความอธิบาย) กัน `KeyError` ฝั่งโค้ดที่เอา report ไปใช้ต่อ
+2. เพิ่มพารามิเตอร์ `max_sta_distance: float | None = 10.0` — ถ้าจุดใกล้สุด
+   ยังห่างเกินนี้ ถือเป็น "ไม่พบ" เหมือนกัน (note ต่างข้อความ) แทนรายงาน FAIL
+   ที่สับสน default 10.0m (ความคลาดเคลื่อนหน้างานจริงไม่เกินไม่กี่เมตร ระยะ
+   ระหว่างจุดจริงในไฟล์อยู่หลักร้อย-พันเมตร — 10m แยกกรณีจริงจาก
+   typo/ป้ายชื่อผิดที่ไปจับจุดไกลๆ ได้ชัดเจน) — `None` ปิดเพดานได้
+   (คืนพฤติกรรมเดิม)
+
+### Before/After
+
+**ตัวอย่าง — orphan drawing point (ชื่อไม่ match):**
+```
+control = [ControlPoint('PC', sta=100, ...)]
+drawing = [{'name':'PC',...}, {'name':'XYZ',...}]
+```
+| | เดิม | ใหม่ |
+| --- | --- | --- |
+| ผลลัพธ์ | `report` มีแค่ 1 แถว (PC) — XYZ หายไปเงียบๆ | `report` มี 2 แถว — XYZ ได้แถว `ok=False, note='ไม่พบจุดควบคุมที่ชื่อตรงกัน'` |
+
+**ตัวอย่าง — จับคู่ไกลเกินไป:**
+```
+control = [ControlPoint('BP', sta=0), ControlPoint('EP', sta=600)]
+drawing = [{'name':'','sta':300,...}]   # อยู่กึ่งกลาง ไม่ใกล้จุดไหนเลย
+```
+| | เดิม | ใหม่ (default 10m) |
+| --- | --- | --- |
+| ผลลัพธ์ | จับคู่กับ BP (ห่าง 300m) รายงาน `ok=False` เหมือน FAIL ธรรมดา | `ok=False, note='จุดควบคุมที่ใกล้สุด (BP) ห่างตามสถานี 300.000 ม. เกินเพดาน 10.000 ม.'` |
+
+### Regression guarantee
+
+- `pytest tests/builders/test_alignment_builder.py::TestDefensiveBuilder -v` →
+  ผ่านหมด (2 เทสเดิมที่ assert พฤติกรรมบั๊กเดิมตรงๆ ถูกแทนที่ด้วยเวอร์ชันใหม่
+  ที่ assert พฤติกรรมถูกต้อง + เพิ่ม 3 เคสใหม่สำหรับ `max_sta_distance`)
+- `pytest tests/builders/test_vertical_builder.py -v -k check_against_drawing`
+  → ผ่านหมด (โครงสร้างเดียวกัน)
+- `pytest -q` เต็มชุด → **528 passed** (517 เดิม + สุทธิ 11 ใหม่)
+- รันจริงกับ `AL1_test_alignment_drawing.csv` (ฉบับแก้ไขแล้ว): core fix
+  อย่างเดียว (ไม่มี adapter) ยังคง 30 matched, 15 no-match **แต่ทุกแถวโผล่
+  ในรายงานแล้ว** ไม่ใช่หายเงียบเหมือนก่อน
+
+### สถานะ .gs/VBA — ไม่มี divergence ต้อง track
+
+ไม่มีพอร์ตของ `check_against_drawing` ใน `reference/gsheet/` หรือ
+`reference/vba/` เลย (ยืนยันด้วย `grep` ทั้ง repo ไม่เจอ) — ไม่มีโค้ด GAS/VBA
+ที่ต้องพิจารณา divergence สำหรับ fix นี้เลย
+
+---
+
+## EXT-004 — check_against_drawing Naming Adapters (IP/PCC)
+
+**วันที่:** 2026-08-09
+**Commit:** (ยังไม่ commit — จะเติมหลัง commit ตามแบบแผนเดิม)
+**ไฟล์:** `src/smt/check.py` (ฟังก์ชันใหม่ล้วนๆ ไม่แตะ protected function ใดๆ)
+**Tests:** `tests/test_check.py` (6 เคสใหม่: `test_normalize_ip_names_*` ×3,
+`test_add_pcc_control_points_*` ×3)
+**อ้างอิง:** `session_logs/plan_20260809_check_against_drawing.md`
+
+### ที่มา
+
+ระหว่าง validate fix ด้านบนกับข้อมูลจริง (`AL1_test_alignment_drawing.csv`)
+พบว่า 33% ของแถว (15/45) เป็น no-match — 11 แถว (`PI1`-`PI11`) ถูกต้องอยู่แล้ว
+โดยธรรมชาติ (PI คือจุดตัดแทนเจนต์ ไม่ใช่จุดบนเส้นทางจริง ไม่ควรมี control
+point ให้จับคู่) แต่ 4 แถว (`IP1`, `IP2`, `PCC`×2) มีจุดจริงตรงตำแหน่งเป๊ะใน
+control แค่ชื่อไม่ตรง convention — CK1024 ยืนยันแล้วว่าอยากให้แจ้งเป็น "ไม่พบ"
+ให้ผู้ใช้ไปตรวจสอบเอง (ไม่ใช่เดา/auto-fix) แต่กรณี IP/PCC นี้มีจุดจริงรออยู่
+แค่ชื่อไม่ตรง สมควรแก้ที่ต้นตอของชื่อแทน
+
+### ฟังก์ชัน
+
+- **`normalize_ip_names(drawing)`** — ตัดเลขออกจากชื่อ `IP<เลข>` ทุก format
+  (`IP1`/`IP-1`/`IP-01`/`IP-001`/`IP 1`) → `IP` เปล่า ให้ตรงกับชื่อที่ control
+  ใช้จริง (control ตั้งชื่อจุดไม่มีโค้งเป็น `IP` เฉยๆ เสมอ ไม่มีเลข) ไม่แตะ
+  `PI*` เลย (ถูกต้องอยู่แล้วที่ไม่ต้อง match) คืน list ใหม่ ไม่แก้ input เดิม
+- **`add_pcc_control_points(control, sta_tolerance=0.01)`** — หา `PT` ตามด้วย
+  `PC` ทันทีที่ station ห่างกัน ≤ `sta_tolerance` (default 1cm — ยืนยันจาก
+  ข้อมูลจริง: 2 คู่ในไฟล์ AL1 ห่างกัน 0.0004-0.001m) แล้วสร้างจุด control
+  สังเคราะห์ชื่อ `PCC` ที่ midpoint เพิ่มเข้า list คืน list ใหม่ ไม่แก้ input เดิม
+
+### ทำไมไม่ใช่ Oracle correction
+
+ฟังก์ชันใหม่ล้วนๆ ไม่แตะ `check_against_drawing`/`build_alignment_from_pi`
+แม้แต่บรรทัดเดียว — เป็น adapter หน้า protected function ตรงตามกฎมาตรฐาน
+ของโปรเจกต์ (`parse_pi_table`/`build_alignment_from_pi`/`check_against_drawing`
+ต้องไม่ถูกแก้โดยตรง งานใหม่เป็น adapter แทน) ไม่เข้าเงื่อนไข Oracle correction
+exception ใดๆ
+
+### Regression guarantee + real-data validation
+
+- `pytest tests/test_check.py -v` → 6 เคสใหม่ผ่านหมด (ครอบคลุม: ตัดเลขทุก
+  format, ไม่แตะชื่ออื่นที่ไม่เกี่ยว, ไม่ mutate input ทั้งสองฟังก์ชัน, `PT`/`PC`
+  ที่ห่างกันจริงไม่ถูกสร้าง `PCC` ปลอม)
+- `pytest -q` เต็มชุด → **528 passed**
+- รันจริงกับ `AL1_test_alignment_drawing.csv` ผ่านทั้ง adapter: **34 matched,
+  11 no-match** (เพิ่มจาก 30/15) — เหลือแค่ `PI1`-`PI11` ที่ถูกต้องอยู่แล้ว
+  gap ของ 4 จุดที่ match ได้ใหม่: 0.0-0.0008m (ยืนยันเป็นจุดเดียวกันจริง)
+- ทดสอบ default `max_sta_distance=10.0` (จาก entry ด้านบน) ว่าไม่บล็อกจุด
+  ที่ควร match จริงแม้แต่จุดเดียวในข้อมูลนี้

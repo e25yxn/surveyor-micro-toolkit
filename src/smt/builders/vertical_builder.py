@@ -166,6 +166,7 @@ def check_against_drawing(
     drawing: list[dict[str, Any]],
     tolerance_sta: float = 0.01,
     tolerance_elev: float = 0.005,
+    max_sta_distance: float | None = 10.0,
 ) -> list[dict[str, Any]]:
     """Cross-check computed control points against drawing / survey values.
 
@@ -173,10 +174,21 @@ def check_against_drawing(
     (filtered by name when drawing entry has a non-empty 'name' key), then
     computes station and elevation deviations.
 
+    FIX (Oracle correction, session_logs/review_src_smt_20260802.md #4,
+    session_logs/plan_<TBD>.md): same defect and same justification as the
+    horizontal check_against_drawing in alignment_builder.py -- see that
+    docstring. No reference/gsheet or reference/vba port of this specific
+    matching algorithm exists, so condition (1) of the Oracle correction
+    exception is N/A here.
+
     drawing entries: {'name' (optional), 'sta', 'elev'}.
-    Returns list of dicts: {name, sta, d_sta, d_elev, ok}.
+    Returns list of dicts: {name, sta, d_sta, d_elev, ok, note}.
     d_sta and d_elev are absolute differences (always ≥ 0).
     ok is True when d_sta ≤ tolerance_sta and d_elev ≤ tolerance_elev.
+    sta/d_sta/d_elev are None and ok is False when no matching control point
+    was found; note then explains why. note is '' for a normal matched row.
+    max_sta_distance defaults to 10.0m (see alignment_builder.check_against_drawing
+    for the full rationale). Pass None to disable the ceiling entirely.
     """
     report: list[dict[str, Any]] = []
     for d in drawing:
@@ -192,6 +204,27 @@ def check_against_drawing(
                 best_dist = dist
                 best = c
         if best is None:
+            report.append({
+                'name':   d_name,
+                'sta':    None,
+                'd_sta':  None,
+                'd_elev': None,
+                'ok':     False,
+                'note':   'ไม่พบจุดควบคุมที่ชื่อตรงกัน',
+            })
+            continue
+        if max_sta_distance is not None and best_dist > max_sta_distance:
+            report.append({
+                'name':   d_name or best.name,
+                'sta':    None,
+                'd_sta':  None,
+                'd_elev': None,
+                'ok':     False,
+                'note': (
+                    f'จุดควบคุมที่ใกล้สุด ({best.name}) ห่างตามสถานี '
+                    f'{best_dist:.3f} ม. เกินเพดาน {max_sta_distance:.3f} ม.'
+                ),
+            })
             continue
         d_sta_diff = abs(best.sta - d_sta)
         d_elev_diff = abs(best.elevation - float(d['elev']))
@@ -201,5 +234,6 @@ def check_against_drawing(
             'd_sta': d_sta_diff,
             'd_elev': d_elev_diff,
             'ok': d_sta_diff <= tolerance_sta and d_elev_diff <= tolerance_elev,
+            'note': '',
         })
     return report

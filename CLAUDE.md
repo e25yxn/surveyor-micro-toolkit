@@ -56,7 +56,7 @@ SAFE - SMALL - STABLE - MODULAR.
   ต่างหาก ไม่ถือว่าปิดงานจนกว่าจะ sync
 
 ## Status
-All phases complete — 517/517 tests passing.
+All phases complete — 528/528 tests passing.
 - Core engine: 9 modules ported and validated against oracle
 - CLI: `smt build` / `smt station-to-coord` / `smt coord-to-station` /
        `smt cross-check` / `smt compare-drawing` / `smt fit-radius` complete
@@ -164,6 +164,20 @@ All phases complete — 517/517 tests passing.
   docs/extensions.md entry "Oracle Correction — parse_pi_table Orphan
   Compound-Sub-Row Guard" — `reference/gsheet/GS_PiTableParser.gs` ยังไม่
   sync ตาม (known divergence)
+- `check_against_drawing` แก้เพิ่มอีกรอบเมื่อ 2026-08-09 (Oracle correction
+  exception #4, session_logs/review_src_smt_20260802.md) — ไม่มีพอร์ตใน
+  reference/gsheet หรือ reference/vba เลย (เงื่อนไข Oracle correction ข้อ 1
+  เป็น N/A) เดิม `best is None` -> `continue` ทำให้จุดที่ชื่อไม่ match หายเงียบ
+  และการจับคู่ closest-by-station ไม่มีเพดานระยะ แก้ด้วยการรายงานแถว no-match
+  ชัดเจนแทนการหายเงียบ + เพิ่ม `max_sta_distance` (default 10.0m) ดู
+  docs/extensions.md entry "Oracle Correction — check_against_drawing
+  No-Match Reporting + Station-Distance Ceiling" (ทั้ง alignment_builder.py
+  และ vertical_builder.py) — ไม่มี .gs/VBA divergence ต้อง track (ไม่มีพอร์ตเลย)
+- EXT-004 (2026-08-09): `check.py::normalize_ip_names()`/`add_pcc_control_points()`
+  ใหม่ — adapter หน้า check_against_drawing แปลงชื่อ `IP<เลข>` ให้ตรงกับ `IP`
+  เปล่าที่ control ใช้ และสร้างจุด `PCC` สังเคราะห์จากคู่ `PT`+`PC` ที่ station
+  ชนกัน ดู docs/extensions.md entry "EXT-004 — check_against_drawing Naming
+  Adapters (IP/PCC)"
 
 ## Civil 3D Interop ground truth references
 - `smt-test1.xml` คือ Civil 3D export จริง 7 spiral types ที่ R=900 L=100
