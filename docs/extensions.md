@@ -592,7 +592,7 @@ EP,200,200,,,,
 ## Oracle Correction — check_against_drawing No-Match Reporting + Station-Distance Ceiling
 
 **วันที่:** 2026-08-09
-**Commit:** (ยังไม่ commit — จะเติมหลัง commit ตามแบบแผนเดิม)
+**Commit:** `3439a53`
 **ไฟล์:** `src/smt/builders/alignment_builder.py`, `src/smt/builders/vertical_builder.py`
 **Tests:** `tests/builders/test_alignment_builder.py` class `TestDefensiveBuilder`
 (5 เคสใหม่), `tests/builders/test_vertical_builder.py` (`test_check_against_drawing_report_fields`
@@ -683,7 +683,7 @@ drawing = [{'name':'','sta':300,...}]   # อยู่กึ่งกลาง �
 ## EXT-004 — check_against_drawing Naming Adapters (IP/PCC)
 
 **วันที่:** 2026-08-09
-**Commit:** (ยังไม่ commit — จะเติมหลัง commit ตามแบบแผนเดิม)
+**Commit:** `3439a53`
 **ไฟล์:** `src/smt/check.py` (ฟังก์ชันใหม่ล้วนๆ ไม่แตะ protected function ใดๆ)
 **Tests:** `tests/test_check.py` (6 เคสใหม่: `test_normalize_ip_names_*` ×3,
 `test_add_pcc_control_points_*` ×3)
