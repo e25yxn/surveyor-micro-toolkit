@@ -2148,3 +2148,20 @@
   กว่า แก้ด้วยการเปลี่ยนวิธีตรวจเป็น apply-แล้ว-mechanical-grep-check แทนการขอดู
   diff text ซ้ำ (ซึ่งพิสูจน์แล้วว่าพิมพ์ผิดจุดใหม่ไปเรื่อยๆ ไม่ช่วยอะไรเพิ่ม) —
   เป็นวิธีที่ควรใช้ตั้งแต่ diff แรกๆ ของไฟล์ที่มีโค้ด+ภาษาไทยปนกันยาวๆ ในรอบหน้า
+
+## [2026-08-10] เติม commit hash ลง docs/extensions.md entry #4 + EXT-004
+
+- ทำ: กลับมาทำงานต่อ ยืนยันสถานะ (git status/log/pytest) ก่อน แล้วเติม
+  `**Commit:** (ยังไม่ commit — จะเติมหลัง commit ตามแบบแผนเดิม)` เป็น
+  `**Commit:** \`3439a53\`` ใน docs/extensions.md 2 จุด (entry "Oracle
+  Correction — check_against_drawing No-Match Reporting + Station-Distance
+  Ceiling" กับ "EXT-004 — check_against_drawing Naming Adapters (IP/PCC)")
+  แสดง diff จริงในแชทให้ผู้ใช้ approve ก่อน save ตามข้อตกลง
+- คำสั่ง: git status -s, git log -3 --oneline, python -m pytest -q (pytest
+  เปล่าไม่อยู่บน PATH ใน Git Bash รอบนี้ — ใช้ python -m pytest ตาม fallback
+  ใน CLAUDE.md), git diff -- docs/extensions.md, git add docs/extensions.md,
+  git commit -F .git/smt_commit_msg.txt (heredoc + cat -A ตรวจก่อน)
+- ผล: PASS — 528 passed, 6.93s
+- commit: 33fa2b3
+- หมายเหตุ: การแก้ครั้งนี้ไม่แตะโค้ด เป็นแค่เติม metadata (commit hash) ที่ค้าง
+  ไว้จากรอบ commit 3439a53 ก่อนหน้า
