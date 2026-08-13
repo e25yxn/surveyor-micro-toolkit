@@ -2227,3 +2227,38 @@
   ด้วย grep -c เฉพาะบรรทัดเก่าหลัง save แล้วได้ 0 ยืนยันว่าไฟล์จริงถูกต้อง
   ไม่มีโค้ดซ้อนกัน ยังเหลือสเต็ป 8-12 ตามแผน (session log append นี้เอง,
   commit, push, clasp push, live test บน Test deployment) ก่อนปิดงานสมบูรณ์
+
+## [2026-08-13] clasp push #1/#2/#3 sync เข้าเว็บแอปต้นแบบจริง (D:\MyClasp_SMT_DEMO)
+- ทำ: ยืนยันกับ CK1024 ก่อนว่ายังไม่มีใคร copy ต้นแบบไปใช้งานจริงเลย (0 สำเนา,
+  ไม่มีข้อมูลสำคัญค้าง) ไม่มีความเสี่ยงเรื่อง migration/แจ้งทีมงาน รัน
+  `clasp status` ยืนยัน 15 tracked files ปกติ ก่อน `clasp push` ครั้งแรกถูก
+  "Skipping push" เพราะ clasp ตรวจพบว่า appsscript.json (manifest) ต่างจาก
+  ที่เคย push ไว้ และรอ confirm แบบ interactive ที่ไม่มีทางตอบผ่านเครื่องมือ
+  นี้ได้ — ก่อนใช้ `-f` ข้ามไปเฉยๆ ตรวจสอบก่อนว่าทำไม manifest ต่างกัน โดยเปิด
+  Apps Script online editor จริง (ผ่าน Claude in Chrome) เทียบเนื้อหา
+  appsscript.json remote กับ local **พบว่า local ขาด block `"webapp":
+  {"executeAs": "USER_DEPLOYING", "access": "MYSELF"}` ที่มีอยู่จริงบน
+  remote** — ถ้า force push ไปตรงๆ โดยไม่เช็คก่อน จะลบการตั้งค่า deployment
+  (ใครรันได้/ใครเข้าถึงเว็บแอปได้) ของจริงทิ้งไปเงียบๆ โดยไม่ตั้งใจ แก้ local
+  appsscript.json ให้มี webapp block ตรงกับ remote ก่อน แล้วค่อย push -f
+  ระหว่างเปิด online editor สังเกตเห็นบัญชีที่ login อยู่คือ
+  repolab.air@gmail.com ซึ่งไม่ใช่บัญชีที่คาดไว้ — ถามยืนยันกับ CK1024 แล้ว
+  แต่ยังไม่ได้รับคำตอบ (ไม่กระทบการ push เพราะ clasp ใช้ auth token แยกของ
+  ตัวเอง ไม่เกี่ยวกับ session login ของ browser)
+- คำสั่ง: npx clasp status, npx clasp push (ครั้งแรก, ถูก skip), cat
+  appsscript.json (local + เทียบกับที่เห็นบน online editor ผ่าน Claude in
+  Chrome), เขียน appsscript.json local ใหม่ผ่าน heredoc ให้มี webapp block,
+  npx clasp status (ซ้ำ), npx clasp push -f
+- ผล: PASS — "Pushed 15 files at 7:28:29 PM" ครบทุกไฟล์ (รวม
+  GS_AlignmentBuilder.gs/GS_PiTableParser.gs ที่มี fix #1/#2/#3 และ
+  appsscript.json ที่แก้ webapp block กลับคืนแล้ว) เว็บแอปต้นแบบ deploy
+  โค้ดใหม่เรียบร้อย
+- commit: N/A (เป็นการ deploy ผ่าน clasp เข้า Apps Script project โดยตรง
+  ไม่ใช่ git commit — โค้ดที่ push ตรงกับที่ commit ไว้แล้วที่ 30be6c5)
+- หมายเหตุ: **บทเรียนสำคัญสำหรับงาน .gs sync/deploy ในอนาคต** — ต้องเทียบ
+  appsscript.json (manifest) กับ remote ก่อน force push เสมอ ไม่ใช่แค่ตรวจ
+  ไฟล์ .js/.gs ที่ตั้งใจแก้ เพราะการตั้งค่า deployment (webapp block) มักถูก
+  แก้ผ่านหน้า UI ตอน Deploy โดยตรง แล้ว sync กลับเข้า local ไม่ครบถ้วน — ยัง
+  ค้างคำถามเรื่องบัญชี repolab.air@gmail.com ที่ login อยู่บน Apps Script
+  online editor รอ CK1024 ยืนยัน เหลือสเต็ป 12 ตามแผนเดิม (live test บน Test
+  deployment) ก่อนปิดงาน .gs sync ทั้งหมดสมบูรณ์
