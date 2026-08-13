@@ -2165,3 +2165,65 @@
 - commit: 33fa2b3
 - หมายเหตุ: การแก้ครั้งนี้ไม่แตะโค้ด เป็นแค่เติม metadata (commit hash) ที่ค้าง
   ไว้จากรอบ commit 3439a53 ก่อนหน้า
+
+## [2026-08-12] .gs sync สำหรับ #1/#2/#3 (Google Apps Script) — code + docs, กระทบเว็บแอปจริง
+- ทำ: สืบสวนขอบเขต .gs sync (session_logs/investigate_gsheet_sync_scope_20260810.md)
+  ยืนยันว่า clasp project ที่ deploy จริง (D:\MyClasp_SMT_DEMO, scriptId
+  1nZHagNeQJL-uCjJe0Ux-pApWgS5loJuT0NfOdRMKhoXAb9gWDHfwNjPp) ตรงกับ
+  reference/gsheet/*.gs แบบ byte-for-byte และ runFullPipeline() เรียกไฟล์
+  เหล่านี้ตรงๆ — บั๊ก #2/#3 ที่ยังไม่ sync กระทบทีมงานที่ใช้เว็บแอปจริงโดยตรง
+  ไม่ใช่แค่ไฟล์ oracle สำหรับเทียบเฉยๆ พบและแก้ document error จาก #1/#2 เดิม:
+  reference/AlignmentBuilder.gs (top-level) เป็นไฟล์ตาย v1.1 (คอมมิตเดียว
+  ตั้งแต่สร้าง ไม่มี EXT-001/EXT-003) ไม่ใช่ไฟล์ที่ deploy จริง — ไฟล์จริงคือ
+  reference/gsheet/GS_AlignmentBuilder.gs เอกสารเดิมชี้ผิดไฟล์มาตลอด ค้นพบ
+  เพิ่มว่า GS_AlignmentBuilder.js ยังมีบั๊ก #1 (singular-deflection ไม่มี
+  guard) ด้วย ไม่ใช่แค่ #2 ตรวจสอบ crossCheck() (pattern เดียวกับ #4) แล้ว
+  ยืนยันเป็น dead code (GS_CrossCheck.js จาก Session E มาแทนที่แล้ว) ไม่รวม
+  ในขอบเขต sync นี้ เขียนแผนเต็ม session_logs/plan_20260810_gsheet_sync.md
+  ออกแบบ+ทดสอบ patch ทั้ง 3 จุดผ่าน Node เทียบ Python จนตรงกันทุกตัวเลข
+  ก่อนส่งให้ Claude Code (รวมทดสอบกับข้อมูลจริง AL1: 36/36 control points
+  ตรงกับ Python ทุกจุด) แก้ reference/gsheet/GS_AlignmentBuilder.gs (เพิ่ม
+  NEAR_PI_EPS_/TOL_METERS_ constants, guard #1 ก่อนจุดหักมุมเอียงหาโค้งไม่ได้,
+  guard #2 signed tan_len + hasGeometricOverlap flag) และ
+  reference/gsheet/GS_PiTableParser.gs (compoundArcsFirstLine + throw แทน
+  return เงียบใน flushPending_) verify ในโปรเจกต์จริงด้วย Node ซ้ำอีกรอบ
+  ผ่านครบทั้ง 3 เคส (fixture #2, delta=0 ของ #1, orphan-row ของ #3 อ้าง
+  เลขบรรทัดถูกต้อง) copy ไฟล์ที่แก้แล้วเข้า D:\MyClasp_SMT_DEMO\ (diff
+  exit 0 ยืนยัน byte-identical ทั้งคู่) — verify ซ้ำแบบ literal ในโฟลเดอร์
+  clasp ทำไม่ได้เพราะ require('../FPMath.gs') เป็นข้อจำกัดเดิมของโครงสร้าง
+  โปรเจกต์ (ไม่เกี่ยวกับ sync รอบนี้ ยืนยันว่า GS_Alignment.js ที่ไม่ได้แตะ
+  เลยก็มี pattern เดียวกัน และไม่กระทบ GAS runtime จริงเพราะ typeof require
+  เป็น undefined เสมอบน Apps Script) ตัดสินใจข้ามขั้นนี้ ถือว่า diff
+  byte-identical + Node test ที่ผ่านแล้วเพียงพอ แก้ CLAUDE.md (3 บูลเล็ต
+  #1/#2/#3 จาก "ยังไม่ sync ตาม" เป็น "sync แล้วเมื่อ 2026-08-10" พร้อมแก้
+  path ไฟล์ให้ถูกต้อง) และ docs/extensions.md (3 หัวข้อ "สถานะ .gs/VBA"
+  เปลี่ยนจาก "divergence ที่รู้ตัว ยังไม่ sync" เป็น "synced 2026-08-10"
+  — ระหว่างแก้พบว่าหัวข้อ #3 เดิมเขียนไม่สม่ำเสมอกับ #1/#2 (ไม่มี "/VBA")
+  แก้ให้ตรงกันไปด้วย)
+- คำสั่ง: node -e (สคริปต์ทดสอบ fixture #1/#2/#3 เทียบ Python, รันทั้งใน
+  reference/gsheet/ และซ้ำในโฟลเดอร์ clasp), cp + diff (copy เข้าโฟลเดอร์
+  clasp แล้วยืนยัน byte-identical), grep หลายจุดยืนยันเนื้อหาไฟล์จริงหลัง
+  save (mechanical check แทนพิมพ์ diff ซ้ำ ตามวิธีที่ใช้มาตั้งแต่ #3/#4)
+- ผล: PASS ครบทุกจุด — Fix #2: issues=2, hasGeometricOverlap=true, station
+  ตรงกับ Python เป๊ะทุกทศนิยม (77.124, 583.222, 914.007, 1201.792, 1219.321)
+  Fix #1: fallback เป็น angle point (IP) ถูกต้อง ไม่มี garbage geometry
+  (NaN/null) อีกต่อไป Fix #3: throw ถูกต้อง อ้างเลขบรรทัดตรงกับ Python เป๊ะ
+  ทั้งกรณีก่อน PI แรกและหลัง EP ข้อมูลจริง AL1 ผ่าน pipeline เต็ม (parse+build
+  ทั้ง 3 fix พร้อมกัน): 36 control points ตรงกับ Python ทุกจุดทุกทศนิยม
+  รวมถึงพบ noise เดียวกันจากการปัดเศษ 3 ตำแหน่งที่ Python เจอตอนพัฒนา #2
+- commit: ยังไม่ commit (โค้ด+เอกสารแก้ในเครื่องจริงแล้วแต่ยังไม่ commit —
+  จะมี entry แยกต่างหากทีหลังตอน commit จริงเกิดขึ้น) clasp push เข้าเว็บแอป
+  จริงก็ยังไม่ทำเช่นกัน (แยกขั้นตอนชัดเจน ต้อง approve เดี่ยวๆ)
+- หมายเหตุ: มี terminal-relay corruption รุนแรงกว่าปกติหลายจุดระหว่างแก้
+  reference/gsheet/GS_AlignmentBuilder.gs (comment ขาดคำ, string concat ขาด
+  operator กลางบรรทัด, els.push(...) ถูกตัดกลาง argument) ทุกจุดตรวจแล้ว
+  ว่าเป็นแค่ preview ตอน relay กลับแชท ไม่ใช่ไฟล์จริง (ยืนยันด้วย grep เจาะจง
+  ทุกจุด) — เจอบั๊ก logic ที่ร้ายแรงกว่า 1 จุดระหว่างทางที่ไม่ใช่แค่ relay:
+  ตอน apply patch ครั้งแรกเอง Claude Chat เองก็เผลอลบ els.push/control.push
+  2 บรรทัดหายไประหว่างทำ str_replace ในเครื่องตัวเอง (ตรวจพบและแก้ก่อนส่ง
+  แผนให้ Claude Code ไม่กระทบไฟล์จริงในโปรเจกต์เลย) และตอน apply diff #2 ของ
+  GS_PiTableParser.gs พบว่า preview โชว์ทั้งโค้ดเก่า (if (pendingPi === null)
+  return;) และโค้ดใหม่อยู่ติดกัน น่ากลัวว่าจะเป็น dead-code bug จริง — ตรวจ
+  ด้วย grep -c เฉพาะบรรทัดเก่าหลัง save แล้วได้ 0 ยืนยันว่าไฟล์จริงถูกต้อง
+  ไม่มีโค้ดซ้อนกัน ยังเหลือสเต็ป 8-12 ตามแผน (session log append นี้เอง,
+  commit, push, clasp push, live test บน Test deployment) ก่อนปิดงานสมบูรณ์

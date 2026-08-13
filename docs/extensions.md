@@ -302,11 +302,15 @@ threshold กว้าง — `_NEAR_PI_EPS` ประกาศแยกเป�
 ยืนยันว่า threshold ไม่กว้างเกินจนกิน legit curve) — `pytest -q` เต็มชุดยังไม่รัน
 ในขั้นตอนนี้ (รอตรวจก่อน commit)
 
-### สถานะ .gs/VBA — divergence ที่รู้ตัว ยังไม่ sync
-`reference/AlignmentBuilder.gs` และ `reference/vba/SMT_Alignment.bas` **ยังไม่ถูก
-แก้ตาม** — สันนิษฐานว่ามี division เดียวกันแบบไม่มี guard (พอร์ตมาจากที่เดียวกัน)
-แต่ยังไม่ได้ตรวจสอบ/ยืนยันจริง ถือเป็น known divergence ตามกฎ Oracle correction
-exception ข้อ 5 — งาน sync เป็นงานแยกต่างหาก ไม่ปิดจนกว่าจะ sync เสร็จ
+### สถานะ .gs/VBA — synced 2026-08-10
+**แก้ไขคำอธิบายเดิม:** entry นี้เคยอ้างถึง `reference/AlignmentBuilder.gs`
+(top-level) แต่ตรวจสอบระหว่างงาน sync (2026-08-10) พบว่าไฟล์นั้นเป็นไฟล์ตาย
+v1.1 (คอมมิตเดียวตั้งแต่สร้าง ไม่มี EXT-001/EXT-003) ไม่ใช่ไฟล์ที่ deploy จริง
+— ไฟล์ที่ deploy จริงคือ `reference/gsheet/GS_AlignmentBuilder.gs` ยืนยันแล้ว
+ว่ามี defect เดียวกันเป๊ะ (ไม่มี guard สำหรับ sin(delta)≈0 เลย) ตอนนี้ sync แล้ว
+— ทดสอบผ่าน Node เทียบ Python จนตรงกันทุกตัวเลข (ดู commit sync ที่เกี่ยวข้อง)
+VBA: ไม่มีพอร์ต `build_alignment_from_pi` เลย (ตาราง VBA Engine map ใน
+CLAUDE.md ไม่มี AlignmentBuilder.gs อยู่) — ไม่มี divergence ต้อง track
 
 ---
 
@@ -454,12 +458,12 @@ strict (zero-tolerance), ตั้งจาก `tan_len_signed < 0` ตรงๆ
   ยืนยันแล้วว่าไฟล์ `ramp01n01_SO.csv`/`r01n01_so_crosscheck.csv` มีอยู่จริง
   ทำให้ test นี้รันจริง ไม่ได้ถูก skip)
 
-### สถานะ .gs/VBA — divergence ที่รู้ตัว ยังไม่ sync
-- **`reference/AlignmentBuilder.gs:122-123`** — ยืนยันแล้วว่ามีบั๊กเดียวกัน
+### สถานะ .gs/VBA — synced 2026-08-10
+- **`reference/gsheet/GS_AlignmentBuilder.gs`** — ยืนยันแล้วว่ามีบั๊กเดียวกัน
   เป๊ะ (unsigned distance ล้วนๆ, ไม่มี `tan_len_signed`/`TOL_METERS`/
-  `has_geometric_overlap` เลย) — **ยังไม่แก้ตามในรอบนี้** — known divergence
-  ตาม Oracle correction exception ข้อ 5 งาน sync เป็นงานแยกต่างหาก ไม่ปิดจน
-  กว่าจะ sync เสร็จ
+  `has_geometric_overlap` เลย) — sync แล้วเมื่อ 2026-08-10 — ทดสอบผ่าน Node
+  เทียบ Python จนตรงกันทุกตัวเลข (รวมถึงข้อมูลจริง AL1 ที่พบ
+  tan_len_signed ติดลบเล็กน้อยจาก rounding เหมือนกับที่ Python เจอตอนพัฒนา #2)
 - **`reference/AlignmentBuilder.gs:145`** (`endLen` — EP-tangent สุดท้ายจาก
   exit ของโค้งสุดท้ายไปยัง EP) ก็ใช้ `WCB.distance2D` แบบ unsigned เหมือนกัน
   ตรงกับ Python `alignment_builder.py` (`ep_len`) — **ตรวจสอบเพิ่มเติมแล้วว่า
@@ -580,12 +584,11 @@ EP,200,200,,,,
   **16 passed** (13 เดิม + 3 เคสใหม่ของ orphan-arc guard)
 - `pytest -q` เต็มชุด → **517 passed** (514 เดิม + 3 ใหม่)
 
-### สถานะ .gs — divergence ที่รู้ตัว ยังไม่ sync
+### สถานะ .gs/VBA — synced 2026-08-10
 - **`reference/gsheet/GS_PiTableParser.gs`** — ยืนยันแล้วว่ามีบั๊กเดียวกันเป๊ะ
   (`flushPending_()` ไม่เคลียร์ `compoundArcs` ตอน `pendingPi === null`
-  เหมือนกัน) — **ยังไม่แก้ตามในรอบนี้** — known divergence ตาม Oracle
-  correction exception ข้อ 5 งาน sync เป็นงานแยกต่างหาก ไม่ปิดจนกว่าจะ sync
-  เสร็จ
+  เหมือนกัน) — sync แล้วเมื่อ 2026-08-10 — ทดสอบผ่าน Node เทียบ Python
+  จนตรงกันทุกตัวเลข (รวมถึงเลขบรรทัดในข้อความ error)
 - **VBA (`reference/vba/`)** — ไม่มีพอร์ต `parse_pi_table` เลย — ไม่มีโค้ด
   VBA ที่ต้องพิจารณา divergence สำหรับบั๊กนี้
 

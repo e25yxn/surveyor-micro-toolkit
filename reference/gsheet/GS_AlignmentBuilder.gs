@@ -44,6 +44,19 @@ if (typeof GS_Alignment === 'undefined' && typeof require !== 'undefined') { var
 var GS_AlignmentBuilder = (function () {
   'use strict';
 
+  // Threshold for the delta≈π (180° reversal) branch of the singular-deflection
+  // guard (Oracle correction, session_logs/review_src_smt_20260802.md #1).
+  // Mirrors Python's _NEAR_PI_EPS (src/smt/builders/alignment_builder.py) --
+  // see that file's comment for the full derivation (Civil 3D rounding floor
+  // vs tightest real hairpin curves). FPMath.EPS covers the delta≈0 branch.
+  var NEAR_PI_EPS_ = 1e-4;   // ~20 arcsec from exact pi
+
+  // Tolerance for the curve-overlap direction guard (Oracle correction,
+  // session_logs/review_src_smt_20260802.md #2). Mirrors Python's
+  // TOL_METERS -- see that file's comment for the full derivation (real
+  // field-data noise floor from AL1_test_alignment_PI.csv / HOR_01N01.csv).
+  var TOL_METERS_ = 0.02;   // 2 cm
+
   // แตกโครงสร้างโค้งที่ PI ออกเป็นรายการ sub-element (kind, R, len, trans)
   // absD = มุมเลี้ยวรวม (รัศมีบวก), คืน {subs, issue}
   // EXT-003: มุมเลี้ยว spiral จริง (แทนสูตรเชิงเส้น Ls/(2R)) mirror
@@ -127,6 +140,7 @@ var GS_AlignmentBuilder = (function () {
 
   function buildFromPI(vertices) {
     var els = [], control = [], issues = [];
+    var hasGeometricOverlap = false;
     var N = vertices.length;
     if (N < 2) {
       throw new Error(
@@ -147,6 +161,23 @@ var GS_AlignmentBuilder = (function () {
       var cs = curveSubs_(vertices[v], absD);
       if (cs.issue) issues.push('PI#' + v + ': ' + cs.issue);
       var subs = cs.subs;
+
+      // FIX (Oracle correction, session_logs/review_src_smt_20260802.md #1,
+      // session_logs/plan_<TBD>.md): sin(delta)≈0 makes the 2x2 tangent-
+      // intersection solve below singular in two distinct cases -- mirrors
+      // build_alignment_from_pi (src/smt/builders/alignment_builder.py,
+      // commit 454b55d) line-for-line. See that file's comment for the full
+      // two-threshold rationale (delta≈0 removable vs delta≈π non-removable).
+      if (subs && subs.length && (
+        Math.abs(Math.sin(delta)) < FPMath.EPS ||
+        Math.abs(Math.PI - Math.abs(delta)) < NEAR_PI_EPS_
+      )) {
+        issues.push(
+          'PI#' + v + ': มุมเบี่ยง ' + FPMath.radToDeg(delta).toFixed(6) + '° ทำให้หาจุดเริ่มโค้งไม่ได้ ' +
+          '(sin(Δ)≈0 — เรียงเส้นตรงหรือหักกลับ 180°) ใช้ angle point (IP) แทนโค้งที่ระบุ'
+        );
+        subs = [];
+      }
 
       // EXTENSION: beyond oracle — angle point (no curve)
       // เกิดเมื่อ R หายหรือ R=0 (รวมถึง collinear PI ที่ delta=0)
@@ -173,6 +204,29 @@ var GS_AlignmentBuilder = (function () {
       // tangent: prev -> curveStart
       var tanLen = WCB.distance2D(prev.n, prev.e, curveStart.n, curveStart.e);
       var staCS = prev.sta + tanLen;
+
+      // FIX (Oracle correction, session_logs/review_src_smt_20260802.md #2,
+      // session_logs/plan_<TBD>.md): tanLen above is an unsigned distance
+      // (hypot) so a curve with too little tangent (overlapping the
+      // previous curve/BP) was never detected -- mirrors
+      // build_alignment_from_pi (src/smt/builders/alignment_builder.py,
+      // commit 39df582) line-for-line. prev and curveStart always lie on
+      // the same azIn line by construction, so this dot product is a true
+      // signed tangent-leg length. prev may be BP itself (v === 1).
+      var dnOv = curveStart.n - prev.n;
+      var deOv = curveStart.e - prev.e;
+      var tanLenSigned = dnOv * Math.cos(azIn) + deOv * Math.sin(azIn);
+      if (tanLenSigned < 0) hasGeometricOverlap = true;
+      if (tanLenSigned < -TOL_METERS_) {
+        var prevLabel = (v === 1) ? 'BP' : ('PI#' + (v - 1));
+        issues.push(
+          'PI#' + v + ': จุดเริ่มโค้ง (curve_start) อยู่หลังจุดจบของ ' + prevLabel + ' ' +
+          'ตามทิศทาง azimuth_in (' + FPMath.radToDeg(azIn).toFixed(4) + '°) — ' +
+          'โค้งซ้อนทับกัน (tan_len_signed = ' + tanLenSigned.toFixed(4) + ' m, ต้อง >= -' + TOL_METERS_.toFixed(2) + ' ม.) ' +
+          'ตรวจสอบ R/Ls หรือระยะห่างระหว่าง ' + prevLabel + ' และ PI#' + v
+        );
+      }
+
       els.push(GS_Alignment.makeElement('T', prev.sta, staCS, prev.n, prev.e, FPMath.radToDeg(azIn), 0));
       control.push({ name: nm.start, sta: staCS, n: curveStart.n, e: curveStart.e });
 
@@ -197,7 +251,7 @@ var GS_AlignmentBuilder = (function () {
     els.push(GS_Alignment.makeElement('T', prev.sta, prev.sta + endLen, prev.n, prev.e, FPMath.radToDeg(azEnd), 0));
     control.push({ name: 'EP', sta: prev.sta + endLen, n: ep.n, e: ep.e });
 
-    return { elements: els, control: control, issues: issues };
+    return { elements: els, control: control, issues: issues, hasGeometricOverlap: hasGeometricOverlap };
   }
 
   function crossCheck(control, drawing, tol) {

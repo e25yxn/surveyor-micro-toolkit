@@ -99,9 +99,26 @@ var GS_PiTableParser = (function () {
     var pendingPiLabel = '';
     var pendingPiLine = 0;
     var compoundArcs = [];
+    var compoundArcsFirstLine = 0;
 
     function flushPending_() {
-      if (pendingPi === null) return;
+      if (pendingPi === null) {
+        // FIX (Oracle correction, session_logs/review_src_smt_20260802.md #3,
+        // session_logs/plan_<TBD>.md): mirrors parse_pi_table's
+        // _flush_pending (src/smt/builders/alignment_builder.py, commit
+        // 795f36b) line-for-line. A compound sub-row with no PI to attach
+        // to (before the first PI, or after EP) used to leak silently onto
+        // the next PI or vanish at EOF -- now raises instead.
+        if (compoundArcs.length) {
+          throw new Error(
+            'compound sub-row (แถวที่ ' + compoundArcsFirstLine + ') มีค่า RADIUS ' +
+            'แต่ไม่มี PI ก่อนหน้าให้ผูก (อยู่ก่อน PI ตัวแรก ก่อน BP, ' +
+            'หรืออยู่หลัง EP) ' +
+            'ตรวจสอบลำดับแถวในไฟล์ว่าไม่มีแถวตกหล่นหรือเรียงผิดที่'
+          );
+        }
+        return;
+      }
       var v;
       if (compoundArcs.length) {
         if (pendingPi.R !== undefined) {
@@ -132,6 +149,7 @@ var GS_PiTableParser = (function () {
         // compound sub-row — only meaningful when R is non-blank
         var rRaw = g(row, 'radius');
         if (!rRaw) continue;
+        if (!compoundArcs.length) compoundArcsFirstLine = lineNo;
         var arc = { R: toFloat_(rRaw) };
         var deltaRaw = g(row, 'delta');
         if (deltaRaw) arc.delta = toFloat_(deltaRaw);

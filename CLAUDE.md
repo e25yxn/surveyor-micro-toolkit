@@ -148,22 +148,24 @@ All phases complete — 528/528 tests passing.
   ทั้งสองกรณี fallback เป็น angle-point (IP) พร้อม log คำเตือน ดู
   docs/extensions.md entry "Oracle Correction — build_alignment_from_pi
   Singular Deflection Guard", session_logs/plan_20260802_1904.md + addendum —
-  `reference/AlignmentBuilder.gs`/VBA ยังไม่ sync ตาม (known divergence)
+  sync ไปยัง `reference/gsheet/GS_AlignmentBuilder.gs` แล้วเมื่อ 2026-08-10
+  (ไฟล์ `reference/AlignmentBuilder.gs` เดิมที่อ้างถึงเป็นไฟล์ตาย v1.1 ไม่ใช่
+  ไฟล์ที่ deploy จริง — แก้คำอธิบายจุดนี้ด้วย) VBA ไม่มีพอร์ตฟังก์ชันนี้เลย
 - `build_alignment_from_pi` แก้เพิ่มอีกรอบเมื่อ 2026-08-05 (Oracle correction
   exception #2, session_logs/review_src_smt_20260802.md) — unsigned distance เดิม
   ทำให้ PI ที่โค้งซ้อนทับกันไม่ถูกตรวจจับ แก้ด้วย signed `tan_len_signed`
   (`TOL_METERS=0.02`) + `BuildResult.has_geometric_overlap` (strict flag แยกให้
   optimizer.py ใช้ต่างจาก `issues`) ดู docs/extensions.md entry "Oracle
   Correction — build_alignment_from_pi Curve-Overlap Direction Guard" —
-  `reference/AlignmentBuilder.gs` ยังไม่ sync ตาม (known divergence)
+  sync ไปยัง `reference/gsheet/GS_AlignmentBuilder.gs` แล้วเมื่อ 2026-08-10
 - `parse_pi_table` แก้เพิ่มอีกรอบเมื่อ 2026-08-07 (Oracle correction exception
   #3, session_logs/review_src_smt_20260802.md) — `_flush_pending` ไม่เคลียร์
   `compound_arcs` เมื่อ `pending_pi is None` ทำให้ orphan compound sub-row
   (ก่อน PI ตัวแรก หรือหลัง EP) รั่วไปเกาะ PI อื่นแบบเงียบ หรือหายไปเงียบๆ
   แก้ด้วยการ raise ValueError ระบุเลขบรรทัดของ arc ตัวแรกที่พบปัญหา ดู
   docs/extensions.md entry "Oracle Correction — parse_pi_table Orphan
-  Compound-Sub-Row Guard" — `reference/gsheet/GS_PiTableParser.gs` ยังไม่
-  sync ตาม (known divergence)
+  Compound-Sub-Row Guard" — `reference/gsheet/GS_PiTableParser.gs` sync
+  แล้วเมื่อ 2026-08-10
 - `check_against_drawing` แก้เพิ่มอีกรอบเมื่อ 2026-08-09 (Oracle correction
   exception #4, session_logs/review_src_smt_20260802.md) — ไม่มีพอร์ตใน
   reference/gsheet หรือ reference/vba เลย (เงื่อนไข Oracle correction ข้อ 1
