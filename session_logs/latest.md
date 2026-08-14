@@ -2350,3 +2350,52 @@
 - ผล: PASS (diff exit code 0 ทั้งสองไฟล์ = byte-identical)
 - commit: (ยังไม่ commit)
 - หมายเหตุ: ไม่มีอะไรผิดปกติ พร้อมเข้าสเต็ป 5 (commit + push เข้า git)
+
+## [2026-08-14] สเต็ป 5 ตามแผน station-alias fix — commit + push แล้ว
+- ทำ: commit ทั้ง 5 ไฟล์ (table_splitter.py, test_table_splitter.py,
+  GS_TableSplitter.gs, Index.html, session_logs/latest.md) ด้วย commit
+  message ผ่าน heredoc + cat -A ตรวจก่อน (LF ล้วน ไม่มี ^M) ตาม
+  `session_logs/plan_20260813_station_alias_ui_fix.md` แล้ว push เข้า
+  origin/main สำเร็จ
+- คำสั่ง: git commit -F .git/smt_commit_msg.txt && git push
+- ผล: PASS (commit 79d2147 ตรงกันทั้ง local HEAD และ origin/main,
+  5 files changed, 79 insertions(+))
+- commit: 79d2147
+- หมายเหตุ: พร้อมเข้าสเต็ป 6 (clasp push -f เข้าเว็บแอปต้นแบบ — เช็ค
+  appsscript.json manifest ก่อนเหมือนรอบที่แล้ว)
+
+## [2026-08-14] สเต็ป 6 — clasp push + live test: ปิดงาน column-alias "STATION" + UI spinner สมบูรณ์
+- ทำ: หลัง commit+push เข้า git (`79d2147`) แล้ว เช็ค `appsscript.json` manifest
+  ก่อน push ทุกครั้ง (บทเรียนจากรอบ .gs sync ก่อนหน้า) ยืนยันว่า `webapp` block
+  (`executeAs: USER_DEPLOYING, access: MYSELF`) ยังอยู่ครบ ไม่ได้หายไประหว่างทาง
+  `clasp push -f` เข้า `D:\MyClasp_SMT_DEMO` สำเร็จ (Pushed 15 files) รวม
+  `GS_TableSplitter.js`/`Index.html` ที่แก้ไป live test บน Test deployment
+  จริงผ่านเบราว์เซอร์ (Claude in Chrome เชื่อมต่อไม่ได้ระหว่างทาง —
+  `select_browser` ถูกปฏิเสธโดยไม่ทราบสาเหตุ CK1024 จึงทดสอบเองโดยตรงแทน
+  ส่ง screenshot กลับมา) ทดสอบครบทั้ง 2 fix:
+  1) column-alias "STATION" — เปิด `HOR_SMT_AL1`/tab `SMT_AL1` (ไฟล์เดียวกับ
+     ที่เคยพังตอนสืบสวน) กด "คำนวณ" จริง ได้ "คำนวณเสร็จแล้ว: 33 elements,
+     ไม่พบ issues" — ไม่มี warning "จุดตรวจสอบบางจุดอยู่นอกช่วงแนวเส้นทาง"
+     อีกเลย (33 elements ตรงกับที่เห็นใน `result_SMT_AL1_Elements` ตอน
+     สืบสวนสเต็ป 12 ของงาน .gs sync ก่อนหน้าเป๊ะ) ทดสอบเสริมกับ `HOR_01N01`/
+     tab `Sheet1` ด้วย ได้ "11 elements, ไม่พบ issues" ยืนยันว่าไม่กระทบไฟล์
+     อื่นที่เคยทำงานปกติอยู่แล้ว
+  2) calcStatus ไม่เคลียร์ — ทดสอบ error path 3 รูปแบบ (ยังไม่เลือกไฟล์,
+     เลือกไฟล์แล้วแต่ยังไม่เลือก tab ×2 ไฟล์) ทุกครั้งขึ้นข้อความ
+     "คำนวณไม่สำเร็จ" ใต้ปุ่มถูกต้อง ไม่ค้าง "กำลังคำนวณ..." อีกต่อไป
+- คำสั่ง: cat appsscript.json (ยืนยัน manifest ก่อน push), npx clasp push -f,
+  npx clasp status (ยืนยันไม่มี pending changes), live test ผ่านเบราว์เซอร์
+  จริงโดย CK1024 (ไม่ผ่าน automation เพราะ Claude in Chrome เชื่อมต่อไม่ได้)
+- ผล: PASS ครบทุกจุด — clasp push สำเร็จ (Pushed 15 files), pipeline คำนวณ
+  ถูกต้องสมบูรณ์บนเว็บแอปจริงสำหรับทั้งไฟล์ที่เคยพังและไฟล์อื่น, error path
+  แสดงผลถูกต้องไม่ค้างสถานะอีกต่อไป
+- commit: `79d2147` (โค้ด+เอกสาร, ทำไปแล้วในสเต็ป 5) — clasp push เป็นการ
+  deploy ผ่าน Apps Script โดยตรง ไม่มี git commit แยกสำหรับขั้นนี้
+- หมายเหตุ: **ปิดงาน column-alias "STATION" + UI spinner สมบูรณ์ครบทุกสเต็ป**
+  ตั้งแต่สืบสวน (พบว่า Python มี alias gap เดียวกันด้วย ไม่ใช่แค่ GAS) ออกแบบ
+  +ทดสอบ fix ผ่าน pytest+Node เขียนแผน แก้โค้ด 4 ไฟล์ (`table_splitter.py`,
+  เทสใหม่, `GS_TableSplitter.gs`, `Index.html`) commit+push เข้า git
+  clasp push เข้าเว็บแอปต้นแบบจริง และ live test ยืนยันผลถูกต้องบนเว็บแอปจริง
+  ครบทั้ง 2 fix — backlog ที่เหลือ (ไม่เร่งด่วน): CSV thousands-separator,
+  Excel BOM handling, ไฟล์ untracked เก่า, Multicurve.py solver (รอ CK1024
+  กำหนดสโคป)
