@@ -2300,3 +2300,53 @@
   ("กำลังคำนวณ...") ใน Index.html ไม่เคลียร์สถานะหลังได้ผลลัพธ์กลับมา
   (ไม่กระทบความถูกต้องของข้อมูล เป็นแค่ UX ที่ทำให้ผู้ใช้เข้าใจผิดว่ายังไม่
   เสร็จ) รอ CK1024 ตัดสินใจว่าจะแก้เมื่อไหร่
+
+## [2026-08-14] สเต็ป 1 ตามแผน station-alias fix — apply diff #1+#2 แล้ว
+- ทำ: apply diff #1 (`src/smt/builders/table_splitter.py` เพิ่ม
+  `'station': 'sta'` เข้า `_COL_ALIASES`) + diff #2
+  (`tests/builders/test_table_splitter.py` เพิ่ม `TestColumnAliases::
+  test_station_header_recognized_as_sta`) ตาม
+  `session_logs/plan_20260813_station_alias_ui_fix.md` — โชว์ diff จริงในแชท
+  ก่อน save ตามกฎ ยังไม่ commit รอ approve สเต็ปถัดไป (diff #3 GS_TableSplitter.gs)
+- คำสั่ง: pytest tests/builders/test_table_splitter.py -v && pytest -q
+- ผล: PASS (12 test ในไฟล์นี้ทั้งหมด รวม test ใหม่ / 529 passed เต็มชุด
+  ตรงกับที่แผนคาดไว้ 528 เดิม + 1 ใหม่)
+- commit: (ยังไม่ commit)
+- หมายเหตุ: ไม่มีอะไรผิดปกติ ไฟล์ตรงกับ diff ในแผนทุกบรรทัด
+
+## [2026-08-14] สเต็ป 2 ตามแผน station-alias fix — apply diff #3 แล้ว
+- ทำ: apply diff #3 (`reference/gsheet/GS_TableSplitter.gs` เพิ่ม
+  `'station': 'sta'` เข้า `COL_ALIASES`) ตาม
+  `session_logs/plan_20260813_station_alias_ui_fix.md` — โชว์ diff จริงในแชท
+  ก่อน save ตามกฎ ยังไม่ commit รอ approve สเต็ปถัดไป (diff #4 Index.html)
+- คำสั่ง: (ไม่มี — .gs ทดสอบผ่าน Node แยกไว้แล้วตามแผน ไม่ได้รันซ้ำในสเต็ปนี้)
+- ผล: N/A
+- commit: (ยังไม่ commit)
+- หมายเหตุ: ไฟล์ตรงกับ diff ในแผนทุกบรรทัด ยังไม่ได้ copy เข้า
+  D:\MyClasp_SMT_DEMO\ หรือ clasp push — รอถึงสเต็ป 4-6 ตามแผน
+
+## [2026-08-14] สเต็ป 3 ตามแผน station-alias fix — apply diff #4 แล้ว
+- ทำ: apply diff #4 (`reference/gsheet/Index.html` แก้ `onCalcFail()` เพิ่ม
+  `document.getElementById('calcStatus').textContent = 'คำนวณไม่สำเร็จ';`
+  ก่อนเรียก `showError(err)` — เคลียร์/อัปเดตสถานะ ไม่ให้ค้าง "กำลังคำนวณ...")
+  ตาม `session_logs/plan_20260813_station_alias_ui_fix.md` — โชว์ diff จริง
+  ในแชทก่อน save ตามกฎ ยังไม่ commit รอ approve สเต็ปถัดไป (สเต็ป 4: copy
+  GS_TableSplitter.gs + Index.html เข้า D:\MyClasp_SMT_DEMO\ เทียบ byte-identical)
+- คำสั่ง: (ไม่มี — เป็น DOM manipulation ทดสอบจริงได้แค่ live test ตามแผน
+  ไม่มี automated test สำหรับไฟล์นี้)
+- ผล: N/A
+- commit: (ยังไม่ commit)
+- หมายเหตุ: ไฟล์ตรงกับ diff ในแผนทุกบรรทัด บริบทรอบๆ (บรรทัด onCalcDone/
+  onCalcFail) ตรงกับที่แผนอ้างอิงทุกจุด แม้เลขบรรทัดจะขยับเล็กน้อยจากตอน
+  เขียนแผน
+
+## [2026-08-14] สเต็ป 4 ตามแผน station-alias fix — copy เข้า MyClasp_SMT_DEMO แล้ว
+- ทำ: copy `reference/gsheet/GS_TableSplitter.gs` ->
+  `D:\MyClasp_SMT_DEMO\GS_TableSplitter.js` และ `reference/gsheet/Index.html`
+  -> `D:\MyClasp_SMT_DEMO\Index.html` ตาม
+  `session_logs/plan_20260813_station_alias_ui_fix.md` แล้ว diff ยืนยัน
+  byte-identical ทั้งคู่
+- คำสั่ง: cp + diff (ทั้งสองไฟล์) ตามที่ CK1024 สั่งตรงๆ
+- ผล: PASS (diff exit code 0 ทั้งสองไฟล์ = byte-identical)
+- commit: (ยังไม่ commit)
+- หมายเหตุ: ไม่มีอะไรผิดปกติ พร้อมเข้าสเต็ป 5 (commit + push เข้า git)

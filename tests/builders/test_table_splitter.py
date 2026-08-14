@@ -129,3 +129,29 @@ class TestCrossCheckHorOrr04:
         report = check_against_drawing(build_result.control, drawing, tolerance=0.1)
         max_gap = max(r['gap_m'] for r in report)
         assert max_gap < 0.08
+
+
+# ---------------------------------------------------------------------------
+# Test: column-alias header matching (session_logs/investigate_ui_spinner_station_alias_20260813.md)
+# ---------------------------------------------------------------------------
+
+class TestColumnAliases:
+
+    def test_station_header_recognized_as_sta(self):
+        # 'STATION' (full word) must resolve the same as 'STA' (abbreviation).
+        # Previously only 'sta'/'chainage' were recognized, so a sheet using
+        # the full word left every drawing row's station cell blank -> float('')
+        # raised (or, on the GAS side, parseFloat('') silently produced NaN
+        # that only surfaced much later as a confusing "station NaN" error).
+        rows = [
+            ['POINT', 'STATION', 'N', 'E'],
+            ['BP', '0', '1000', '2000'],
+            ['PC', '50', '1050', '2000'],
+            ['PT', '150', '1100', '2050'],
+            ['EP', '200', '1100', '2100'],
+        ]
+        vertex_rows, drawing = split_mixed_alignment_table(rows)
+        assert drawing == [
+            {'name': 'PC', 'sta': 50.0, 'n': 1050.0, 'e': 2000.0},
+            {'name': 'PT', 'sta': 150.0, 'n': 1100.0, 'e': 2050.0},
+        ]

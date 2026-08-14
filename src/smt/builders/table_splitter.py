@@ -20,6 +20,7 @@ _VERTEX_POINT_RE = re.compile(r'^(BP|PI-\d+|EP)$')
 _COL_ALIASES: dict[str, str] = {
     'point':      'point',
     'sta':        'sta',
+    'station':    'sta',
     'chainage':   'sta',
     'n':          'northing',
     'northing':   'northing',

@@ -26,6 +26,7 @@ var GS_TableSplitter = (function () {
   var COL_ALIASES = {
     'point':      'point',
     'sta':        'sta',
+    'station':    'sta',
     'chainage':   'sta',
     'n':          'northing',
     'northing':   'northing',
