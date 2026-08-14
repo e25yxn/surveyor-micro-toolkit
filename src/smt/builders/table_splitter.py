@@ -46,10 +46,15 @@ _NUMERIC_KEYS: tuple[str, ...] = (
 
 
 def _parse_header(header_row: list[Any]) -> dict[str, int]:
-    """Return canonical-key -> column-index mapping from the header row."""
+    """Return canonical-key -> column-index mapping from the header row.
+
+    Strips a leading BOM (U+FEFF) before matching, since Excel's "CSV UTF-8"
+    export prepends one to the file - and hence to the first header cell -
+    which str.strip() alone does not remove.
+    """
     col_map: dict[str, int] = {}
     for i, cell in enumerate(header_row):
-        key = _COL_ALIASES.get(str(cell).strip().lower())
+        key = _COL_ALIASES.get(str(cell).lstrip('\ufeff').strip().lower())
         if key is not None and key not in col_map:
             col_map[key] = i
     return col_map

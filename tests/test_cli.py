@@ -130,6 +130,14 @@ def pi_csv(tmp_path):
 
 
 @pytest.fixture()
+def pi_csv_bom(tmp_path):
+    """Same PI table, but saved the way Excel's 'CSV UTF-8' export does (leading BOM)."""
+    p = tmp_path / 'pi_bom.csv'
+    p.write_text(_PI_TABLE, encoding='utf-8-sig')
+    return str(p)
+
+
+@pytest.fixture()
 def field_csv(tmp_path):
     p = tmp_path / 'field.csv'
     p.write_text(_FIELD_CSV, encoding='utf-8')
@@ -216,6 +224,14 @@ def test_build_default_out_dir(pi_csv, capsys):
     assert os.path.exists(os.path.join(out_dir, 'controls_so_output.csv'))
 
 
+def test_build_with_bom_header_succeeds(pi_csv_bom, tmp_path, capsys):
+    """Excel's 'CSV UTF-8' export prepends a BOM to the POINT header cell -
+    must not break parse_pi_table()'s column lookup."""
+    rc = cli.main(['build', pi_csv_bom, '--out-dir', str(tmp_path)])
+    assert rc == 0
+    assert (tmp_path / 'elements_output.csv').exists()
+
+
 # ---------------------------------------------------------------------------
 # compare-drawing subcommand
 # ---------------------------------------------------------------------------
@@ -274,6 +290,14 @@ def test_fit_radius_basic(pi_csv, drawing_csv, capsys):
     out = capsys.readouterr().out
     assert 'gap_before' in out
     assert 'gap_after' in out
+
+
+def test_fit_radius_with_bom_header_succeeds(pi_csv_bom, drawing_csv, capsys):
+    """Same BOM concern as smt build - fit_radius() locates POINT/RADIUS by
+    header name too."""
+    pytest.importorskip('scipy', reason='scipy not installed; pip install surveyor-micro-toolkit[optimize]')
+    rc = cli.main(['fit-radius', pi_csv_bom, drawing_csv])
+    assert rc == 0
 
 
 def test_fit_radius_missing_file(capsys):

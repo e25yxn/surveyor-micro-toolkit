@@ -14,8 +14,8 @@ from typing import Any
 
 
 def read_csv_rows(raw_bytes: bytes) -> list[list[str]]:
-    """Decode uploaded CSV bytes (utf-8) into a list of row lists."""
-    text = io.StringIO(raw_bytes.decode('utf-8'))
+    """Decode uploaded CSV bytes (utf-8, tolerates a leading BOM) into a list of row lists."""
+    text = io.StringIO(raw_bytes.decode('utf-8-sig'))
     return list(csv.reader(text))
 
 

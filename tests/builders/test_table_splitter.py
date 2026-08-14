@@ -155,3 +155,25 @@ class TestColumnAliases:
             {'name': 'PC', 'sta': 50.0, 'n': 1050.0, 'e': 2000.0},
             {'name': 'PT', 'sta': 150.0, 'n': 1100.0, 'e': 2050.0},
         ]
+
+    def test_bom_prefixed_point_header_recognized(self):
+        # Excel's "CSV UTF-8" export prepends a BOM (U+FEFF) to the file, which
+        # lands on the first header cell (e.g. 'POINT' becomes BOM+POINT).
+        # str.strip() alone does not remove it, so the column lookup used to
+        # silently fail to find 'point' - every row's point cell then read as
+        # '', collapsing the whole drawing list to empty instead of raising
+        # anything. Built via chr(0xFEFF) rather than a raw string escape to
+        # avoid any ambiguity in how the BOM character is typed into source.
+        bom = chr(0xFEFF)
+        rows = [
+            [bom + 'POINT', 'STA', 'N', 'E'],
+            ['BP', '0', '1000', '2000'],
+            ['PC', '50', '1050', '2000'],
+            ['PT', '150', '1100', '2050'],
+            ['EP', '200', '1100', '2100'],
+        ]
+        vertex_rows, drawing = split_mixed_alignment_table(rows)
+        assert drawing == [
+            {'name': 'PC', 'sta': 50.0, 'n': 1050.0, 'e': 2000.0},
+            {'name': 'PT', 'sta': 150.0, 'n': 1100.0, 'e': 2050.0},
+        ]

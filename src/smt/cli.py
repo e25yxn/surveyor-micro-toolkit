@@ -37,7 +37,7 @@ def _read_alignment(path: str) -> list[alignment.Element]:
     Transition stay as strings.  Delegates the actual construction to
     alignment.parse_alignment_table.
     """
-    with open(path, newline='', encoding='utf-8') as f:
+    with open(path, newline='', encoding='utf-8-sig') as f:
         raw = list(csv.reader(f))
     if not raw:
         raise ValueError(f'{path} is empty')
@@ -62,7 +62,7 @@ def _read_alignment(path: str) -> list[alignment.Element]:
 
 def _read_pi_table(path: str) -> list[dict[str, Any]]:
     """Read a PI-table CSV and return a vertex list for build_alignment_from_pi."""
-    with open(path, newline='', encoding='utf-8') as f:
+    with open(path, newline='', encoding='utf-8-sig') as f:
         rows = list(csv.reader(f))
     if not rows:
         raise ValueError(f'{path} is empty')
@@ -74,7 +74,7 @@ def _read_field_csv(path: str) -> list[dict[str, Any]]:
 
     Column order: NAME, N, E, Z, DISC.  DISC is optional (defaults to 0.0).
     """
-    with open(path, newline='', encoding='utf-8') as f:
+    with open(path, newline='', encoding='utf-8-sig') as f:
         raw = list(csv.reader(f))
     if not raw:
         raise ValueError(f'{path} is empty')
@@ -92,7 +92,7 @@ def _read_field_csv(path: str) -> list[dict[str, Any]]:
 
 def _read_drawing_csv(path: str) -> list[dict[str, Any]]:
     """Read a drawing control-point CSV (Name,STA,N,E) into a list of dicts."""
-    with open(path, newline='', encoding='utf-8') as f:
+    with open(path, newline='', encoding='utf-8-sig') as f:
         raw = list(csv.reader(f))
     if not raw:
         raise ValueError(f'{path} is empty')
@@ -227,7 +227,7 @@ def _run_fit_radius(args: argparse.Namespace) -> int:
     """fit-radius: optimise PI radii to minimise coordinate residuals against drawing points."""
     from .optimizer import fit_radius as _fit_radius
 
-    with open(args.alignment, newline='', encoding='utf-8') as f:
+    with open(args.alignment, newline='', encoding='utf-8-sig') as f:
         pi_rows: list[Any] = list(csv.reader(f))
     if not pi_rows:
         raise ValueError(f'{args.alignment} is empty')
