@@ -2508,3 +2508,36 @@
 - ผล: PASS (545 passed) ; ruff กลับมา 13 errors (จาก 15) ตรงกับ baseline เดิม ;
   mypy 1 error เท่าเดิม (landxml.py:144, ของเก่าก่อนเซสชันนี้ ไม่มีของใหม่)
 - commit: 7e323c4 (ยังไม่ push)
+
+## [2026-08-15] fix(vertical): validate VC length + guard duplicate-VPI/EVP-before-end
+- ทำ: แก้ review finding #8/#9 (session_logs/review_src_smt_20260802.md) ที่ค้าง
+  มาตั้งแต่ 2026-08-02 — ยืนยันก่อนแล้วว่าไม่ต้องผ่าน Oracle correction exception
+  (ไม่มี live .gs/VBA parsing logic ให้ diverge) #8: parse_vertical_table() เพิ่ม
+  validate lvc/lvc2 เทียบความยาว segment (tolerance 2cm) raise ถ้าไม่ตรง #9(a):
+  build_vertical_from_vpi() กัน VPI สอง station ซ้ำกัน (ทั้ง 2 ทิศทาง) ไม่ให้
+  ZeroDivisionError ดิบ #9(b): กัน EVP อยู่ก่อนจุดจบจริงของโปรไฟล์แบบเงียบ —
+  เพิ่มเทสใหม่ 11 ตัว + ปรับเทสเดิม 1 ตัวที่บังเอิญสาธิตบั๊ก #9(b) อยู่แล้ว
+- คำสั่ง: pytest -q ; ruff check src/ ; mypy src/smt
+- ผล: PASS (556 passed, 545 baseline + 11 ใหม่) ; ruff 13 errors (เท่าเดิม) ;
+  mypy 1 error เท่าเดิม (landxml.py:144)
+- commit: 3cad392 (push แล้ว 283a97e..3cad392 main -> main)
+- หมายเหตุ: ไม่แตะ protected function เลย (alignment_builder.py และ
+  vertical_builder.py::check_against_drawing ที่เคยผ่าน Oracle correction
+  มาก่อน) — backlog ที่เหลือ: crossfall.py ยังไม่เคยผ่านการรีวิวเลย
+
+## [2026-08-15] fix(crossfall): reject reversed segments + row-context parse errors
+- ทำ: รีวิว crossfall.py ครั้งแรก (ไม่เคยผ่าน Fable 5 review เลย ต่างจาก
+  vertical.py ที่เพิ่งแก้ #8/#9 ไป) ยืนยันไม่ต้องผ่าน Oracle correction
+  exception เหมือนกัน (ไม่มี live .gs/VBA parsing) เจอ 2 จุด: (1) reversed
+  segment (sta_end < sta_start) ไม่ validate — value ดูถูกโดยบังเอิญแต่ rate
+  ผิดเครื่องหมาย อันตรายเพราะไม่มีสัญญาณเตือน (2) parse_crossfall_table ขาด
+  try/except ให้คอลัมน์อื่นนอกจาก sta_start ทำให้ crash ดิบไม่บอกเลขบรรทัด
+  แก้ทั้งคู่ด้วย raise ที่ parse function เท่านั้น (pattern เดียวกับ #8)
+  ไม่แตะ calculate_crossfall_at/calculate_crossfall_rate_at เลย
+- คำสั่ง: pytest -q ; ruff check src/
+- ผล: PASS (563 passed, 556 baseline + 7 ใหม่) ; ruff 13 errors เท่าเดิม
+- commit: 32ff018 (push แล้ว 3cad392..32ff018 main -> main)
+- หมายเหตุ: entry นี้ append รวมกับ 16 บรรทัดที่ค้างจากงาน vertical fix
+  (commit 3cad392) ที่ลืมสั่ง commit ให้ตอนนั้น — commit นี้เลย commit
+  session log ของทั้ง 2 งานพร้อมกัน — backlog ที่เหลือ: multicurve.py
+  (รอกำหนดสโคป), real SMT_COGO_Builder_DEMO spreadsheet ID ยังไม่ยืนยัน
