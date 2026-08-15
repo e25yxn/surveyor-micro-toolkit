@@ -327,3 +327,70 @@ class TestDefensiveVertical:
         assert len(segs) == 1
         assert segs[0].lvc == 200.0
         assert segs[0].lvc2 is None
+
+
+# ---------------------------------------------------------------------------
+# Test: parse_vertical_table validates lvc/lvc2 against segment length
+# (review finding #8, session_logs/review_src_smt_20260802.md) -
+# calculate_elevation_at()'s asymmetric-VC formula silently assumes
+# sta_end == sta_start + lvc + lvc2 and produces a wrong elevation with no
+# warning if that doesn't hold; a builder-produced table always satisfies
+# this, but a hand-typed/hand-edited one might not.
+# ---------------------------------------------------------------------------
+
+class TestParseVerticalTableLengthValidation:
+
+    def test_asymmetric_vc_length_mismatch_raises(self):
+        # lvc+lvc2 = 70, but sta_end-sta_start = 80 - off by 10 m, way past
+        # the 2 cm tolerance.
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2'],
+            [1, 100, 180, 102.0, 2.0, -1.0, 40, 30],
+        ]
+        with pytest.raises(ValueError, match='แถวที่ 2'):
+            vt.parse_vertical_table(rows)
+
+    def test_asymmetric_vc_correct_length_parses(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2'],
+            [1, 100, 170, 102.0, 2.0, -1.0, 40, 30],
+        ]
+        segs = vt.parse_vertical_table(rows)
+        assert len(segs) == 1
+
+    def test_asymmetric_vc_within_tolerance_parses(self):
+        # 1.5 cm off - within the 2 cm tolerance, matching real-world
+        # coordinate rounding noise (same TOL_METERS as horizontal).
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2'],
+            [1, 100, 170.015, 102.0, 2.0, -1.0, 40, 30],
+        ]
+        segs = vt.parse_vertical_table(rows)
+        assert len(segs) == 1
+
+    def test_symmetric_vc_lvc_longer_than_segment_raises(self):
+        # Symmetric VC (no lvc2): lvc=200 but the segment is only 150 m long.
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2'],
+            [1, 0.0, 150.0, 100.0, 1.5, 1.5, 200.0, None],
+        ]
+        with pytest.raises(ValueError, match='แถวที่ 2'):
+            vt.parse_vertical_table(rows)
+
+    def test_symmetric_vc_lvc_fits_segment_parses(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2'],
+            [1, 0.0, 200.0, 100.0, 1.5, 1.5, 150.0, None],
+        ]
+        segs = vt.parse_vertical_table(rows)
+        assert len(segs) == 1
+
+    def test_tangent_segment_zero_lvc_never_validated(self):
+        # lvc=0 (tangent) - length check must not fire regardless of
+        # sta_start/sta_end (there's no VC to validate).
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'level', 'g1', 'g2', 'lvc', 'lvc2'],
+            [1, 0.0, 50.0, 100.0, 1.5, 1.5, 0, None],
+        ]
+        segs = vt.parse_vertical_table(rows)
+        assert len(segs) == 1

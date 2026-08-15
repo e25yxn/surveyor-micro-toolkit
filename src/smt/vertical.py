@@ -136,15 +136,32 @@ def calculate_elevation(segs: list[VerticalSegment], sta: float) -> float | None
 # Public: parse
 # ---------------------------------------------------------------------------
 
+# Tolerance for validating that a segment's LVC (and LVC2, for asymmetric VCs)
+# actually fits within its own [sta_start, sta_end] span (review finding #8,
+# session_logs/review_src_smt_20260802.md). Same value as alignment_builder's
+# TOL_METERS - both bound real-world coordinate rounding noise, not distinct
+# phenomena, so there's no reason for a different threshold here; no vertical-
+# specific field data exists yet to justify a different number.
+TOL_METERS: float = 0.02   # 2 cm
+
+
 def parse_vertical_table(rows: list[Any]) -> list[VerticalSegment]:
     """Parse a row-table (first row = headers) into a list of VerticalSegment.
 
     Expected columns: index, sta_start, sta_end, level, grade_in(%), grade_out(%), lvc, (lvc2).
     Rows where sta_start is empty / non-numeric are skipped.
     Matches the format used in tests/golden/tables.json ["vtable"].
+
+    Raises ValueError when a segment's LVC (or LVC1+LVC2 for an asymmetric VC)
+    doesn't fit within sta_end-sta_start to within TOL_METERS - calculate_
+    elevation_at()'s asymmetric-VC formula silently assumes sta_end equals
+    sta_start+lvc+lvc2 exactly and produces a wrong elevation with no warning
+    if that assumption doesn't hold (review finding #8). A builder-produced
+    table always satisfies this by construction; only a hand-typed/hand-
+    edited table can violate it, which is exactly what this catches.
     """
     segs: list[VerticalSegment] = []
-    for row in rows[1:]:                         # skip header
+    for line_no, row in enumerate(rows[1:], start=2):    # start=2: row 1 is the header
         sta_start_raw = row[1]
         is_nan = isinstance(sta_start_raw, float) and math.isnan(sta_start_raw)
         if sta_start_raw in ('', None) or is_nan:
@@ -153,13 +170,31 @@ def parse_vertical_table(rows: list[Any]) -> list[VerticalSegment]:
             sta_start = float(sta_start_raw)
         except (TypeError, ValueError):
             continue
+        sta_end = float(row[2])
         lvc_raw = row[6]
         lvc = float(lvc_raw) if lvc_raw not in ('', None) else 0.0
         lvc2_raw = row[7] if len(row) > 7 else None
         lvc2 = float(lvc2_raw) if lvc2_raw is not None and lvc2_raw != '' else None
+
+        seg_len = sta_end - sta_start
+        if lvc2 is not None:
+            l_total = lvc + lvc2
+            if abs(l_total - seg_len) > TOL_METERS:
+                raise ValueError(
+                    f'แถวที่ {line_no}: lvc+lvc2 ({l_total}) ไม่เท่ากับความยาว segment '
+                    f'(sta_end-sta_start = {seg_len}) ต่างกัน {abs(l_total - seg_len):.4f} ม. '
+                    f'เกิน tolerance {TOL_METERS} ม. — ตรวจสอบ sta_end หรือ lvc/lvc2'
+                )
+        elif lvc and lvc > seg_len + TOL_METERS:
+            raise ValueError(
+                f'แถวที่ {line_no}: lvc ({lvc}) ยาวกว่าความยาว segment '
+                f'(sta_end-sta_start = {seg_len}) เกิน tolerance {TOL_METERS} ม. — '
+                f'ตรวจสอบ sta_end หรือ lvc'
+            )
+
         segs.append(VerticalSegment(
             sta_start=sta_start,
-            sta_end=float(row[2]),
+            sta_end=sta_end,
             level=float(row[3]),
             grade_in=float(row[4]),
             grade_out=float(row[5]),

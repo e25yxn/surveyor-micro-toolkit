@@ -89,10 +89,32 @@ def build_vertical_from_vpi(vpis: list[dict[str, Any]]) -> VerticalBuildResult:
         v = vpis[i]
         v_sta = float(v['sta'])
         v_elev = float(v['elev'])
-
-        grade_in = (v_elev - float(vpis[i - 1]['elev'])) / (v_sta - float(vpis[i - 1]['sta'])) * 100
-        next_elev = float(vpis[i + 1]['elev'])
+        prev_sta = float(vpis[i - 1]['sta'])
+        prev_elev = float(vpis[i - 1]['elev'])
         next_sta  = float(vpis[i + 1]['sta'])
+        next_elev = float(vpis[i + 1]['elev'])
+
+        # Review finding #9(a), session_logs/review_src_smt_20260802.md: a
+        # duplicate station (this VPI vs. its neighbour) makes the grade
+        # calculation below a division by zero. Matching this function's own
+        # documented issues-not-raise geometry-error policy: skip the VPI
+        # (its PVC/PVI/PVT are never created; end_sta/end_elev stay at the
+        # last successfully-built point) rather than crash. Checked in both
+        # directions - a clash with either neighbour would divide by zero.
+        if abs(v_sta - prev_sta) < 1e-9:
+            issues.append(
+                f'VPI#{i} (STA {v_sta}): station ซ้ำกับจุดก่อนหน้า (STA {prev_sta}) '
+                'คำนวณ grade เข้า VPI นี้ไม่ได้ (หารด้วยศูนย์) — ข้าม VPI นี้ไป'
+            )
+            continue
+        if abs(next_sta - v_sta) < 1e-9:
+            issues.append(
+                f'VPI#{i} (STA {v_sta}): station ซ้ำกับจุดถัดไป (STA {next_sta}) '
+                'คำนวณ grade ออกจาก VPI นี้ไม่ได้ (หารด้วยศูนย์) — ข้าม VPI นี้ไป'
+            )
+            continue
+
+        grade_in = (v_elev - prev_elev) / (v_sta - prev_sta) * 100
         grade_out = (next_elev - v_elev) / (next_sta - v_sta) * 100
 
         is_symmetric = v.get('L1') is None and v.get('L2') is None
@@ -136,6 +158,17 @@ def build_vertical_from_vpi(vpis: list[dict[str, Any]]) -> VerticalBuildResult:
             sta_start=end_sta, sta_end=ep_sta, level=end_elev,
             grade_in=grade_end, grade_out=grade_end, lvc=0, lvc2=None,
         ))
+    elif ep_sta < end_sta - 1e-6:
+        # Review finding #9(b): previously silent - no final tangent row was
+        # appended AND no issue was raised, so the profile's rows quietly
+        # stopped at end_sta (the last VPI's PVT) while the EVP control point
+        # still claimed a different, earlier station - self-contradictory
+        # output with no warning. Mirrors the interior-VPI overlap check
+        # above (same tolerance, same issues-not-raise policy).
+        issues.append(
+            f'EVP (STA {ep_sta}): อยู่ก่อนจุดจบของ VPI ก่อนหน้า (STA {end_sta}) '
+            'โปรไฟล์ถูกตัดจบที่ VPI สุดท้ายแทน — ตรวจสอบ station ของ EVP หรือ LVC ของ VPI ก่อนหน้า'
+        )
     control.append(VerticalControlPoint(name='EVP', sta=ep_sta, elevation=ep_elev))
 
     return VerticalBuildResult(rows=rows, control=control, issues=issues)

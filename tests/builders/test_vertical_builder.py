@@ -194,7 +194,7 @@ def test_overlap_reported_as_issue() -> None:
     vpis = [
         {'sta': 0,    'elev': 100},
         {'sta': 500,  'elev': 110, 'L': 1200},   # PVC would be at -100 < 0
-        {'sta': 1000, 'elev': 120},
+        {'sta': 1200, 'elev': 120},               # past pvt_sta (1100) - no 2nd issue
     ]
     res = vb.build_vertical_from_vpi(vpis)
     assert len(res.issues) == 1
@@ -267,3 +267,80 @@ class TestDefensiveVerticalBuilder:
         assert report[0]['ok'] is False
         assert report[0]['d_sta'] is None
         assert report[0]['note'] != ''
+
+
+# ---------------------------------------------------------------------------
+# Test: review findings #9(a)/#9(b), session_logs/review_src_smt_20260802.md
+# ---------------------------------------------------------------------------
+
+class TestDuplicateStationVpi:
+    """#9(a): a duplicate VPI station used to raise a raw ZeroDivisionError
+    from the grade calculation. Now appends an issue and skips that VPI
+    instead (its PVC/PVI/PVT are never created; end_sta/end_elev stay at the
+    last successfully-built point), matching this function's own documented
+    issues-not-raise policy for geometry problems.
+    """
+
+    def test_duplicate_with_previous_vpi_no_longer_raises(self) -> None:
+        vpis = [
+            {'sta': 0,   'elev': 100},
+            {'sta': 100, 'elev': 102,   'L': 40},
+            {'sta': 100, 'elev': 102.5, 'L': 30},   # same station as VPI#1
+            {'sta': 300, 'elev': 101},
+        ]
+        result = vb.build_vertical_from_vpi(vpis)   # must not raise
+        assert len(result.issues) == 2
+        assert 'VPI#1' in result.issues[0] and 'ถัดไป' in result.issues[0]
+        assert 'VPI#2' in result.issues[1] and 'ก่อนหน้า' in result.issues[1]
+
+    def test_duplicate_with_next_vpi_no_longer_raises(self) -> None:
+        vpis = [
+            {'sta': 0,   'elev': 100},
+            {'sta': 100, 'elev': 102, 'L': 20},
+            {'sta': 200, 'elev': 103, 'L': 20},
+            {'sta': 200, 'elev': 104, 'L': 20},     # same station as VPI#2
+            {'sta': 300, 'elev': 101},
+        ]
+        result = vb.build_vertical_from_vpi(vpis)   # must not raise
+        assert len(result.issues) == 2
+
+    def test_non_duplicate_stations_unaffected(self) -> None:
+        vpis = [
+            {'sta': 0,   'elev': 100},
+            {'sta': 100, 'elev': 102, 'L': 20},
+            {'sta': 200, 'elev': 101},
+        ]
+        result = vb.build_vertical_from_vpi(vpis)
+        assert result.issues == []
+
+
+class TestEvpBeforeProfileEnd:
+    """#9(b): an EVP station before the last built point (e.g. an overlong
+    LVC on the final interior VPI) used to be silently dropped - no closing
+    row, no issue, while the EVP control point still reported its own
+    (earlier, now-inconsistent) station. Now appends an issue instead.
+    """
+
+    def test_evp_before_last_pvt_appends_issue(self) -> None:
+        vpis = [
+            {'sta': 0,   'elev': 100},
+            {'sta': 200, 'elev': 105, 'L': 300},   # PVT lands at sta=350
+            {'sta': 250, 'elev': 103},              # EVP before that PVT
+        ]
+        result = vb.build_vertical_from_vpi(vpis)
+        assert len(result.issues) == 1
+        assert 'EVP' in result.issues[0]
+        # The EVP control point itself must still be reported at its own
+        # (as-given) station - the issue flags the inconsistency, it doesn't
+        # silently move anything.
+        evp = next(c for c in result.control if c.name == 'EVP')
+        assert evp.sta == 250.0
+
+    def test_evp_after_last_pvt_no_issue(self) -> None:
+        vpis = [
+            {'sta': 0,   'elev': 100},
+            {'sta': 200, 'elev': 105, 'L': 100},   # PVT lands at sta=250
+            {'sta': 400, 'elev': 103},              # well past PVT
+        ]
+        result = vb.build_vertical_from_vpi(vpis)
+        assert result.issues == []
