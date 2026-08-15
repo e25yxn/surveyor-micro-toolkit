@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import re
 import sys
 from typing import Any
 
@@ -102,6 +103,58 @@ def _read_alignment(path: str) -> list[alignment.Element]:
     return alignment.parse_alignment_table(rows)
 
 
+def _pi_label_map(vertex_rows: list[list[Any]]) -> dict[int, str]:
+    """Map 1-based PI position -> the row's real POINT label from the file.
+
+    build_alignment_from_pi()'s issue messages identify a PI only by its
+    positional index ("PI#7") since parse_pi_table() doesn't carry the
+    original label through into the vertex dicts it returns - so "PI#7"
+    may not correspond to a row actually labelled "PI7" in the source file
+    (e.g. AL1_test_alignment_PI.csv has IP1/IP2 ahead of PI1..PI11, so
+    "PI#1" there is really the IP1 row). This walks vertex_rows the same
+    way parse_pi_table() counts positions (every non-blank row other than
+    BP/EP advances the count by one; blank-POINT compound sub-rows don't)
+    so the two numbering schemes always agree.
+    """
+    if not vertex_rows:
+        return {}
+    header = vertex_rows[0]
+    point_col = next(
+        (i for i, c in enumerate(header) if str(c).strip().lower() == 'point'), None
+    )
+    if point_col is None:
+        return {}
+    label_map: dict[int, str] = {}
+    position = 0
+    for row in vertex_rows[1:]:
+        if point_col >= len(row):
+            continue
+        point = str(row[point_col]).strip()
+        if not point or point in ('BP', 'EP'):
+            continue
+        position += 1
+        label_map[position] = point
+    return label_map
+
+
+def _enrich_pi_issues(issues: list[str], label_map: dict[int, str]) -> list[str]:
+    """Append each issue's real PI label(s) next to its "PI#N" reference(s),
+    e.g. 'PI#7: ...' -> 'PI#7 (PI7): ...'. A message may reference more than
+    one PI (e.g. the curve-overlap issue also cites the previous PI); every
+    "PI#N" occurrence is enriched independently. Positions with no mapped
+    label (map empty, or index absent) are left unchanged.
+    """
+    if not label_map:
+        return issues
+
+    def _sub(m: re.Match[str]) -> str:
+        n = int(m.group(1))
+        label = label_map.get(n)
+        return f'PI#{n} ({label})' if label else m.group(0)
+
+    return [re.sub(r'PI#(\d+)', _sub, issue) for issue in issues]
+
+
 def _read_pi_table(path: str) -> list[dict[str, Any]]:
     """Read a PI-table CSV and return a vertex list for build_alignment_from_pi.
 
@@ -113,6 +166,15 @@ def _read_pi_table(path: str) -> list[dict[str, Any]]:
     first as defense-in-depth for any column the splitter's header-name
     lookup doesn't recognise.
     """
+    vertices, _label_map = _read_pi_table_and_labels(path)
+    return vertices
+
+
+def _read_pi_table_and_labels(path: str) -> tuple[list[dict[str, Any]], dict[int, str]]:
+    """Same as _read_pi_table(), but also returns the PI label map (see
+    _pi_label_map()) so a caller can enrich build_alignment_from_pi()'s
+    issue messages with the file's real labels via _enrich_pi_issues().
+    """
     with open(path, newline='', encoding='utf-8-sig') as f:
         rows = list(csv.reader(f))
     if not rows:
@@ -120,7 +182,7 @@ def _read_pi_table(path: str) -> list[dict[str, Any]]:
     vertex_rows, _drawing = split_mixed_alignment_table(
         _strip_thousands_separators_from_rows(rows)
     )
-    return parse_pi_table(vertex_rows)
+    return parse_pi_table(vertex_rows), _pi_label_map(vertex_rows)
 
 
 def _read_field_csv(path: str) -> list[dict[str, Any]]:
@@ -172,11 +234,11 @@ def _radius_from_element(el: alignment.Element) -> float:
 def _run_build(args: argparse.Namespace) -> int:
     """build: PI table CSV -> elements_output.csv + controls_so_output.csv."""
     import os
-    vertices = _read_pi_table(args.alignment)
+    vertices, label_map = _read_pi_table_and_labels(args.alignment)
     if not vertices:
         raise ValueError('ไม่พบข้อมูล PI ในไฟล์ หรือไฟล์ไม่ใช่ PI table format')
     build_result = build_alignment_from_pi(vertices)
-    for issue in build_result.issues:
+    for issue in _enrich_pi_issues(build_result.issues, label_map):
         print(f'warning: {issue}', file=sys.stderr)
 
     out_dir = args.out_dir if args.out_dir else os.path.dirname(os.path.abspath(args.alignment))
@@ -224,9 +286,9 @@ def _run_build(args: argparse.Namespace) -> int:
 
 def _run_cross_check(args: argparse.Namespace) -> int:
     """cross-check: PI CSV + field CSV -> station/offset table."""
-    vertices = _read_pi_table(args.alignment)
+    vertices, label_map = _read_pi_table_and_labels(args.alignment)
     build_result = build_alignment_from_pi(vertices)
-    for issue in build_result.issues:
+    for issue in _enrich_pi_issues(build_result.issues, label_map):
         print(f'warning: {issue}', file=sys.stderr)
     field_points = _read_field_csv(args.field)
     rows = check.bulk_cross_check(build_result.elements, field_points)
@@ -368,11 +430,11 @@ def _run_inv(args: argparse.Namespace) -> int:
 
 def _run_export_landxml(args: argparse.Namespace) -> int:
     """export-landxml: PI table CSV -> LandXML 1.2 XML string or file."""
-    vertices = _read_pi_table(args.alignment)
+    vertices, label_map = _read_pi_table_and_labels(args.alignment)
     if not vertices:
         raise ValueError('ไม่พบข้อมูล PI ในไฟล์')
     result = build_alignment_from_pi(vertices)
-    for issue in result.issues:
+    for issue in _enrich_pi_issues(result.issues, label_map):
         print(f'warning: {issue}', file=sys.stderr)
     xml_str = export_alignment_landxml(result, name=args.name)
     if args.out:

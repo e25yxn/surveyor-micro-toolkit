@@ -332,6 +332,84 @@ def test_build_with_mixed_table_succeeds(pi_csv_mixed, tmp_path, capsys):
 
 
 # ---------------------------------------------------------------------------
+# PI issue-message label enrichment (2026-08-15)
+#
+# build_alignment_from_pi()'s "PI#N" issue messages identify a PI only by
+# its 1-based position, since parse_pi_table() doesn't carry the file's
+# original label through into the vertex dicts it returns. When a file has
+# IP1/IP2-style angle points ahead of the numbered PI-n curves (as
+# AL1_test_alignment_PI.csv genuinely does), "PI#1" in an issue is actually
+# the IP1 row, not "PI1" - misleading anyone trying to find that row in
+# their own file. _pi_label_map()/_enrich_pi_issues() fix this at the
+# cli.py boundary only; parse_pi_table()/build_alignment_from_pi() (both
+# protected functions) are untouched.
+# ---------------------------------------------------------------------------
+
+def test_pi_label_map_matches_parse_pi_table_position_counting():
+    """Position numbering must skip BP/EP and blank compound sub-rows
+    exactly like parse_pi_table()'s own vertex count - including counting
+    IP-labelled angle points, which are ordinary PI vertices to
+    parse_pi_table() even though they aren't numbered "PI-n"."""
+    rows = [
+        ['POINT', 'N', 'E', 'R'],
+        ['BP', '0', '0', ''],
+        ['IP1', '50', '50', ''],
+        ['IP2', '100', '100', ''],
+        ['PI1', '200', '100', '150'],
+        ['', '', '', '80'],          # blank-POINT compound sub-row - no new position
+        ['PI2', '300', '100', '100'],
+        ['EP', '400', '0', ''],
+    ]
+    label_map = cli._pi_label_map(rows)
+    assert label_map == {1: 'IP1', 2: 'IP2', 3: 'PI1', 4: 'PI2'}
+
+
+def test_enrich_pi_issues_appends_real_label():
+    label_map = {2: 'IP2', 3: 'PI1'}
+    issues = ['PI#3: overlaps PI#2 somehow']
+    enriched = cli._enrich_pi_issues(issues, label_map)
+    assert enriched == ['PI#3 (PI1): overlaps PI#2 (IP2) somehow']
+
+
+def test_enrich_pi_issues_leaves_unmapped_position_unchanged():
+    enriched = cli._enrich_pi_issues(['PI#9: something'], {1: 'PI1'})
+    assert enriched == ['PI#9: something']
+
+
+_PI_TABLE_OVERLAP_WITH_IP = """\
+POINT,N,E,R
+BP,0,0,
+IP1,50,50,
+IP2,100,100,
+PI1,200,100,150
+PI2,199.9999999,100.0000002,100
+EP,300,0,
+"""
+
+
+@pytest.fixture()
+def pi_csv_overlap_with_ip(tmp_path):
+    """Reproduces AL1's real IP1/IP2-before-PI1 layout with two PIs placed
+    to trigger a real curve-overlap issue, so "PI#3"/"PI#4" (positional)
+    diverge from "PI1"/"PI2" (the file's actual labels)."""
+    p = tmp_path / 'pi_overlap_ip.csv'
+    p.write_text(_PI_TABLE_OVERLAP_WITH_IP, encoding='utf-8')
+    return str(p)
+
+
+def test_build_warning_shows_real_label_not_just_position(pi_csv_overlap_with_ip, tmp_path, capsys):
+    """End-to-end: smt build's printed warning for a curve-overlap issue at
+    the file's PI1 (position #3, since IP1/IP2 take positions #1/#2) must
+    show "PI1", not just the positional "PI#3" a user can't map back to
+    their own file without counting rows by hand."""
+    rc = cli.main(['build', pi_csv_overlap_with_ip, '--out-dir', str(tmp_path)])
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert 'PI#3 (PI1)' in err
+    assert 'PI#2 (IP2)' in err
+
+
+# ---------------------------------------------------------------------------
 # compare-drawing subcommand
 # ---------------------------------------------------------------------------
 
