@@ -272,3 +272,78 @@ class TestDefensiveCrossfall:
         segs = cf.parse_crossfall_table(rows)
         assert len(segs) == 1
         assert segs[0].type == 'V'
+
+
+# ---------------------------------------------------------------------------
+# crossfall.py review (2026-08-15) - reversed segments and malformed columns
+# beyond sta_start previously produced either a plausible-but-wrong value
+# (calculate_crossfall_rate_at() silently flips sign on a reversed segment)
+# or a raw error with no row context.
+# ---------------------------------------------------------------------------
+
+class TestCrossfallReview20260815:
+
+    def test_reversed_segment_raises(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'xf_start', 'xf_end', 'type'],
+            [1, 100, 50, -2.0, 2.0, 'V'],
+        ]
+        with pytest.raises(ValueError, match='แถวที่ 2'):
+            cf.parse_crossfall_table(rows)
+
+    def test_forward_segment_parses(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'xf_start', 'xf_end', 'type'],
+            [1, 50, 100, -2.0, 2.0, 'V'],
+        ]
+        segs = cf.parse_crossfall_table(rows)
+        assert len(segs) == 1
+
+    def test_zero_length_segment_still_parses(self):
+        # sta_end == sta_start is not "reversed" - already handled safely by
+        # both calculate functions' own L==0 guard, so parse must not reject it.
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'xf_start', 'xf_end', 'type'],
+            [1, 100, 100, -2.0, -2.0, 'N'],
+        ]
+        segs = cf.parse_crossfall_table(rows)
+        assert len(segs) == 1
+
+    def test_reversed_segment_rate_sign_bug_demonstrated(self):
+        """Documents the bug this fix prevents: pre-fix, a reversed segment's
+        calculate_crossfall_at() coincidentally returns the same value as the
+        equivalent forward segment (the sign flip in the negative length
+        cancels out), but calculate_crossfall_rate_at() silently returns the
+        opposite sign - constructed directly (bypassing parse_crossfall_table,
+        which now rejects this) to show the two calculate_* functions
+        themselves still trust their input, matching parse_vertical_table's
+        equivalent design for #8."""
+        seg_reversed = cf.CrossfallSegment(sta_start=100, sta_end=50, crossfall_start=-2.0, crossfall_end=4.0, type='V')
+        seg_forward  = cf.CrossfallSegment(sta_start=50, sta_end=100, crossfall_start=-2.0, crossfall_end=4.0, type='V')
+        assert cf.calculate_crossfall_at(seg_reversed, 75) == cf.calculate_crossfall_at(seg_forward, 75)
+        assert cf.calculate_crossfall_rate_at(seg_reversed, 75) == -cf.calculate_crossfall_rate_at(seg_forward, 75)
+
+    def test_missing_sta_end_raises_with_row_context(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'xf_start', 'xf_end', 'type'],
+            [1, 0.0, '', -2.0, 2.0, 'V'],
+        ]
+        with pytest.raises(ValueError, match='แถวที่ 2'):
+            cf.parse_crossfall_table(rows)
+
+    def test_row_too_short_for_crossfall_end_raises_with_row_context(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'xf_start'],
+            [1, 0.0, 100.0, -2.0],
+        ]
+        with pytest.raises(ValueError, match='แถวที่ 2'):
+            cf.parse_crossfall_table(rows)
+
+    def test_second_row_error_cites_correct_line_number(self):
+        rows = [
+            ['index', 'sta_start', 'sta_end', 'xf_start', 'xf_end', 'type'],
+            [1, 0.0, 100.0, -2.0, -2.0, 'N'],   # valid
+            [2, 100.0, '', -2.0, 4.0, 'V'],       # malformed sta_end
+        ]
+        with pytest.raises(ValueError, match='แถวที่ 3'):
+            cf.parse_crossfall_table(rows)

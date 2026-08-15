@@ -112,11 +112,26 @@ def parse_crossfall_table(rows: list[Any]) -> list[CrossfallSegment]:
     """Parse a row-table (first row = headers) into a list of CrossfallSegment.
 
     Expected columns: index, sta_start, sta_end, crossfall_start(%), crossfall_end(%), type.
-    Rows where sta_start is empty / non-numeric are skipped.
+    Rows where sta_start is empty / non-numeric are skipped (treated as a
+    blank/spacer row, not real data).
     Matches the format used in tests/golden/tables.json ["xLT"] and ["xRT"].
+
+    Raises ValueError, citing the row number, when:
+    - a row has a real sta_start but a malformed/missing sta_end,
+      crossfall_start, or crossfall_end (unlike a blank sta_start, this is a
+      genuine data error, not a spacer row - silently skipping it would
+      leave an unexplained gap in the crossfall profile)
+    - sta_end < sta_start (a reversed segment). Unlike a zero-length segment
+      (already handled safely - both calculate_crossfall_at() and
+      calculate_crossfall_rate_at() return a defined value when
+      sta_end == sta_start), a reversed segment computes a plausible-
+      looking but wrong value with no warning: calculate_crossfall_at()
+      happens to still return the correct interpolated value (the sign
+      flip in the negative length cancels out), but
+      calculate_crossfall_rate_at() silently returns the wrong sign.
     """
     segs: list[CrossfallSegment] = []
-    for row in rows[1:]:                  # skip header
+    for line_no, row in enumerate(rows[1:], start=2):    # start=2: row 1 is the header
         sta_start_raw = row[1]
         if sta_start_raw in ('', None):
             continue
@@ -126,12 +141,29 @@ def parse_crossfall_table(rows: list[Any]) -> list[CrossfallSegment]:
             continue
         if math.isnan(sta_start):
             continue
+
+        try:
+            sta_end = float(row[2])
+            crossfall_start = float(row[3])
+            crossfall_end = float(row[4])
+        except (IndexError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f'แถวที่ {line_no}: sta_end/crossfall_start/crossfall_end อ่านค่าไม่ได้ '
+                f'({exc}) — ตรวจสอบว่าตารางมีครบทุกคอลัมน์และเป็นตัวเลข'
+            ) from exc
+
+        if sta_end < sta_start:
+            raise ValueError(
+                f'แถวที่ {line_no}: sta_end ({sta_end}) น้อยกว่า sta_start ({sta_start}) '
+                '— segment กลับด้าน ตรวจสอบลำดับ station'
+            )
+
         type_raw = row[5] if len(row) > 5 else None
         segs.append(CrossfallSegment(
             sta_start=sta_start,
-            sta_end=float(row[2]),
-            crossfall_start=float(row[3]),
-            crossfall_end=float(row[4]),
+            sta_end=sta_end,
+            crossfall_start=crossfall_start,
+            crossfall_end=crossfall_end,
             type=_normalize_type(type_raw),
         ))
     return segs
