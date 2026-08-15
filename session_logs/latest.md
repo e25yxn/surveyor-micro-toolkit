@@ -2479,3 +2479,32 @@
 - หมายเหตุ: ทดสอบผ่าน @HEAD Test deployment (AKfycbxmyii_Bm2XMSpuiAELAfz5avQkDOZyxQYfr4ip_Sna)
   ยังไม่ได้ deploy version ใหม่แบบถาวร (New deployment/version bump) — เป็นขั้นตอนแยก
   ถ้า CK1024 ต้องการ promote ไปเป็น production version
+
+## [2026-08-15] Enrich PI issue messages with real labels (cli.py)
+- ทำ: apply diff จาก session_logs/plan_20260815_pi_error_message_labels.md
+  หัวข้อ 5 ครบทั้ง 2 ไฟล์ (src/smt/cli.py, tests/test_cli.py) — เพิ่ม
+  _pi_label_map() / _enrich_pi_issues() / _read_pi_table_and_labels()
+  เพื่อให้ warning message ที่แสดง "PI#N" ต่อท้ายด้วย label จริงจากไฟล์
+  (เช่น "PI#3 (PI1): ...") ไม่แตะ parse_pi_table/build_alignment_from_pi เลย
+- คำสั่ง: python -m pytest -q
+- ผล: PASS (545 passed)
+- คำสั่ง: python -m smt.cli build test_data/AL1_test_alignment_PI.csv --out-dir /tmp/verify_build_pi_labels
+- ผล: PASS (exit 0)
+- คำสั่ง: python -m smt.cli cross-check test_data/AL1_test_alignment_PI.csv test_data/AL1_test_alignment_drawing.csv
+- ผล: PASS (exit 0)
+- คำสั่ง: python -m smt.cli export-landxml test_data/AL1_test_alignment_PI.csv
+- ผล: PASS (exit 0)
+- commit: 23ad716 (feat(cli): enrich PI issue messages with the file's real labels)
+- หมายเหตุ: git diff --stat ยืนยันแตะแค่ 2 ไฟล์ตามแผน (147 insertions/7 deletions,
+  ใกล้เคียง 148/7 ที่คาดในแผน — ต่างกันจากการนับบรรทัดว่างท้ายไฟล์เล็กน้อย ไม่กระทบเนื้อหา)
+  push ขึ้น origin/main แล้ว (53c651d..23ad716)
+
+## [2026-08-15] style: wrap two long lines in cli.py (ruff E501)
+- ทำ: health check พบ ruff 15 errors (เทียบ baseline ก่อนเซสชันนี้ 13 errors)
+  ตรวจแล้วว่า 2 จุดที่เพิ่มมาเกิดจาก _strip_commas() ที่ห่อ float() ตอนแก้
+  thousands-separator fix ก่อนหน้านี้ในวันนี้ - แก้โดยแยกทีละบรรทัด ไม่เปลี่ยน
+  behavior ใดๆ (_read_field_csv/_read_drawing_csv)
+- คำสั่ง: pytest -q ; ruff check src/ ; mypy src/smt
+- ผล: PASS (545 passed) ; ruff กลับมา 13 errors (จาก 15) ตรงกับ baseline เดิม ;
+  mypy 1 error เท่าเดิม (landxml.py:144, ของเก่าก่อนเซสชันนี้ ไม่มีของใหม่)
+- commit: 7e323c4 (ยังไม่ push)
