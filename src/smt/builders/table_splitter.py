@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-_VERTEX_POINT_RE = re.compile(r'^(BP|PI-\d+|EP)$')
+_DRAWING_POINT_RE = re.compile(r'^(PT|PC|PCC|TS|SC|CS|ST)$')
 
 # Maps lowercased header cell text -> canonical column key (mirrors the subset
 # of alignment_builder._COL_ALIASES this module needs).
@@ -100,7 +100,7 @@ def split_mixed_alignment_table(
             continue
 
         point = cell(row, 'point')
-        if not point or _VERTEX_POINT_RE.match(point):
+        if not point or not _DRAWING_POINT_RE.match(point):
             cleaned = list(row)
             for key in _NUMERIC_KEYS:
                 idx = col_map.get(key)

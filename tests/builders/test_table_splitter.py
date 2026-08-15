@@ -177,3 +177,60 @@ class TestColumnAliases:
             {'name': 'PC', 'sta': 50.0, 'n': 1050.0, 'e': 2000.0},
             {'name': 'PT', 'sta': 150.0, 'n': 1100.0, 'e': 2050.0},
         ]
+
+
+# ---------------------------------------------------------------------------
+# Test: POINT-label classification is drawing-point-whitelist-based, not a
+# vertex-pattern regex (2026-08-15 - wiring split_mixed_alignment_table()
+# into cli.py surfaced that AL1_test_alignment_PI.csv, the project's main
+# golden fixture, uses bare "PI" (repeated) plus real angle-point vertices
+# labelled "IP1"/"IP2" - neither matches a "PI-\d+"-style vertex regex, but
+# both must still end up as vertices, matching parse_pi_table()'s own
+# behaviour of accepting any non-blank label other than BP/EP as a PI.
+# ---------------------------------------------------------------------------
+
+class TestDrawingPointWhitelist:
+
+    def test_bare_pi_label_is_a_vertex(self):
+        """The project's main convention ('PI', repeated, no suffix) must
+        route to vertex_rows, not drawing."""
+        rows = [
+            ['POINT', 'STA', 'N', 'E', 'RADIUS'],
+            ['BP', '0', '1000', '2000', ''],
+            ['PI', '', '1000', '2500', '100'],
+            ['EP', '', '1500', '2500', ''],
+        ]
+        vertex_rows, drawing = split_mixed_alignment_table(rows)
+        assert [r[0] for r in vertex_rows[1:]] == ['BP', 'PI', 'EP']
+        assert drawing == []
+
+    def test_ip_labelled_angle_point_is_a_vertex(self):
+        """'IP1'/'IP2' (real angle-point vertices in AL1_test_alignment_PI.csv,
+        blank RADIUS) must route to vertex_rows - they are not one of the
+        known drawing control-point abbreviations, so must not be dropped."""
+        rows = [
+            ['POINT', 'STA', 'N', 'E', 'RADIUS'],
+            ['BP', '0', '1000', '2000', ''],
+            ['IP1', '', '1050', '2100', ''],
+            ['IP2', '', '1100', '2200', ''],
+            ['PI', '', '1200', '2300', '100'],
+            ['EP', '', '1500', '2500', ''],
+        ]
+        vertex_rows, drawing = split_mixed_alignment_table(rows)
+        assert [r[0] for r in vertex_rows[1:]] == ['BP', 'IP1', 'IP2', 'PI', 'EP']
+        assert drawing == []
+
+    def test_pcc_is_a_drawing_point(self):
+        """'PCC' (point of compound curve, e.g. HOR_01N01.csv) is a computed
+        checkpoint, not an alignment-defining vertex - must route to drawing."""
+        rows = [
+            ['POINT', 'STA', 'N', 'E', 'RADIUS'],
+            ['BP', '0', '1000', '2000', ''],
+            ['PI-1', '', '1000', '2500', '150'],
+            ['PCC', '50', '1050', '2000', ''],
+            ['PI-2', '', '1100', '2600', '150'],
+            ['EP', '', '1500', '2500', ''],
+        ]
+        vertex_rows, drawing = split_mixed_alignment_table(rows)
+        assert [r[0] for r in vertex_rows[1:]] == ['BP', 'PI-1', 'PI-2', 'EP']
+        assert [d['name'] for d in drawing] == ['PCC']

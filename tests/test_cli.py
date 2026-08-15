@@ -301,6 +301,36 @@ def test_build_with_thousands_separator_succeeds(pi_csv_commas, tmp_path, capsys
     assert (tmp_path / 'elements_output.csv').exists()
 
 
+_PI_TABLE_MIXED = """\
+POINT,STA,N,E,RADIUS
+BP,0,1000,2000,
+PI-1,,1000,2500,100
+PT,50,1050,2000,
+EP,,1500,2500,
+"""
+
+
+@pytest.fixture()
+def pi_csv_mixed(tmp_path):
+    """A PI table with a drawing control-point row (PT) interleaved -
+    exercises _read_pi_table()'s split_mixed_alignment_table() routing."""
+    p = tmp_path / 'pi_mixed.csv'
+    p.write_text(_PI_TABLE_MIXED, encoding='utf-8')
+    return str(p)
+
+
+def test_build_with_mixed_table_succeeds(pi_csv_mixed, tmp_path, capsys):
+    """smt build must accept a table with PT/PC/PCC/TS/SC/CS/ST rows
+    interleaved directly - _read_pi_table() now routes through
+    split_mixed_alignment_table() so the PT row is excluded from the
+    vertex list instead of being misread as a PI (2026-08-15)."""
+    rc = cli.main(['build', pi_csv_mixed, '--out-dir', str(tmp_path)])
+    assert rc == 0
+    with open(tmp_path / 'elements_output.csv', encoding='utf-8') as f:
+        rows = f.readlines()
+    assert len(rows) == 4   # header + 3 elements (tangent, curve, tangent)
+
+
 # ---------------------------------------------------------------------------
 # compare-drawing subcommand
 # ---------------------------------------------------------------------------

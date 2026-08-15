@@ -25,6 +25,7 @@ from .builders.alignment_builder import (
     build_alignment_from_pi,
     parse_pi_table,
 )
+from .builders.table_splitter import split_mixed_alignment_table
 from .landxml import export_alignment_landxml
 
 
@@ -102,12 +103,24 @@ def _read_alignment(path: str) -> list[alignment.Element]:
 
 
 def _read_pi_table(path: str) -> list[dict[str, Any]]:
-    """Read a PI-table CSV and return a vertex list for build_alignment_from_pi."""
+    """Read a PI-table CSV and return a vertex list for build_alignment_from_pi.
+
+    Routed through split_mixed_alignment_table() so a table with drawing
+    control-point rows (PT/PC/PCC/TS/SC/CS/ST) interleaved works directly,
+    not just a pure vertex table - matching the live GAS pipeline's
+    split->parse->build order. The drawing half is discarded here; callers
+    wanting it should read the file directly. Generic comma-stripping runs
+    first as defense-in-depth for any column the splitter's header-name
+    lookup doesn't recognise.
+    """
     with open(path, newline='', encoding='utf-8-sig') as f:
         rows = list(csv.reader(f))
     if not rows:
         raise ValueError(f'{path} is empty')
-    return parse_pi_table(_strip_thousands_separators_from_rows(rows))
+    vertex_rows, _drawing = split_mixed_alignment_table(
+        _strip_thousands_separators_from_rows(rows)
+    )
+    return parse_pi_table(vertex_rows)
 
 
 def _read_field_csv(path: str) -> list[dict[str, Any]]:
@@ -272,7 +285,9 @@ def _run_fit_radius(args: argparse.Namespace) -> int:
         raw_rows: list[Any] = list(csv.reader(f))
     if not raw_rows:
         raise ValueError(f'{args.alignment} is empty')
-    pi_rows: list[Any] = _strip_thousands_separators_from_rows(raw_rows)
+    pi_rows, _drawing = split_mixed_alignment_table(
+        _strip_thousands_separators_from_rows(raw_rows)
+    )
 
     drawing_points = _read_drawing_csv(args.drawing)
     fix_names_raw = [s.strip() for s in args.fix.split(',') if s.strip()]
