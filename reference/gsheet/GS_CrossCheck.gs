@@ -96,7 +96,7 @@ var GS_CrossCheck = (function () {
   // original interleaved row order (BP, PI-1, PT, PC, PI-2, ...) is preserved.
   // Mirrors แผนแม่ §2.4 ทางเลือก (ก) — ไม่แก้ GS_TableSplitter.gs
   // ==========================================================================
-  var VERTEX_POINT_RE = /^(BP|PI-\d+|EP)$/;
+  var DRAWING_POINT_RE = /^(PT|PC|PCC|TS|SC|CS|ST)$/;
 
   // header cell (lowercased) -> canonical column key (subset needed here)
   var COL_ALIASES_ = {
@@ -163,7 +163,7 @@ var GS_CrossCheck = (function () {
         e: toNumber_(cell_(row, colMap, 'easting')),
         sta: staRaw ? toNumber_(staRaw) : null
       };
-      if (VERTEX_POINT_RE.test(name)) {
+      if (!DRAWING_POINT_RE.test(name)) {
         rec.kind = 'vertex';
         rec.vertexIndex = vidx;
         vidx++;
@@ -248,7 +248,7 @@ var GS_CrossCheck = (function () {
     // นับ ตรงกับตำแหน่งจริงใน vertices[] ที่ parsePiTable() สร้าง — เช็คแบบง่าย
     // ที่สุดที่ยืนยันได้โดยไม่ต้อง re-parse: จำนวนแถวที่ scanRawRows_ ติด
     // kind='vertex' ต้องเท่ากับ vertices.length เป๊ะ (ถ้าไม่เท่า แปลว่า regex
-    // VERTEX_POINT_RE หรือกติกานับแถว sub ที่นี่เพี้ยนไปจาก parsePiTable จริง)
+    // DRAWING_POINT_RE หรือกติกานับแถว sub ที่นี่เพี้ยนไปจาก parsePiTable จริง)
     var vertexRowCount = 0;
     for (var k = 0; k < recs.length; k++) {
       if (recs[k].kind === 'vertex') vertexRowCount++;
@@ -257,7 +257,7 @@ var GS_CrossCheck = (function () {
       throw new Error(
         'GS_CrossCheck.checkPiCurves: scanRawRows_ นับแถว vertex ได้ ' + vertexRowCount +
         ' แถว แต่ vertices.length = ' + vertices.length + ' — vertexIndex จะจับคู่กับ ' +
-        'vertices[] ผิดตำแหน่ง (ตรวจ VERTEX_POINT_RE หรือการนับแถว compound sub-row)'
+        'vertices[] ผิดตำแหน่ง (ตรวจ DRAWING_POINT_RE หรือการนับแถว compound sub-row)'
       );
     }
 

@@ -19,7 +19,7 @@
 var GS_TableSplitter = (function () {
   'use strict';
 
-  var VERTEX_POINT_RE = /^(BP|PI-\d+|EP)$/;
+  var DRAWING_POINT_RE = /^(PT|PC|PCC|TS|SC|CS|ST)$/;
 
   // header cell (lowercased) -> canonical column key
   // mirrors the subset of table_splitter._COL_ALIASES this module needs
@@ -85,7 +85,7 @@ var GS_TableSplitter = (function () {
       if (isBlankRow_(row)) continue;
 
       var point = cell_(row, colMap, 'point');
-      if (!point || VERTEX_POINT_RE.test(point)) {
+      if (!point || !DRAWING_POINT_RE.test(point)) {
         var cleaned = row.slice();
         for (var k = 0; k < NUMERIC_KEYS.length; k++) {
           var key = NUMERIC_KEYS[k];
