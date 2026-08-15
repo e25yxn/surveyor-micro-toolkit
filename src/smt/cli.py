@@ -28,6 +28,47 @@ from .builders.alignment_builder import (
 from .landxml import export_alignment_landxml
 
 
+def _strip_commas(value: str) -> str:
+    """Remove thousands-separator commas (e.g. '1,537,772.85' -> '1537772.85').
+
+    Excel/field-survey exports sometimes format large coordinates with commas;
+    csv.reader preserves them verbatim inside quoted cells, but float() does
+    not accept comma-grouped numbers. No-op on values without commas.
+    """
+    return value.replace(',', '')
+
+
+def _strip_thousands_separators_from_rows(rows: list[list[Any]]) -> list[list[Any]]:
+    """Strip thousands-separator commas from data rows, leaving row 0 (header) alone.
+
+    Used ahead of parse_pi_table(), which does its own column-name lookup
+    internally (unlike the other _read_* helpers here, which know column
+    order positionally) - so commas can't be stripped by known-column-index
+    here. Instead, a cell only has its commas removed when doing so leaves a
+    string float() can parse; this is structure-agnostic (no assumption about
+    POINT-label format) and never touches a genuinely non-numeric cell such
+    as a POINT name or Type/Transition code.
+    """
+    if not rows:
+        return rows
+    out: list[list[Any]] = [rows[0]]
+    for row in rows[1:]:
+        cleaned_row = []
+        for cell in row:
+            s = str(cell)
+            if ',' in s:
+                candidate = s.replace(',', '')
+                try:
+                    float(candidate)
+                    cleaned_row.append(candidate)
+                    continue
+                except ValueError:
+                    pass
+            cleaned_row.append(cell)
+        out.append(cleaned_row)
+    return out
+
+
 def _read_alignment(path: str) -> list[alignment.Element]:
     """Read a CSV element table from path into a list of Elements.
 
@@ -48,12 +89,12 @@ def _read_alignment(path: str) -> list[alignment.Element]:
             continue   # tolerate blank lines
         sta_start, sta_end, n, e, az_deg, radius, type_, trans = line[:8]
         rows.append([
-            float(sta_start),
-            float(sta_end),
-            float(n),
-            float(e),
-            float(az_deg),
-            float(radius) if str(radius).strip() != '' else 0.0,
+            float(_strip_commas(sta_start)),
+            float(_strip_commas(sta_end)),
+            float(_strip_commas(n)),
+            float(_strip_commas(e)),
+            float(_strip_commas(az_deg)),
+            float(_strip_commas(radius)) if str(radius).strip() != '' else 0.0,
             type_.strip(),
             trans.strip(),
         ])
@@ -66,7 +107,7 @@ def _read_pi_table(path: str) -> list[dict[str, Any]]:
         rows = list(csv.reader(f))
     if not rows:
         raise ValueError(f'{path} is empty')
-    return parse_pi_table(rows)
+    return parse_pi_table(_strip_thousands_separators_from_rows(rows))
 
 
 def _read_field_csv(path: str) -> list[dict[str, Any]]:
@@ -84,7 +125,7 @@ def _read_field_csv(path: str) -> list[dict[str, Any]]:
             continue
         padded = line + [''] * 5
         name = padded[0].strip()
-        n, e, z = float(padded[1]), float(padded[2]), float(padded[3])
+        n, e, z = float(_strip_commas(padded[1])), float(_strip_commas(padded[2])), float(_strip_commas(padded[3]))
         disc = padded[4].strip()
         points.append({'name': name, 'n': n, 'e': e, 'z': z, 'disc': disc})
     return points
@@ -101,7 +142,7 @@ def _read_drawing_csv(path: str) -> list[dict[str, Any]]:
         if not line or all(c.strip() == '' for c in line):
             continue
         name = line[0].strip()
-        sta, n, e = float(line[1]), float(line[2]), float(line[3])
+        sta, n, e = float(_strip_commas(line[1])), float(_strip_commas(line[2])), float(_strip_commas(line[3]))
         points.append({'name': name, 'sta': sta, 'n': n, 'e': e})
     return points
 
@@ -228,9 +269,10 @@ def _run_fit_radius(args: argparse.Namespace) -> int:
     from .optimizer import fit_radius as _fit_radius
 
     with open(args.alignment, newline='', encoding='utf-8-sig') as f:
-        pi_rows: list[Any] = list(csv.reader(f))
-    if not pi_rows:
+        raw_rows: list[Any] = list(csv.reader(f))
+    if not raw_rows:
         raise ValueError(f'{args.alignment} is empty')
+    pi_rows: list[Any] = _strip_thousands_separators_from_rows(raw_rows)
 
     drawing_points = _read_drawing_csv(args.drawing)
     fix_names_raw = [s.strip() for s in args.fix.split(',') if s.strip()]

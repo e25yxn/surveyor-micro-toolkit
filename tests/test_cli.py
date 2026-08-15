@@ -20,6 +20,11 @@ StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition
 0,100,1000,2000,90,0,T,
 """
 
+_TABLE_COMMAS = """\
+StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition
+0,100,"1,000","2,000",90,0,T,
+"""
+
 _EMPTY_TABLE = """\
 StaStart,StaEnd,N,E,Azimuth,Radius,Type,Transition
 """
@@ -32,8 +37,26 @@ def table(tmp_path: Path) -> str:
     return str(p)
 
 
+@pytest.fixture
+def table_commas(tmp_path: Path) -> str:
+    """Same geometry as `table`, but N/E use Excel's thousands-separator format."""
+    p = tmp_path / 'line_commas.csv'
+    p.write_text(_TABLE_COMMAS, encoding='utf-8')
+    return str(p)
+
+
 def test_fwd_centerline(table, capsys):
     rc = cli.main(['station-to-coord', table, '40'])
+    assert rc == 0
+    n_str, e_str = capsys.readouterr().out.strip().split(',')
+    assert math.isclose(float(n_str), 1000.0, abs_tol=1e-6)
+    assert math.isclose(float(e_str), 2040.0, abs_tol=1e-6)
+
+
+def test_fwd_centerline_with_thousands_separator(table_commas, capsys):
+    """Excel-formatted N/E ('1,000', '2,000') in the element table must not
+    break _read_alignment()'s float() parsing."""
+    rc = cli.main(['station-to-coord', table_commas, '40'])
     assert rc == 0
     n_str, e_str = capsys.readouterr().out.strip().split(',')
     assert math.isclose(float(n_str), 1000.0, abs_tol=1e-6)
@@ -114,6 +137,11 @@ NAME,N,E,Z,DISC
 PT01,1000,2250,85.000,0.001
 """
 
+_FIELD_CSV_COMMAS = """\
+NAME,N,E,Z,DISC
+PT01,"1,000","2,250",85.000,0.001
+"""
+
 _PI_TABLE_ANGLE = """\
 POINT,N,E,Sta,R,Ls,LsIn,LsOut,Trans,Delta
 BP,1000,2000,0,,,,,,
@@ -137,10 +165,33 @@ def pi_csv_bom(tmp_path):
     return str(p)
 
 
+_PI_TABLE_COMMAS = """\
+POINT,N,E,Sta,R,Ls,LsIn,LsOut,Trans,Delta
+BP,"1,000",2000,0,,,,,,
+PI,"1,000","2,500",,"1,500",,,,,
+EP,"1,500","2,500",,,,,,,
+"""
+
+
+@pytest.fixture()
+def pi_csv_commas(tmp_path):
+    """Same shape as pi_csv, but N/E/R cells use Excel's thousands-separator format."""
+    p = tmp_path / 'pi_commas.csv'
+    p.write_text(_PI_TABLE_COMMAS, encoding='utf-8')
+    return str(p)
+
+
 @pytest.fixture()
 def field_csv(tmp_path):
     p = tmp_path / 'field.csv'
     p.write_text(_FIELD_CSV, encoding='utf-8')
+    return str(p)
+
+
+@pytest.fixture()
+def field_csv_commas(tmp_path):
+    p = tmp_path / 'field_commas.csv'
+    p.write_text(_FIELD_CSV_COMMAS, encoding='utf-8')
     return str(p)
 
 
@@ -150,6 +201,16 @@ def test_cross_check_basic(pi_csv, field_csv, capsys):
     out = capsys.readouterr().out
     assert 'NAME' in out
     assert 'STA' in out
+    assert 'PT01' in out
+
+
+def test_cross_check_with_thousands_separator_succeeds(pi_csv_commas, field_csv_commas, capsys):
+    """Excel-formatted large coordinates ('1,000' etc.) in both the PI table and
+    the field CSV must not break parsing - exercises _read_pi_table() and
+    _read_field_csv() together."""
+    rc = cli.main(['cross-check', pi_csv_commas, field_csv_commas])
+    assert rc == 0
+    out = capsys.readouterr().out
     assert 'PT01' in out
 
 
@@ -232,6 +293,14 @@ def test_build_with_bom_header_succeeds(pi_csv_bom, tmp_path, capsys):
     assert (tmp_path / 'elements_output.csv').exists()
 
 
+def test_build_with_thousands_separator_succeeds(pi_csv_commas, tmp_path, capsys):
+    """Excel-formatted large coordinates/radius ('1,000', '1,500') must not
+    break _read_pi_table()'s float() parsing."""
+    rc = cli.main(['build', pi_csv_commas, '--out-dir', str(tmp_path)])
+    assert rc == 0
+    assert (tmp_path / 'elements_output.csv').exists()
+
+
 # ---------------------------------------------------------------------------
 # compare-drawing subcommand
 # ---------------------------------------------------------------------------
@@ -244,11 +313,25 @@ PI,50,1000,2050
 CP1,80,1000,2080
 """
 
+_DRAWING_CSV_COMMAS = """\
+Name,STA,N,E
+BP,0,"1,000","2,000"
+PI,50,"1,000","2,050"
+CP1,80,"1,000","2,080"
+"""
+
 
 @pytest.fixture()
 def drawing_csv(tmp_path: Path) -> str:
     p = tmp_path / 'drawing.csv'
     p.write_text(_DRAWING_CSV, encoding='utf-8')
+    return str(p)
+
+
+@pytest.fixture()
+def drawing_csv_commas(tmp_path: Path) -> str:
+    p = tmp_path / 'drawing_commas.csv'
+    p.write_text(_DRAWING_CSV_COMMAS, encoding='utf-8')
     return str(p)
 
 
@@ -259,6 +342,16 @@ def test_compare_drawing_basic(table, drawing_csv, capsys):
     assert 'BP' in out
     assert 'PI' in out
     assert 'HIP' in out
+    assert 'CP1' in out
+    assert 'OK' in out
+
+
+def test_compare_drawing_with_thousands_separator_succeeds(table_commas, drawing_csv_commas, capsys):
+    """Excel-formatted N/E ('1,000' etc.) in the drawing CSV must not break
+    _read_drawing_csv()'s float() parsing."""
+    rc = cli.main(['compare-drawing', table_commas, drawing_csv_commas])
+    assert rc == 0
+    out = capsys.readouterr().out
     assert 'CP1' in out
     assert 'OK' in out
 

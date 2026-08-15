@@ -87,7 +87,7 @@ def fit_radius(
         point = str(row[point_col]).strip()
         if not point or point in ('BP', 'EP'):
             continue
-        r_raw = str(row[r_col]).strip()
+        r_raw = str(row[r_col]).strip().replace(',', '')
         if not r_raw:
             continue
         try:

@@ -90,6 +90,25 @@ class TestTangentOnly:
         assert res.gap_before < 1e-9
 
 
+class TestThousandsSeparatorRadius:
+    def test_comma_formatted_radius_not_silently_skipped(self) -> None:
+        """A RADIUS cell like '1,500' (Excel thousands-separator export) must be
+        recognised as a free PI, not silently treated as an angle point.
+
+        fit_radius() scans pi_rows for its own POINT/R columns (separate from
+        parse_pi_table()'s internal parsing) wrapped in a bare
+        `except ValueError: continue` - before the fix, a comma-formatted R
+        failed float() there and the PI vanished from the optimisation with
+        no error at all.
+        """
+        rows = _rows(0.0, 0.0, [('PI1', 50.0, 50.0, '1,500')], 100.0, 0.0)
+
+        res = fit_radius(rows, [])
+
+        assert res.names == ['PI1']
+        assert res.r_initial == [1500.0]
+
+
 # ---------------------------------------------------------------------------
 # Test 2 — simple curve: optimizer should converge to correct R
 # ---------------------------------------------------------------------------
