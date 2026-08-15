@@ -200,7 +200,9 @@ def _read_field_csv(path: str) -> list[dict[str, Any]]:
             continue
         padded = line + [''] * 5
         name = padded[0].strip()
-        n, e, z = float(_strip_commas(padded[1])), float(_strip_commas(padded[2])), float(_strip_commas(padded[3]))
+        n = float(_strip_commas(padded[1]))
+        e = float(_strip_commas(padded[2]))
+        z = float(_strip_commas(padded[3]))
         disc = padded[4].strip()
         points.append({'name': name, 'n': n, 'e': e, 'z': z, 'disc': disc})
     return points
@@ -217,7 +219,9 @@ def _read_drawing_csv(path: str) -> list[dict[str, Any]]:
         if not line or all(c.strip() == '' for c in line):
             continue
         name = line[0].strip()
-        sta, n, e = float(_strip_commas(line[1])), float(_strip_commas(line[2])), float(_strip_commas(line[3]))
+        sta = float(_strip_commas(line[1]))
+        n = float(_strip_commas(line[2]))
+        e = float(_strip_commas(line[3]))
         points.append({'name': name, 'sta': sta, 'n': n, 'e': e})
     return points
 
