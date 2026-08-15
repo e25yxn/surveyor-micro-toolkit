@@ -2399,3 +2399,83 @@
   ครบทั้ง 2 fix — backlog ที่เหลือ (ไม่เร่งด่วน): CSV thousands-separator,
   Excel BOM handling, ไฟล์ untracked เก่า, Multicurve.py solver (รอ CK1024
   กำหนดสโคป)
+
+## [06:07] fix(cli): BOM-tolerant CSV reading
+- ทำ: แก้ csv reading ให้ใช้ utf-8-sig เพื่อรองรับ BOM ที่ Excel ใส่มาตอน export
+  "CSV UTF-8 (Comma delimited)" (แก้ table_splitter.py, cli.py, webhelpers.py
+  + เพิ่ม defensive BOM strip ใน table_splitter._parse_header) เพิ่ม 3 regression
+  tests: test_build_with_bom_header_succeeds, test_fit_radius_with_bom_header_succeeds,
+  test_bom_prefixed_point_header_recognized
+- คำสั่ง: pytest -q
+- ผล: PASS (532)
+- commit: c8b37d2
+- หมายเหตุ: ลบไฟล์ test ซ้ำที่หลงมาผิดที่ src/smt/builders/test_table_splitter.py
+  (untracked, ไม่ใช่ของจริงที่ tests/builders/) ก่อน commit ไฟล์ที่แก้จริง 5 ไฟล์เท่านั้น
+  ที่ stage — test_data/AL1_*.csv และ handoff/session-log อื่นๆ ที่ยัง untracked/modified
+  ไม่แตะ
+
+## [2026-08-15] fix(cli): strip thousands-separator commas before float() parsing
+- ทำ: ทำตาม session_logs/plan_20260815_thousands_separator_fix.md (diff verified
+  มาก่อนแล้ว) apply ตรงตามแผน 4 ไฟล์: เพิ่ม _strip_commas / _strip_thousands_
+  separators_from_rows ใน src/smt/cli.py ใช้ที่ _read_alignment, _read_pi_table,
+  _read_field_csv, _read_drawing_csv, _run_fit_radius; แก้ src/smt/optimizer.py
+  ::fit_radius strip comma ที่จุดอ่าน RADIUS เอง (เคย silent-skip PI ที่มี comma
+  โดยไม่มี error เตือนเลย); เพิ่ม regression test 5 ตัวใน tests/test_cli.py +
+  tests/test_optimizer.py ไม่แตะ alignment_builder.py/vertical_builder.py เลย
+- คำสั่ง: pytest -q
+- ผล: PASS (537)
+- commit: c1a0b12 (push แล้ว c8b37d2..c1a0b12 main -> main)
+- หมายเหตุ: git diff --stat ตอนแรกเห็น 7 ไฟล์ แต่ 3 ไฟล์เกินเป็นของเก่าก่อนหน้า
+  เซสชันนี้ (session_logs/latest.md, test_data/AL1_*.csv) commit จริง stage
+  เฉพาะ 4 ไฟล์ตามแผน ยืนยันด้วย git status --short ก่อน commit — backlog ที่
+  เหลือ: HOR_01N01.csv (mixed PI/drawing table) ยังให้ผลผิดความหมายถ้าป้อนตรง
+  เข้า _read_pi_table รอ CK1024 ตัดสินใจสโคปแยกต่างหาก
+
+## [2026-08-15] wire split_mixed_alignment_table() เข้า cli.py
+- ทำ: แก้ table_splitter.py (regex กลับหัว: whitelist drawing-point PT/PC/PCC/TS/SC/CS/ST
+  แทน regex vertex เดิม BP|PI-\d+|EP) + cli.py (_read_pi_table และ _run_fit_radius เรียก
+  split_mixed_alignment_table() ก่อน parse_pi_table() แล้ว) — แก้ปัญหาที่ HOR_01N01.csv/
+  HOR_ORR_04.csv (มี PT/PC/PCC ปนกับ PI) ตีความ PT/PC/PCC เป็น PI vertex ผิดความหมายมาก่อน
+  เพิ่มเทสใหม่ 4 ตัว (bare-PI, IP1/IP2, PCC classification, end-to-end mixed table build)
+- คำสั่ง: pytest -q ; smt build บน AL1_test_alignment_PI.csv / HOR_01N01.csv / HOR_ORR_04.csv
+- ผล: PASS (541/541) — smt build ทั้ง 3 ไฟล์ exit code 0, จำนวน elements 35/12/25 ตรงตามคาด
+- commit: d9a5d9d
+- หมายเหตุ: ไม่แตะ alignment_builder.py/vertical_builder.py เลย ไม่ต้องผ่าน Oracle correction
+  exception ฝั่ง .gs (GS_TableSplitter.gs) ยังใช้ regex เดิม PI-\d+ เท่านั้น — sync แยก plan
+  doc ต่างหาก (ตกลงกับ CK1024 แล้ว ไม่ใช่ scope ของ commit นี้)
+
+## [2026-08-15] sync .gs classification จาก Python (drawing-point whitelist)
+- ทำ: sync GS_TableSplitter.gs ให้ตรงกับ Python (commit d9a5d9d) — เปลี่ยนจาก
+  vertex-pattern regex (BP|PI-\d+|EP) เป็น drawing-point whitelist
+  (PT|PC|PCC|TS|SC|CS|ST) กลับหัวตรรกะเหมือนกัน พบเพิ่มว่า GS_CrossCheck.gs
+  มี logic จำแนกซ้ำอีกชุด (scanRawRows_ ภายใน สำหรับ Table 2b/2c CrossCheck_
+  Radius/Deflection ไม่มี Python oracle) ก็แก้ให้ตรงกันด้วย ไม่งั้นจะกลาย
+  เป็นสองระบบจำแนกไม่ตรงกันเองในโปรเจกต์เดียวกัน เพิ่มไฟล์เทสถาวรใหม่ 2 ไฟล์
+  (verify_drawing_point_whitelist.js, verify_crosscheck_classification.js)
+- คำสั่ง: node reference/gsheet/verify_drawing_point_whitelist.js ;
+  node reference/gsheet/verify_crosscheck_classification.js ;
+  node reference/gsheet/smoke_test.js ; node reference/gsheet/test_error_message_map.js
+- ผล: PASS ทั้ง 4 script (16/16, 4/4, 23/23, 8/8) exit code 0 ทั้งหมด
+- commit: 6cd7690
+- หมายเหตุ: ยังไม่ deploy จริง — clasp push ไป D:\MyClasp_SMT_DEMO เป็นขั้นตอน
+  แยกที่ CK1024 จะทำเอง (pattern เดียวกับ Session #5) ก่อน force push ต้อง
+  เทียบ appsscript.json กับ Apps Script online editor ก่อนเสมอ
+
+## [2026-08-15] deploy .gs sync ไป D:\MyClasp_SMT_DEMO (Test deployment)
+- ทำ: ก่อน push พบว่า GS_TableSplitter.js/GS_CrossCheck.js ใน D:\MyClasp_SMT_DEMO
+  ยังเป็นโค้ดเก่า (VERTEX_POINT_RE) ไม่ตรงกับ reference/gsheet ที่แก้แล้ว (commit
+  6cd7690) — copy 2 ไฟล์เข้าไปก่อน (ตาม pattern plan_20260810_gsheet_sync.md)
+  แล้ว diff ยืนยัน byte-identical เทียบ appsscript.json local กับที่ clone มาจาก
+  Apps Script online จริง (scriptId เดียวกัน) ผ่าน clasp clone ในโฟลเดอร์ scratch
+  แยกต่างหาก — byte-identical (diff exit 0) ปลอดภัยที่จะ force push
+- คำสั่ง: clasp status ; clasp push -f ; live-test ผ่าน Claude in Chrome บน
+  Test deployment (Deploy > Test deployments > Web app URL) เลือก
+  001_Hor_Align / HOR-ORR-04 / HOR-ORR-04 แล้วกดคำนวณ
+- ผล: PASS — clasp push -f ส่ง 15 ไฟล์สำเร็จ (รวม GS_CrossCheck.js/
+  GS_TableSplitter.js ที่มี fix) เวลา 1:06:02 PM. live-test จริงบนเว็บแอป
+  ได้ "คำนวณเสร็จแล้ว: 25 elements, ไม่พบ issues" ตรงกับ Python/Node
+  verification ทุกตัวเลข ไม่มี console error
+- commit: (ไม่มี — deploy เท่านั้น ไม่มีการแก้โค้ดเพิ่มในรอบนี้)
+- หมายเหตุ: ทดสอบผ่าน @HEAD Test deployment (AKfycbxmyii_Bm2XMSpuiAELAfz5avQkDOZyxQYfr4ip_Sna)
+  ยังไม่ได้ deploy version ใหม่แบบถาวร (New deployment/version bump) — เป็นขั้นตอนแยก
+  ถ้า CK1024 ต้องการ promote ไปเป็น production version
