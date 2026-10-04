@@ -13,6 +13,23 @@ Transition shapes (spiral elements only):
   CLOTHOID (default) : linear curvature change        f(τ) = τ
   BLOSS              : f(τ) = 3τ²-2τ³                 (zero jerk at both ends)
   SINE               : f(τ) = τ-sin(2πτ)/(2π)         (zero jerk at both ends)
+  CUBIC              : cubic parabola y = x³/(6·R·L), x = distance along the entry
+                       tangent, L = the spiral ARC length (the "Ls" of the design table
+                       and the "L" of the Civil 3D cubic-parabola parameters).  The SC/CS
+                       point sits at x = X < L, solved so the arc length from the straight
+                       end equals L exactly.  Heading tan(θ) = x²/(2·R·L), so the turning
+                       angle at SC is atan(X²/(2RL)), slightly LESS than clothoid's L/(2R)
+                       (0.75″ at R=2500/L=95), which the circular arc then makes up.
+                       Pinned to real data: the turning angles measured on the 39 spiral
+                       curves of a Thai State Railway setting-out drawing that specifies a
+                       cubic parabola (chi-square 43 for 39 curves, vs 3569 for CLOTHOID
+                       and 172 for the variant with X in the denominator).
+                       Closed form in x like COSINE, so it gets its own branch in
+                       `calculate_point_on_element` (pure SPIN/SPOUT only — a spiral
+                       joining two curved ends raises instead of degrading to a
+                       clothoid).  Against CLOTHOID at L=100 the SC offset differs by about
+                       0.06 mm at R=2500, 1 mm at R=1000, 7.5 mm at R=500, 34 mm at R=300;
+                       the heading differs by 0.9", 14", 109", 495" respectively.
   COSINE             : Civil 3D "Sine Half-Wavelength Diminishing Tangent Curve" —
                        NOT a curvature-vs-arc-length shape like the three above.
                        Closed form in tangent-projected distance x: with
@@ -73,6 +90,11 @@ from . import fpmath, wcb
 
 SPIRAL_STEPS: int = 48   # Simpson intervals for spiral numerical integration (must be even)
 _SINE_HALFWAVE_C: float = 0.0226689447   # Civil 3D closed-form tangent-length correction constant
+
+# Spiral transition names this engine actually implements. Anything else used to
+# fall through to CLOTHOID silently (in this module, GS_Alignment.gs and
+# SMT_Alignment.bas alike); make_element() now rejects it for SPIN/SPOUT instead.
+_VALID_TRANSITIONS: tuple[str, ...] = ('CLOTHOID', 'BLOSS', 'SINE', 'COSINE', 'CUBIC')
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +283,73 @@ def calculate_sine_halfwave_tangent_length(length: float, r: float) -> float:
     return length - _SINE_HALFWAVE_C * length ** 3 / r ** 2
 
 
+def _cubic_dydx(x: float, length: float, r: float) -> float:
+    """dy/dx of the cubic parabola y = x³/(6·R·L) at tangent-projected distance x
+    (= tan of the heading angle).  L is the spiral ARC length (the "Ls" of the design
+    table), not the abscissa of the SC.  Sign follows r (+ right turn)."""
+    return x * x / (2.0 * r * length)
+
+
+def _cubic_arc_length(x: float, length: float, r: float, n_seg: int = SPIRAL_STEPS) -> float:
+    """True arc length of the cubic parabola from the straight end to tangent-
+    projected distance x:  s(x) = integral[0..x] sqrt(1+(dy/dt)^2) dt  via Simpson.
+    The integrand is smooth and monotone, so SPIRAL_STEPS intervals are far more than
+    enough (checked against an independent fine integration in tests/test_alignment.py).
+    """
+    if x == 0.0:
+        return 0.0
+    h = x / n_seg
+    total = 0.0
+    for i in range(n_seg + 1):
+        w = 1 if (i == 0 or i == n_seg) else (4 if i % 2 == 1 else 2)
+        total += w * math.hypot(1.0, _cubic_dydx(i * h, length, r))
+    return total * h / 3.0
+
+
+def calculate_cubic_parabola_tangent_length(length: float, r: float) -> float:
+    """X for the CUBIC transition: the tangent-projected abscissa of the SC/CS point,
+    i.e. the x at which the cubic parabola y = x³/(6·R·L) has arc length exactly L
+    (solved by bisection; X < L).
+
+    length : spiral arc length L (m), the "Ls" of the design table.
+    r      : radius at the curved end (m); only |r| matters here.
+    """
+    r_abs = abs(r)
+    hi = length                                              # s(X) >= X  =>  X <= L
+    lo = length / math.hypot(1.0, length / (2.0 * r_abs))    # slope <= L/(2R) on [0, X]
+    for _ in range(60):
+        mid = (lo + hi) / 2.0
+        if _cubic_arc_length(mid, length, r_abs) < length:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
+
+
+def _cubic_solve_x(d: float, length: float, r: float) -> float:
+    """Solve s(x) = d for the tangent-projected distance x (Newton).  s is convex and
+    increasing with s(d) >= d, so starting at x=d the iteration approaches the root
+    monotonically from above and cannot overshoot below 0."""
+    x = d
+    for _ in range(30):
+        step = (_cubic_arc_length(x, length, r) - d) / math.hypot(1.0, _cubic_dydx(x, length, r))
+        x -= step
+        if abs(step) < 1e-13:
+            break
+    return x
+
+
+def _cubic_point(d: float, big_x: float, r: float, length: float) -> tuple[float, float, float]:
+    """CUBIC transition, canonical (SPIN) form: (x, y, theta) at arc distance d from the
+    straight end — x along the entry tangent, y the local offset (sign follows r, like
+    `_sine_halfwave_point`), theta the heading angle in radians.  big_x is X, used only
+    for the d == length shortcut."""
+    x = big_x if abs(d - length) < 1e-9 else _cubic_solve_x(d, length, r)
+    y = x ** 3 / (6.0 * r * length)
+    theta = math.atan(_cubic_dydx(x, length, r))
+    return x, y, theta
+
+
 def _calculate_turning_angle_at(el: Element, s: float) -> float:
     """Accumulated turning angle at arc distance s from element start (radians).
 
@@ -323,6 +412,11 @@ def make_element(
         k_in = curvature_from_radius(r_in)
         k_out = curvature_from_radius(r_out)
     tr = str(trans).strip().upper() if trans else 'CLOTHOID'
+    if t in ('SPIN', 'SPOUT') and tr not in _VALID_TRANSITIONS:
+        raise ValueError(
+            f"ไม่รู้จัก transition '{trans}' — ใช้ได้เฉพาะ {' / '.join(_VALID_TRANSITIONS)} "
+            "(เดิมระบบคำนวณเป็น CLOTHOID เงียบๆ ซึ่งผิดจากที่ตั้งใจ)"
+        )
     return Element(
         type=t,
         sta_start=sta_start,
@@ -389,6 +483,38 @@ def calculate_point_on_element(el: Element, d: float) -> ElementState:
             big_x = calculate_sine_halfwave_tangent_length(length, r)
             x_end, y_end, theta_total = _sine_halfwave_point(length, big_x, r, length)
             x_g, y_g, theta_g = _sine_halfwave_point(length - d, big_x, r, length)
+            dx, dy = x_end - x_g, y_end - y_g
+            x_local = dx * math.cos(theta_total) + dy * math.sin(theta_total)
+            y_local = dx * math.sin(theta_total) - dy * math.cos(theta_total)
+            theta_local = theta_total - theta_g
+        ca, sa = math.cos(el.azimuth), math.sin(el.azimuth)
+        return ElementState(
+            n=el.n + x_local * ca - y_local * sa,
+            e=el.e + x_local * sa + y_local * ca,
+            azimuth=fpmath.normalize_angle(el.azimuth + theta_local),
+        )
+
+    # CUBIC (cubic parabola) spiral — closed form in tangent-projected x, same SPIN/SPOUT
+    # structure as the COSINE branch above (kept separate so that validated COSINE code is
+    # untouched).  Pure SPIN or SPOUT only: a spiral between two curved ends has no
+    # closed form here, and must NOT fall through to the generic clothoid integration
+    # below (it would silently compute a different curve), so it raises.
+    if el.transition == 'CUBIC':
+        if (el.k_in == 0) == (el.k_out == 0):
+            raise ValueError(
+                'CUBIC รองรับเฉพาะ spiral ที่ปลายด้านหนึ่งเป็นเส้นตรง (TS-SC หรือ CS-ST) '
+                'ไม่รองรับ spiral ที่เชื่อมโค้งสองรัศมี'
+            )
+        length = el.sta_end - el.sta_start
+        if el.k_in == 0:   # SPIN: curvature 0 -> 1/R
+            r = radius_from_curvature(el.k_out)
+            big_x = calculate_cubic_parabola_tangent_length(length, r)
+            x_local, y_local, theta_local = _cubic_point(d, big_x, r, length)
+        else:              # SPOUT: curvature 1/R -> 0, mirror of the canonical form (s <-> L-d)
+            r = radius_from_curvature(el.k_in)
+            big_x = calculate_cubic_parabola_tangent_length(length, r)
+            x_end, y_end, theta_total = _cubic_point(length, big_x, r, length)
+            x_g, y_g, theta_g = _cubic_point(length - d, big_x, r, length)
             dx, dy = x_end - x_g, y_end - y_g
             x_local = dx * math.cos(theta_total) + dy * math.sin(theta_total)
             y_local = dx * math.sin(theta_total) - dy * math.cos(theta_total)

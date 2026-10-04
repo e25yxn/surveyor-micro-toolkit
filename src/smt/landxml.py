@@ -133,7 +133,17 @@ def _rotation(k: float) -> str:
 
 
 def _spiral_lx_type(transition: str) -> str:
-    return _SPIRAL_TYPE.get(transition.upper(), 'clothoid')
+    # No silent fallback: an unmapped shape used to be exported as spiType="clothoid",
+    # i.e. a different curve from the one SMT computed. CUBIC is deliberately unmapped
+    # until its LandXML/Civil 3D representation (cubic vs cubicParabola) is verified
+    # against a real Civil 3D import.
+    try:
+        return _SPIRAL_TYPE[transition.upper()]
+    except KeyError:
+        raise ValueError(
+            f"LandXML export ยังไม่รองรับ transition '{transition}' "
+            f"(รองรับ: {', '.join(_SPIRAL_TYPE)})"
+        ) from None
 
 
 def _coord(n: float, e: float) -> str:

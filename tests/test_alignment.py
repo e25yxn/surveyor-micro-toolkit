@@ -7,6 +7,7 @@ Two test categories:
   2. roundtrip:     forward (sta→coord) then inverse (coord→sta) must
                     recover the original station within 1e-3 m, offset ≈ 0.
 """
+import bisect
 import json
 import math
 from pathlib import Path
@@ -521,3 +522,183 @@ def test_cosine_spin_spout_symmetry_matches_civil3d(r, length):
     spin_turn = al.calculate_exit_state(spin).azimuth - spin.azimuth
     spout_turn = al.calculate_exit_state(spout).azimuth - spout.azimuth
     assert math.isclose(spin_turn, spout_turn, abs_tol=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# CUBIC transition (cubic parabola y = x^3/(6*R*L), L = spiral arc length) and the
+# unknown-transition guard (2026-09-29).
+#
+# Before this, any transition name the engine did not know (a typo, or a shape
+# like CUBIC it simply lacked) silently fell through to CLOTHOID.  The reference
+# construction below is deliberately independent of the implementation: a fine
+# trapezoid table of the curve's true arc length s(x), inverted by interpolation,
+# instead of the Simpson + Newton solver in smt.alignment.
+# ---------------------------------------------------------------------------
+
+_CUBIC_REF_N = 4000
+_CUBIC_REF_CACHE: dict[tuple[float, float], tuple[float, list[float]]] = {}
+
+
+def _cubic_reference_table(r_abs: float, length: float) -> tuple[float, list[float]]:
+    """(X, cumulative arc length at x = i*X/N) with X chosen so the last entry == length."""
+    key = (r_abs, length)
+    if key in _CUBIC_REF_CACHE:
+        return _CUBIC_REF_CACHE[key]
+
+    def table(big_x: float) -> list[float]:
+        h = big_x / _CUBIC_REF_N
+        s = [0.0]
+        prev = 1.0
+        for i in range(1, _CUBIC_REF_N + 1):
+            x = i * h
+            cur = math.hypot(1.0, x * x / (2.0 * r_abs * length))
+            s.append(s[-1] + (prev + cur) * h / 2.0)
+            prev = cur
+        return s
+
+    lo, hi = length * 0.9, length
+    for _ in range(40):
+        mid = (lo + hi) / 2.0
+        if table(mid)[-1] < length:
+            lo = mid
+        else:
+            hi = mid
+    big_x = (lo + hi) / 2.0
+    _CUBIC_REF_CACHE[key] = (big_x, table(big_x))
+    return _CUBIC_REF_CACHE[key]
+
+
+def _cubic_reference_point(d: float, r_abs: float, length: float) -> tuple[float, float, float]:
+    """(x, y, theta) at arc distance d, from the independent table (x by interpolation)."""
+    big_x, table = _cubic_reference_table(r_abs, length)
+    h = big_x / _CUBIC_REF_N
+    i = min(max(bisect.bisect_left(table, d), 1), _CUBIC_REF_N)
+    x = (i - 1) * h + (d - table[i - 1]) / (table[i] - table[i - 1]) * h
+    return x, x ** 3 / (6.0 * r_abs * length), math.atan(x * x / (2.0 * r_abs * length))
+
+
+@pytest.mark.parametrize(
+    'r,length', [(2500.0, 100.0), (500.0, 100.0), (300.0, 100.0), (150.0, 60.0)]
+)
+def test_cubic_tangent_length_satisfies_arc_length_condition(r, length):
+    big_x = al.calculate_cubic_parabola_tangent_length(length, r)
+    ref_x, _ = _cubic_reference_table(abs(r), length)
+    assert math.isclose(big_x, ref_x, abs_tol=1e-6)
+    assert big_x < length            # tangent-projected X is always shorter than the arc
+
+
+@pytest.mark.parametrize('r', [300.0, -300.0, 750.0])
+def test_cubic_spin_points_match_independent_reference(r):
+    """Right (+R) and left (-R) spirals, interior points and both ends."""
+    length = 100.0
+    el = al.make_element('SPIN', 0, length, 0.0, 0.0, 0.0, r, None, 'CUBIC')
+    sign = 1.0 if r > 0 else -1.0
+    for d in (0.0, 12.5, 40.0, 77.7, 100.0):
+        x, y, theta = _cubic_reference_point(d, abs(r), length)
+        st = al.calculate_point_on_element(el, d)
+        assert math.isclose(st.n, x, abs_tol=1e-6)
+        assert math.isclose(st.e, sign * y, abs_tol=1e-6)
+        assert math.isclose(st.azimuth, al.fpmath.normalize_angle(sign * theta), abs_tol=1e-8)
+
+
+def test_cubic_end_state_closed_form():
+    """At the SC the curve is exactly (X, X^3/(6RL)) with heading atan(X^2/(2RL))."""
+    r, length = 400.0, 90.0
+    big_x = al.calculate_cubic_parabola_tangent_length(length, r)
+    spin = al.make_element('SPIN', 0, length, 0.0, 0.0, 0.0, r, None, 'CUBIC')
+    st = al.calculate_exit_state(spin)
+    assert math.isclose(st.n, big_x, abs_tol=1e-9)
+    assert math.isclose(st.e, big_x ** 3 / (6.0 * r * length), abs_tol=1e-9)
+    assert math.isclose(st.azimuth, math.atan(big_x ** 2 / (2.0 * r * length)), abs_tol=1e-12)
+
+
+@pytest.mark.parametrize('r,length', [(300.0, 100.0), (-500.0, 70.0)])
+def test_cubic_spin_then_spout_is_mirror_symmetric_about_the_junction(r, length):
+    """SPIN followed by an equal SPOUT: the path is symmetric about the normal at the
+    junction - equal chords, equal turning, and SPOUT(d) mirrors SPIN(L-d)."""
+    spin = al.make_element('SPIN', 0, length, 0.0, 0.0, 0.0, r, None, 'CUBIC')
+    j = al.calculate_exit_state(spin)
+    spout = al.make_element(
+        'SPOUT', length, 2 * length, j.n, j.e, math.degrees(j.azimuth), r, None, 'CUBIC'
+    )
+    end = al.calculate_exit_state(spout)
+    assert math.isclose(math.hypot(j.n, j.e), math.hypot(end.n - j.n, end.e - j.e), abs_tol=1e-9)
+    turn1 = al.fpmath.normalize_angle(j.azimuth + math.pi) - math.pi
+    turn2 = al.fpmath.normalize_angle(end.azimuth - j.azimuth + math.pi) - math.pi
+    assert math.isclose(turn1, turn2, abs_tol=1e-9)
+    ux, uy = math.cos(j.azimuth), math.sin(j.azimuth)         # junction tangent (n, e)
+    wx, wy = -math.sin(j.azimuth), math.cos(j.azimuth)        # its right-hand normal
+    for d in (10.0, 33.0, 80.0):
+        p_out = al.calculate_point_on_element(spout, d)
+        p_in = al.calculate_point_on_element(spin, length - d)
+        assert math.isclose(math.hypot(p_out.n - j.n, p_out.e - j.e),
+                            math.hypot(j.n - p_in.n, j.e - p_in.e), abs_tol=1e-9)
+        # Direction-sensitive: SPOUT(d) is SPIN(L-d) reflected about the normal at the
+        # junction (tangent component flips, normal component kept) - so the SPOUT keeps
+        # bending the SAME way instead of away. Distances alone cannot see a flipped side.
+        vx, vy = p_in.n - j.n, p_in.e - j.e
+        a, b = vx * ux + vy * uy, vx * wx + vy * wy
+        assert math.isclose(p_out.n, j.n - a * ux + b * wx, abs_tol=1e-8)
+        assert math.isclose(p_out.e, j.e - a * uy + b * wy, abs_tol=1e-8)
+        # heading change after the junction == heading change before it
+        h_out = al.fpmath.normalize_angle(p_out.azimuth - j.azimuth + math.pi) - math.pi
+        h_in = al.fpmath.normalize_angle(j.azimuth - p_in.azimuth + math.pi) - math.pi
+        assert math.isclose(h_out, h_in, abs_tol=1e-9)
+
+
+def test_cubic_is_close_to_clothoid_for_gentle_spirals():
+    args = ('SPIN', 0, 100.0, 0.0, 0.0, 0.0, 2500.0, None)
+    a = al.calculate_exit_state(al.make_element(*args, 'CUBIC'))
+    b = al.calculate_exit_state(al.make_element(*args, 'CLOTHOID'))
+    assert math.isclose(a.n, b.n, abs_tol=1e-4) and math.isclose(a.e, b.e, abs_tol=1e-4)
+
+
+def test_cubic_really_differs_from_clothoid_for_sharp_spirals():
+    """Guard against CUBIC silently degrading to the clothoid default branch."""
+    args = ('SPIN', 0, 100.0, 0.0, 0.0, 0.0, 300.0, None)
+    a = al.calculate_exit_state(al.make_element(*args, 'CUBIC'))
+    b = al.calculate_exit_state(al.make_element(*args, 'CLOTHOID'))
+    assert abs(a.e - b.e) > 0.015       # ~3.4 cm at R=300, L=100
+    assert abs(a.azimuth - b.azimuth) > 1e-3
+
+
+def test_cubic_turning_angle_matches_real_drawing_measurement():
+    """Pins the definition to real data.  The SETTING OUT DATA drawing of the Red Line
+    (State Railway of Thailand, EX-GN-005) specifies a cubic parabola.  Measuring each
+    spiral's turning angle as (total deflection - circular arc angle)/2 from the
+    drawing's own points, the two R=2500 / Ls=95 curves (IP-LT-024, IP-RT-013) turn
+    0.784" and 0.738" LESS than a clothoid (sigma about 0.02" from coordinate rounding).
+    Candidate definitions predict: X in the denominator -0.613", X taken as Ls -0.471",
+    L (arc length) in the denominator -0.754"; only the last fits (chi-square over all 39
+    spiral curves: 43 vs 172 / 546, and 3569 for a clothoid).  Do not 'simplify' the
+    denominator back to X."""
+    r, length = 2500.0, 95.0
+    el = al.make_element('SPIN', 0, length, 0.0, 0.0, 0.0, r, None, 'CUBIC')
+    deficit = (length / (2.0 * r) - al.calculate_exit_state(el).azimuth) * 206264.806
+    assert 0.70 < deficit < 0.80
+
+
+def test_cubic_spiral_between_two_curved_ends_raises():
+    """k_in and k_out both nonzero has no closed form here; must not become a clothoid."""
+    el = al.make_element('SPIN', 0, 100.0, 0.0, 0.0, 0.0, 500.0, 300.0, 'CUBIC')
+    with pytest.raises(ValueError, match='CUBIC'):
+        al.calculate_exit_state(el)
+
+
+@pytest.mark.parametrize('type_', ['SPIN', 'SPOUT'])
+@pytest.mark.parametrize('bad', ['CUBICC', 'COSIN', 'abcdef', 'LINEAR'])
+def test_unknown_spiral_transition_raises(type_, bad):
+    with pytest.raises(ValueError, match='ไม่รู้จัก transition'):
+        al.make_element(type_, 0, 100.0, 0.0, 0.0, 0.0, 500.0, None, bad)
+
+
+@pytest.mark.parametrize('ok', ['clothoid', ' Bloss ', 'SINE', 'cosine', 'Cubic', '', None])
+def test_known_or_blank_spiral_transition_still_accepted(ok):
+    el = al.make_element('SPIN', 0, 100.0, 0.0, 0.0, 0.0, 500.0, None, ok)
+    assert el.transition in ('CLOTHOID', 'BLOSS', 'SINE', 'COSINE', 'CUBIC')
+
+
+def test_transition_is_not_validated_for_tangent_and_curve_elements():
+    """T/C rows can carry any text in a Transition column - it is unused for them."""
+    for t in ('T', 'C'):
+        al.make_element(t, 0, 100.0, 0.0, 0.0, 0.0, 0.0 if t == 'T' else 500.0, None, 'whatever')

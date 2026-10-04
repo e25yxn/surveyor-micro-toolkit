@@ -506,3 +506,44 @@ def test_fit_radius_missing_file(capsys):
     err = capsys.readouterr().err
     assert rc == 1
     assert 'error' in err.lower()
+
+
+# ---------------------------------------------------------------------------
+# CUBIC transition + unknown-transition guard through `smt build` (2026-09-29)
+# ---------------------------------------------------------------------------
+
+_PI_TABLE_SPIRAL = """\
+POINT,N,E,R,LsIn,LsOut,Transition
+BP,0,0,,,,
+PI1,1000,0,400,80,120,{trans}
+EP,1612.835,514.230,,,,
+"""
+
+
+def test_build_with_cubic_transition_succeeds(tmp_path, capsys):
+    p = tmp_path / 'cubic.csv'
+    p.write_text(_PI_TABLE_SPIRAL.format(trans='CUBIC'), encoding='utf-8')
+    rc = cli.main(['build', str(p), '--out-dir', str(tmp_path)])
+    assert rc == 0
+    rows = (tmp_path / 'elements_output.csv').read_text(encoding='utf-8').splitlines()
+    assert sum(1 for r in rows if ',SPIN,' in r or ',SPOUT,' in r) == 2
+    assert all('CUBIC' in r for r in rows if ',SPIN,' in r or ',SPOUT,' in r)
+
+
+def test_build_with_unknown_transition_fails_loudly(tmp_path, capsys):
+    """A typo'd transition used to be computed as a clothoid with no message at all."""
+    p = tmp_path / 'typo.csv'
+    p.write_text(_PI_TABLE_SPIRAL.format(trans='CUBICC'), encoding='utf-8')
+    rc = cli.main(['build', str(p), '--out-dir', str(tmp_path)])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'CUBICC' in err
+
+
+def test_export_landxml_with_cubic_fails_loudly(tmp_path, capsys):
+    p = tmp_path / 'cubic.csv'
+    p.write_text(_PI_TABLE_SPIRAL.format(trans='CUBIC'), encoding='utf-8')
+    rc = cli.main(['export-landxml', str(p)])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert 'CUBIC' in err

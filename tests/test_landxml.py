@@ -531,3 +531,25 @@ class TestCurvePIGeometricInvariant:
             en, ee = _ne(curve, 'End')
             assert math.isclose(math.hypot(pi_n - sn, pi_e - se), tangent, abs_tol=1e-6)
             assert math.isclose(math.hypot(pi_n - en, pi_e - ee), tangent, abs_tol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# No silent clothoid fallback in the exporter (2026-09-29).
+# CUBIC is deliberately unmapped until its LandXML/Civil 3D form is verified.
+# ---------------------------------------------------------------------------
+
+def test_spiral_lx_type_unmapped_names_raise():
+    for name in ('CUBIC', 'cubic', 'NOPE'):
+        with pytest.raises(ValueError, match='LandXML export'):
+            _spiral_lx_type(name)
+
+
+def test_export_of_cubic_alignment_raises_instead_of_writing_clothoid():
+    az = math.radians(40.0)
+    result = build_alignment_from_pi([
+        {'n': 0.0, 'e': 0.0, 'sta': 0.0},
+        {'n': 1000.0, 'e': 0.0, 'R': 400.0, 'LsIn': 80.0, 'LsOut': 120.0, 'trans': 'CUBIC'},
+        {'n': 1000.0 + 800.0 * math.cos(az), 'e': 800.0 * math.sin(az)},
+    ])
+    with pytest.raises(ValueError, match='CUBIC'):
+        export_alignment_landxml(result, name='cubic_test')

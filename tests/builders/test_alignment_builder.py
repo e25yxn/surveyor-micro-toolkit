@@ -1155,3 +1155,43 @@ class TestParsePiTable:
         )
         with pytest.raises(ValueError, match='แถวที่ 3'):
             ab.parse_pi_table(rows)
+
+
+# ---------------------------------------------------------------------------
+# CUBIC (cubic parabola) transition through the builder (2026-09-29).
+# build_alignment_from_pi() needs no change for a new shape - it hands the name to
+# alignment.make_element(); this pins that the whole chain works and closes.
+# ---------------------------------------------------------------------------
+
+def _cubic_pi_vertices(trans):
+    az = math.radians(40.0)
+    return [
+        {'n': 0.0, 'e': 0.0, 'sta': 0.0},
+        {'n': 1000.0, 'e': 0.0, 'R': 400.0, 'LsIn': 80.0, 'LsOut': 120.0, 'trans': trans},
+        {'n': 1000.0 + 800.0 * math.cos(az), 'e': 800.0 * math.sin(az)},
+    ]
+
+
+def test_cubic_spirals_build_close_onto_ep_and_name_controls():
+    vertices = _cubic_pi_vertices('CUBIC')
+    res = ab.build_alignment_from_pi(vertices)
+    assert res.issues == []
+    assert [c.name for c in res.control] == ['BP', 'TS', 'SC', 'CS', 'ST', 'EP']
+    assert [e.transition for e in res.elements if e.type in ('SPIN', 'SPOUT')] == ['CUBIC', 'CUBIC']
+    end = al.calculate_exit_state(res.elements[-1])
+    assert math.isclose(end.n, vertices[2]['n'], abs_tol=1e-6)
+    assert math.isclose(end.e, vertices[2]['e'], abs_tol=1e-6)
+
+
+def test_cubic_build_differs_from_clothoid_build():
+    """Guards against the builder quietly using the clothoid for CUBIC input."""
+    cubic = ab.build_alignment_from_pi(_cubic_pi_vertices('CUBIC'))
+    clothoid = ab.build_alignment_from_pi(_cubic_pi_vertices('CLOTHOID'))
+    ts_cubic = next(c for c in cubic.control if c.name == 'TS')
+    ts_clothoid = next(c for c in clothoid.control if c.name == 'TS')
+    assert abs(ts_cubic.sta - ts_clothoid.sta) > 0.05      # ~0.31 m for this geometry
+
+
+def test_builder_rejects_unknown_transition_name():
+    with pytest.raises(ValueError, match='ไม่รู้จัก transition'):
+        ab.build_alignment_from_pi(_cubic_pi_vertices('CUBICC'))
