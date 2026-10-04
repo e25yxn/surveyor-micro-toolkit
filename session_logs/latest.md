@@ -2541,3 +2541,19 @@
   (commit 3cad392) ที่ลืมสั่ง commit ให้ตอนนั้น — commit นี้เลย commit
   session log ของทั้ง 2 งานพร้อมกัน — backlog ที่เหลือ: multicurve.py
   (รอกำหนดสโคป), real SMT_COGO_Builder_DEMO spreadsheet ID ยังไม่ยืนยัน
+
+## [2026-10-05] feat(alignment): add CUBIC spiral; reject unknown transitions
+- ทำ: เพิ่ม transition ชนิดที่ 5 ชื่อ CUBIC (cubic parabola y = x^3/(6RL) โดย L = ความยาวส่วนโค้ง
+  ของ spiral, จุด SC อยู่ที่ x = X < L ซึ่งหาจากเงื่อนไขความยาวส่วนโค้ง = L) ใน src/smt/alignment.py
+  ยืนยันนิยามกับแบบจริง (SETTING OUT DATA ของ Red Line, EX-GN-005): วัดมุมที่ spiral หมุนของ 39 โค้ง
+  นิยามนี้ได้ chi-square 43 (clothoid 3569, ตัวหารเป็น X 172) สถานี C.S./S.T. ของโค้ง R=2500 ต่างจากแบบ
+  ไม่เกิน 0.3 มม. และแก้จุดอันตรายเดิม: ชื่อ transition ที่ไม่รู้จักเคยถูกคำนวณเป็น clothoid เงียบๆ
+  ตอนนี้ error ชัดเจน (make_element, landxml._spiral_lx_type) LandXML ยังไม่ map CUBIC ตั้งใจ
+  (รอทดสอบกับ Civil 3D) ไม่แตะ protected function
+- คำสั่ง: pytest -q ; ruff check src/ ; mypy src/smt
+- ผล: PASS (601 passed, 563 เดิม + 38 ใหม่) ; ruff 13 errors เท่าเดิม ; mypy 1 error เท่าเดิม
+  (landxml.py:154 เลขบรรทัดเลื่อนจาก 144)
+- commit: b5eca0e (push แล้ว 70cde8b..b5eca0e main -> main)
+- หมายเหตุ: GS_Alignment.gs (เว็บแอป) และ SMT_Alignment.bas (VBA) ยังไม่รู้จัก CUBIC และชื่อที่ไม่รู้จัก
+  ยังคำนวณเป็น clothoid เงียบๆ - ตาราง PI ที่ใส่ CUBIC ในเว็บแอปจะได้ clothoid โดยไม่เตือน ให้ใช้ CUBIC
+  กับ smt (Python) เท่านั้นจนกว่าจะแก้ฝั่งนั้น | หลักฐานนิยามมาจากแบบเดียว (แยกนิยามได้จริง 2 โค้ง R=2500)
