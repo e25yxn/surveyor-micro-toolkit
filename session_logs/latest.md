@@ -2557,3 +2557,22 @@
 - หมายเหตุ: GS_Alignment.gs (เว็บแอป) และ SMT_Alignment.bas (VBA) ยังไม่รู้จัก CUBIC และชื่อที่ไม่รู้จัก
   ยังคำนวณเป็น clothoid เงียบๆ - ตาราง PI ที่ใส่ CUBIC ในเว็บแอปจะได้ clothoid โดยไม่เตือน ให้ใช้ CUBIC
   กับ smt (Python) เท่านั้นจนกว่าจะแก้ฝั่งนั้น | หลักฐานนิยามมาจากแบบเดียว (แยกนิยามได้จริง 2 โค้ง R=2500)
+
+## [2026-10-05] feat(gas,vba): CUBIC spiral + reject unknown transitions in web app and Excel
+- ทำ: พอร์ต CUBIC (cubic parabola y = x^3/(6RL), L = ความยาวส่วนโค้ง) และการ error เมื่อชื่อ transition
+  ไม่รู้จัก จาก Python (b5eca0e) ไปยังเว็บแอป reference/gsheet/GS_Alignment.gs และ Excel
+  reference/vba/SMT_Alignment.bas (VBA คืน #NAME? แทนการคำนวณเป็น clothoid เงียบๆ) เพิ่ม UDF
+  GS_CUBIC_TANGENT_LENGTH / GS_CUBIC_THETA_DEG / GS_CUBIC_TOTAL_Y และสคริปต์ตรวจ
+  reference/gsheet/verify_cubic_transition.js (273 ข้อ เทียบค่าจาก Python) GS_AlignmentBuilder.gs
+  และ GS_PiTableParser.gs ไม่ต้องแก้ ไม่แตะ protected function
+- คำสั่ง: node reference/gsheet/verify_cubic_transition.js + node test เดิม 4 ตัว ; pytest -q ;
+  ruff check src/ ; mypy src/smt ; VBA รันจริงใน LibreOffice 343 กรณีเทียบ Python
+- ผล: PASS (node 273 ข้อ และชุดเดิมผ่านหมด ; pytest 601 ; ruff 13 ; mypy 1 error เดิม ; VBA ตรง Python
+  ภายใน 1e-11)
+- commit: 655c17c (push แล้ว ecf18e6..655c17c main -> main)
+- หมายเหตุ: ยังไม่ได้ deploy จริง — ต้อง copy GS_Alignment.gs ไปโฟลเดอร์ clasp แล้ว clasp push -f เอง
+  และ import SMT_Alignment.bas เข้า Excel ใหม่ แล้วพิมพ์เซลล์ตรวจตามค่าท้ายไฟล์ ฝั่ง VBA ยังไม่เคยรันใน
+  Excel จริง (ผ่านเฉพาะ LibreOffice) | จนกว่าจะ deploy เว็บแอปยังคำนวณ CUBIC เป็น clothoid เงียบๆ
+  | นิยาม CUBIC ยืนยันกับ LandXML ที่ Civil 3D 2023 ส่งออกเอง (AL-LRL-R0.xml, 52 spiral cubicParabola)
+  แล้ว: ทั้ง 104 จุด TS/SC/CS/ST ตรง 0.00005 มม. | พบบั๊กเดิมในตัวส่งออก LandXML (PI ของ SPOUT ผิด
+  3-32 ม.) ยังไม่แก้ แพตช์ landxml_cubic.patch เตรียมไว้แล้ว CK1024 พักไว้ก่อน
