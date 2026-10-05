@@ -2576,3 +2576,19 @@
   | นิยาม CUBIC ยืนยันกับ LandXML ที่ Civil 3D 2023 ส่งออกเอง (AL-LRL-R0.xml, 52 spiral cubicParabola)
   แล้ว: ทั้ง 104 จุด TS/SC/CS/ST ตรง 0.00005 มม. | พบบั๊กเดิมในตัวส่งออก LandXML (PI ของ SPOUT ผิด
   3-32 ม.) ยังไม่แก้ แพตช์ landxml_cubic.patch เตรียมไว้แล้ว CK1024 พักไว้ก่อน
+
+## [2026-10-05] ยืนยัน deploy CUBIC ในเครื่องจริง (เว็บแอป + Excel)
+- ทำ: deploy งานของ commit 655c17c: copy reference/gsheet/GS_Alignment.gs ไปเป็น GS_Alignment.js ในโฟลเดอร์
+  clasp D:\MyClasp_SMT_DEMO (สำรองของเดิมเป็น GS_Alignment.js.bak_20261005 ; hash ไฟล์ตรงกับใน repo)
+  แล้ว clasp push -f (15 ไฟล์ เวลา 15:41) และ import reference/vba/SMT_Alignment.bas ใหม่ใน Excel
+- คำสั่ง: certutil -hashfile ; clasp status ; clasp push -f ; พิมพ์สูตรทดสอบในเซลล์ ; รันเว็บแอปกับตาราง PI ทดสอบ ;
+  พิมพ์สูตร SMT_* ใน Excel กับตาราง 1 แถว (0 | 95 | 0 | 0 | 0 | 2500 | SPIN | CUBIC)
+- ผล: ยืนยันแล้วในเครื่องจริง 2026-10-05 : UDF GS_CUBIC_TANGENT_LENGTH / THETA_DEG / TOTAL_Y (95, 2500) =
+  94.996571290281 / 1.088410291399 / 0.601601523533 ตรง Python ; เว็บแอปคำนวณตารางทดสอบ CUBIC (R=400,
+  LsIn=80, LsOut=120) ได้ TS 812.5792 (clothoid จะได้ 812.8878) ตรง Python ภายใน 3.4e-7 ม. ; Excel
+  SMT_StaToN / SMT_StaToE / SMT_WCBatSta (95, 0) ได้ 94.9965712902813 / 0.601601523533194 / 1.08841029139899
+  ตรง Python ถึงหลักที่ 15
+- commit: ไม่มีการแก้โค้ดรอบนี้ (deploy ของ 655c17c)
+- หมายเหตุ: ยังไม่ได้ทดสอบกรณีพิมพ์ผิด (Transition = CUBICC) ในเว็บแอป (ต้องขึ้น error ภาษาไทย) และใน Excel
+  (ต้องขึ้น #NAME?) | คอมเมนต์ท้ายไฟล์ SMT_Alignment.bas ยังเขียนว่า "NOT yet confirmed in real Excel" ซึ่ง
+  ล้าสมัยแล้ว (แก้ได้รอบหน้า) | ส่งออก LandXML (แพตช์ landxml_cubic.patch) ยังพักไว้
