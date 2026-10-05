@@ -79,7 +79,7 @@ columns are assigned as follows:
 | F | `Azimuth` | Forward azimuth at start, in **decimal degrees** |
 | G | `Radius` | Signed radius (metres); see sign convention below |
 | H | `Type` | Element type: `T` / `C` / `SPIN` / `SPOUT` |
-| I | `Transition` | Transition shape: `CLOTHOID` / `BLOSS` / `COSINE` / `SINE` |
+| I | `Transition` | Transition shape: `CLOTHOID` / `BLOSS` / `COSINE` / `SINE` / `CUBIC` (an unknown name on a SPIN/SPOUT row returns `#NAME?`) |
 
 Column A is typically the element index (1-based).
 
@@ -144,7 +144,7 @@ Named Range **SMT_Elements** must have 8 columns per row (no header row):
 | 5 | Azimuth | **decimal degrees** — converted to radians internally |
 | 6 | Radius | signed metres (+right curve / -left curve); 0 for tangent |
 | 7 | Type | `T` / `C` / `SPIN` / `SPOUT` |
-| 8 | Transition | `CLOTHOID` / `BLOSS` / `COSINE` / `SINE` (blank = CLOTHOID) |
+| 8 | Transition | `CLOTHOID` / `BLOSS` / `COSINE` / `SINE` / `CUBIC` (blank = CLOTHOID; any other name on a SPIN/SPOUT row = `#NAME?`) |
 
 | Function | Arguments | Returns | Notes |
 |----------|-----------|---------|-------|

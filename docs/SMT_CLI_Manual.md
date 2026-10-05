@@ -84,7 +84,7 @@ EP,,1565724.112,679180.443,,,,,,
 | Ls | ความยาว spiral สมมาตร | |
 | LsIn | ความยาว spiral เข้า (อสมมาตร) | |
 | LsOut | ความยาว spiral ออก (อสมมาตร) | |
-| Transition | CLOTHOID, BLOSS, COSINE, SINE | ว่าง = CLOTHOID |
+| Transition | CLOTHOID, BLOSS, COSINE, SINE, CUBIC | ว่าง = CLOTHOID; ชื่ออื่นของ spiral = error |
 | Delta | มุมเลี้ยวของ arc ใน compound curve (องศา) | ใช้กับแถว compound sub-arc |
 
 **รูปแบบพิเศษ:**

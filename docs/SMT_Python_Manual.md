@@ -87,7 +87,7 @@ EP,,1565724.112,679180.443,,,,,,
 | RADIUS | รัศมีโค้ง (เมตร) | 0 หรือว่าง = angle point (ไม่มีโค้ง) |
 | Ls | ความยาว spiral สมมาตร | |
 | LsIn / LsOut | ความยาว spiral เข้า/ออก (อสมมาตร) | |
-| Transition | CLOTHOID, BLOSS, COSINE, SINE | ว่าง = CLOTHOID |
+| Transition | CLOTHOID, BLOSS, COSINE, SINE, CUBIC | ว่าง = CLOTHOID; ชื่ออื่นของ spiral = error |
 | Delta | มุมเลี้ยว compound sub-arc | |
 
 ### Output: `elements_output.csv` (ทศนิยม 6 ตำแหน่ง)

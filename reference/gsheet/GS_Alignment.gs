@@ -38,6 +38,10 @@ var GS_Alignment = (function () {
   var SPIRAL_STEPS = 48;   // จำนวนช่วง Simpson สำหรับ integrate spiral (คู่; 48 ละเอียดระดับไมครอน)
   var SINE_HALFWAVE_C = 0.0226689447;   // Civil 3D closed-form tangent-length correction constant
 
+  // ชนิด transition ที่ engine นี้รองรับจริง — ชื่ออื่น (พิมพ์ผิด หรือรูปร่างที่ยังไม่มี) เคยตกไปเป็น
+  // CLOTHOID เงียบๆ; makeElement ตอนนี้ throw แทนสำหรับ element SPIN/SPOUT (mirrors alignment.py)
+  var VALID_TRANSITIONS = ['CLOTHOID', 'BLOSS', 'SINE', 'COSINE', 'CUBIC'];
+
   // ---- รูปร่างการเปลี่ยน curvature (transition shape) ----
   //  curvature ที่สัดส่วน τ = s/L :  k = kIn + (kOut-kIn)*f(τ)   โดย f(0)=0, f(1)=1
   //  ทุกชนิดมี ∫₀¹ f = 1/2 เท่ากัน  => มุมเลี้ยวรวมเท่ากัน (ปลายทางมุมเดียวกัน)
@@ -184,12 +188,73 @@ var GS_Alignment = (function () {
     return { x: x, y: y, theta: theta };
   }
 
+  // ============================================================
+  // CUBIC (cubic parabola y = x^3/(6*R*L), L = ความยาว "ส่วนโค้ง" ของ spiral) closed-form
+  // helpers — NEW. Mirrors src/smt/alignment.py (_cubic_dydx, _cubic_arc_length,
+  // calculate_cubic_parabola_tangent_length, _cubic_solve_x, _cubic_point).
+  // x = ระยะบนเส้นสัมผัสขาเข้า; จุด SC/CS อยู่ที่ x = X < L ซึ่งหาจากเงื่อนไข "ความยาวส่วนโค้ง 0..X = L"
+  // tan(theta) = x^2/(2*R*L); มุมที่ SC = atan(X^2/(2RL)) น้อยกว่า clothoid (L/2R) เล็กน้อย
+  // นิยามนี้ยืนยันกับแบบจริง (SETTING OUT DATA Red Line, EX-GN-005; 39 โค้ง) ดู docstring ใน alignment.py
+  // ห้ามเปลี่ยนตัวหารกลับเป็น X
+  // ============================================================
+
+  // dy/dx = tan(heading) ที่ระยะ x บนเส้นสัมผัส; เครื่องหมายตาม r (+ = เลี้ยวขวา)
+  function cubicDydx_(x, length, r) {
+    return x * x / (2 * r * length);
+  }
+
+  // s(x) = integral[0..x] sqrt(1+(dy/dt)^2) dt  ด้วย Simpson (ความยาวส่วนโค้งจริงจากปลายตรง)
+  function cubicArcLength_(x, length, r, nSeg) {
+    if (nSeg === undefined) nSeg = SPIRAL_STEPS;
+    if (x === 0) return 0;
+    var h = x / nSeg;
+    var total = 0;
+    for (var i = 0; i <= nSeg; i++) {
+      var w = (i === 0 || i === nSeg) ? 1 : (i % 2 === 1 ? 4 : 2);
+      total += w * Math.hypot(1, cubicDydx_(i * h, length, r));
+    }
+    return total * h / 3;
+  }
+
+  // X ของ CUBIC: abscissa ของจุด SC/CS ที่ความยาวส่วนโค้ง = length พอดี (bisection; X < length)
+  // Public (ไม่มี underscore ท้ายชื่อ) เพื่อให้ UDF GS_CUBIC_TANGENT_LENGTH เรียกได้
+  function calcCubicParabolaTangentLength(length, r) {
+    var rAbs = Math.abs(r);
+    var hi = length;                                          // s(X) >= X  =>  X <= L
+    var lo = length / Math.hypot(1, length / (2 * rAbs));     // slope <= L/(2R) บน [0, X]
+    for (var it = 0; it < 60; it++) {
+      var mid = (lo + hi) / 2;
+      if (cubicArcLength_(mid, length, rAbs) < length) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  // แก้ s(x) = d หา x (Newton). s นูนและเพิ่มขึ้น, s(d) >= d => เริ่มที่ x=d แล้วเข้าหารากจากด้านบนแบบ monotone
+  function cubicSolveX_(d, length, r) {
+    var x = d;
+    for (var it = 0; it < 30; it++) {
+      var step = (cubicArcLength_(x, length, r) - d) / Math.hypot(1, cubicDydx_(x, length, r));
+      x -= step;
+      if (Math.abs(step) < 1e-13) break;
+    }
+    return x;
+  }
+
+  // CUBIC แบบ canonical (SPIN): {x, y, theta} ที่ระยะส่วนโค้ง d จากปลายตรง
+  function cubicPoint_(d, bigX, r, length) {
+    var x = (Math.abs(d - length) < 1e-9) ? bigX : cubicSolveX_(d, length, r);
+    var y = x * x * x / (6 * r * length);
+    var theta = Math.atan(cubicDydx_(x, length, r));
+    return { x: x, y: y, theta: theta };
+  }
+
   /**
    * สร้าง element 1 ตัว  (เก็บ azimuth เป็น radian, curvature ภายใน)
    *  azDeg = azimuth ขาเข้า (องศา decimal ตามตารางที่ 3)
    *  โหมดคอลัมน์เดียว (rOut ว่าง) อิง Type: T / C / SPIN / SPOUT
    *  โหมด rIn,rOut ชัดเจน -> compound spiral (R1->R2)
-   *  trans = ชนิด transition: CLOTHOID(default) / BLOSS / COSINE / SINE  (มีผลเฉพาะ spiral)
+   *  trans = ชนิด transition: CLOTHOID(default) / BLOSS / COSINE / SINE / CUBIC  (มีผลเฉพาะ spiral;
+   *          ชื่ออื่นสำหรับ SPIN/SPOUT -> throw ไม่ตกไปเป็น CLOTHOID เงียบๆ)
    */
   function makeElement(type, staStart, staEnd, n, e, azDeg, rIn, rOut, trans) {
     var t = String(type).trim().toUpperCase();
@@ -204,6 +269,12 @@ var GS_Alignment = (function () {
       kOut = curvatureFromRadius(rOut);
     }
     var tr = trans ? String(trans).trim().toUpperCase() : 'CLOTHOID';
+    if ((t === 'SPIN' || t === 'SPOUT') && VALID_TRANSITIONS.indexOf(tr) < 0) {
+      throw new Error(
+        "ไม่รู้จัก transition '" + trans + "' — ใช้ได้เฉพาะ " + VALID_TRANSITIONS.join(' / ') +
+        ' (เดิมระบบคำนวณเป็น CLOTHOID เงียบๆ ซึ่งผิดจากที่ตั้งใจ)'
+      );
+    }
     return {
       type: t,
       staStart: staStart, staEnd: staEnd,
@@ -264,6 +335,43 @@ var GS_Alignment = (function () {
         n: el.n + xLocal * caC - yLocal * saC,
         e: el.e + xLocal * saC + yLocal * caC,
         az: FPMath.normalizeAngle(el.az + thLocal)
+      };
+    }
+    // --- CUBIC (cubic parabola) pure SPIN/SPOUT: closed form ---
+    //  Mirrors src/smt/alignment.py calculate_point_on_element (CUBIC branch). โครงเดียวกับ COSINE ด้านบน
+    //  แต่แยก branch ไว้ (ไม่แตะ COSINE). spiral ที่เชื่อมสองปลายโค้ง (kIn,kOut ไม่เป็น 0 ทั้งคู่) ไม่มี
+    //  closed form ที่นี่ และต้องไม่ตกไปเป็น clothoid ใน Simpson ด้านล่างเงียบๆ -> throw
+    if (el.trans === 'CUBIC') {
+      if ((el.kIn === 0) === (el.kOut === 0)) {
+        throw new Error(
+          'CUBIC รองรับเฉพาะ spiral ที่ปลายด้านหนึ่งเป็นเส้นตรง (TS-SC หรือ CS-ST) ' +
+          'ไม่รองรับ spiral ที่เชื่อมโค้งสองรัศมี'
+        );
+      }
+      var lenCu = el.staEnd - el.staStart;
+      var xCu, yCu, thCu;
+      if (el.kIn === 0) {
+        // SPIN: curvature 0 -> 1/R
+        var rCuIn = radiusFromCurvature(el.kOut);
+        var bigXCuIn = calcCubicParabolaTangentLength(lenCu, rCuIn);
+        var ptCuIn = cubicPoint_(d, bigXCuIn, rCuIn, lenCu);
+        xCu = ptCuIn.x; yCu = ptCuIn.y; thCu = ptCuIn.theta;
+      } else {
+        // SPOUT: curvature 1/R -> 0, mirror ของรูป canonical ผ่าน s <-> L-d
+        var rCuOut = radiusFromCurvature(el.kIn);
+        var bigXCuOut = calcCubicParabolaTangentLength(lenCu, rCuOut);
+        var ptCuEnd = cubicPoint_(lenCu, bigXCuOut, rCuOut, lenCu);
+        var ptCuG = cubicPoint_(lenCu - d, bigXCuOut, rCuOut, lenCu);
+        var dxCu = ptCuEnd.x - ptCuG.x, dyCu = ptCuEnd.y - ptCuG.y;
+        xCu = dxCu * Math.cos(ptCuEnd.theta) + dyCu * Math.sin(ptCuEnd.theta);
+        yCu = dxCu * Math.sin(ptCuEnd.theta) - dyCu * Math.cos(ptCuEnd.theta);
+        thCu = ptCuEnd.theta - ptCuG.theta;
+      }
+      var caCu = Math.cos(el.az), saCu = Math.sin(el.az);
+      return {
+        n: el.n + xCu * caCu - yCu * saCu,
+        e: el.e + xCu * saCu + yCu * caCu,
+        az: FPMath.normalizeAngle(el.az + thCu)
       };
     }
     // --- Spiral: ความโค้งเปลี่ยน (kIn != kOut) — รูปร่างตาม el.trans ---
@@ -409,6 +517,7 @@ var GS_Alignment = (function () {
     curvatureFromRadius: curvatureFromRadius,
     radiusFromCurvature: radiusFromCurvature,
     calcSineHalfwaveTangentLength: calcSineHalfwaveTangentLength,   // NEW
+    calcCubicParabolaTangentLength: calcCubicParabolaTangentLength, // NEW (CUBIC)
     makeElement: makeElement,
     pointOnElement: pointOnElement,
     exitState: exitState,
@@ -471,10 +580,51 @@ function GS_COSINE_TOTAL_Y(length, r) {
   return st.e;
 }
 
+/**
+ * Tangent-projected length X (abscissa of SC/CS) for a CUBIC (cubic parabola) spiral:
+ * y = x^3/(6*R*L), L = spiral ARC length, X solved so the arc length 0..X equals L.
+ * @param {number} length Spiral arc length L (m).
+ * @param {number} r Radius at the curved end (m); sign does not matter.
+ * @return {number} X (m).
+ * @customfunction
+ */
+function GS_CUBIC_TANGENT_LENGTH(length, r) {
+  return GS_Alignment.calcCubicParabolaTangentLength(length, r);
+}
+
+/**
+ * Total turning angle (degrees) of a full-length CUBIC SPIN(0->1/R).
+ * @param {number} length Spiral arc length L (m).
+ * @param {number} r Radius at the curved end (m).
+ * @return {number} theta in decimal degrees.
+ * @customfunction
+ */
+function GS_CUBIC_THETA_DEG(length, r) {
+  var el = GS_Alignment.makeElement('SPIN', 0, length, 0, 0, 0, r, null, 'CUBIC');
+  var st = GS_Alignment.exitState(el);
+  return st.az * 180 / Math.PI;
+}
+
+/**
+ * Local perpendicular offset y at the full-length end of a CUBIC SPIN(0->1/R).
+ * @param {number} length Spiral arc length L (m).
+ * @param {number} r Radius at the curved end (m).
+ * @return {number} y (m).
+ * @customfunction
+ */
+function GS_CUBIC_TOTAL_Y(length, r) {
+  var el = GS_Alignment.makeElement('SPIN', 0, length, 0, 0, 0, r, null, 'CUBIC');
+  var st = GS_Alignment.exitState(el);
+  return st.e;   // az=0, n=0, e=0 -> rotation is identity, so st.e IS the local y
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports.GS_COSINE_TANGENT_LENGTH = GS_COSINE_TANGENT_LENGTH;
   module.exports.GS_COSINE_THETA_DEG = GS_COSINE_THETA_DEG;
   module.exports.GS_COSINE_TOTAL_Y = GS_COSINE_TOTAL_Y;
+  module.exports.GS_CUBIC_TANGENT_LENGTH = GS_CUBIC_TANGENT_LENGTH;
+  module.exports.GS_CUBIC_THETA_DEG = GS_CUBIC_THETA_DEG;
+  module.exports.GS_CUBIC_TOTAL_Y = GS_CUBIC_TOTAL_Y;
 }
 
 // ============================================================
@@ -496,4 +646,21 @@ if (typeof module !== 'undefined' && module.exports) {
 //   =GS_COSINE_TANGENT_LENGTH(70, 500)  = 69.968898207872
 //   =GS_COSINE_THETA_DEG(70, 500)       = 4.002399624674
 //   =GS_COSINE_TOTAL_Y(70, 500)         = 1.455757918206
+// ============================================================
+
+// ============================================================
+// CUBIC (cubic parabola, y = x^3/(6*R*L)) -- expected values from the Python engine
+// (src/smt/alignment.py) and cross-checked by reference/gsheet/verify_cubic_transition.js.
+// Type these into cells of the live spreadsheet after `clasp push` to confirm the deployed copy:
+//
+//   =GS_CUBIC_TANGENT_LENGTH(95, 2500) = 94.996571290281
+//   =GS_CUBIC_THETA_DEG(95, 2500)      = 1.088410291399
+//   =GS_CUBIC_TOTAL_Y(95, 2500)        = 0.601601523533
+//
+//   =GS_CUBIC_TANGENT_LENGTH(100, 500) = 99.900633015830
+//   =GS_CUBIC_THETA_DEG(100, 500)      = 5.699324638442
+//   =GS_CUBIC_TOTAL_Y(100, 500)        = 3.323406505443
+//
+// (a CLOTHOID of the same L and R would give THETA_DEG = L/(2R) in degrees: 1.08861981 for (95,2500),
+//  5.72957795 for (100,500) -- CUBIC deliberately differs, see alignment.py docstring)
 // ============================================================

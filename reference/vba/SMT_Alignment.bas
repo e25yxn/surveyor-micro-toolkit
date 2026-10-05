@@ -9,7 +9,10 @@ Option Explicit
 ' Named Range SMT_Elements layout (8 columns per row, no header):
 '   col1=StaStart  col2=StaEnd  col3=N       col4=E
 '   col5=Azimuth(decimal degrees)  col6=Radius(signed metres)
-'   col7=Type(T/C/SPIN/SPOUT)     col8=Transition(CLOTHOID/BLOSS/COSINE/SINE)
+'   col7=Type(T/C/SPIN/SPOUT)     col8=Transition(CLOTHOID/BLOSS/COSINE/SINE/CUBIC)
+'   A SPIN/SPOUT row whose Transition is not one of those names (a typo, or a shape this
+'   engine lacks) used to be computed as CLOTHOID silently; every lookup now returns #NAME?
+'   instead. CUBIC (cubic parabola) is supported for a pure SPIN/SPOUT only.
 '
 ' Sign convention:
 '   offset: +right of travel / -left.  radius: +right curve / -left curve.
@@ -21,6 +24,7 @@ Option Explicit
 Private Const SMT_SPIRAL_STEPS As Long = 48  ' Simpson intervals (must be even)
 Private Const SMT_STA_TOL As Double = 0.0001 ' station range tolerance (metres)
 Private Const SMT_SINE_HALFWAVE_C As Double = 0.0226689447  ' Civil 3D closed-form tangent-length correction constant
+Private Const SMT_VALID_TRANSITIONS As String = "|CLOTHOID|BLOSS|SINE|COSINE|CUBIC|"
 
 ' ============================================================
 ' Private: atan2(y, x)
@@ -120,6 +124,30 @@ Private Sub SMT_GetCurvatures(typStr As String, radius As Double, _
 End Sub
 
 ' ============================================================
+' Private: can this element row be evaluated by this engine?
+' Only SPIN/SPOUT rows carry a meaningful Transition. An unknown name used to fall into the
+' CLOTHOID default silently (a different curve from the one the table was built with);
+' mirrors make_element / calculate_point_on_element in src/smt/alignment.py. CUBIC is
+' closed-form for a pure SPIN/SPOUT (one end straight) only -- a spiral joining two curved
+' ends is unsupported and must not become a clothoid either.
+' ============================================================
+
+Private Function SMT_ElementSupported(typStr As String, transStr As String, _
+                                       kIn As Double, kOut As Double) As Boolean
+    Dim t As String, tr As String
+    SMT_ElementSupported = True
+    t = UCase(Trim(typStr))
+    tr = UCase(Trim(transStr))
+    If t = "SPIN" Or t = "SPOUT" Then
+        If InStr(SMT_VALID_TRANSITIONS, "|" & tr & "|") = 0 Then
+            SMT_ElementSupported = False
+        ElseIf tr = "CUBIC" Then
+            If (kIn = 0#) = (kOut = 0#) Then SMT_ElementSupported = False
+        End If
+    End If
+End Function
+
+' ============================================================
 ' Private: COSINE (Civil 3D Sine Half-Wave) closed-form helpers
 ' Mirrors src/smt/alignment.py (_cosine_dydx, _cosine_arc_length,
 ' _cosine_solve_a, calculate_sine_halfwave_tangent_length,
@@ -204,6 +232,99 @@ Private Function SMT_SineHalfwavePoint(d As Double, bigX As Double, r As Double,
 End Function
 
 ' ============================================================
+' Private: CUBIC (cubic parabola y = x^3/(6*R*L)) closed-form helpers
+' L is the spiral ARC length (the Ls of the design table); x runs along the entry tangent;
+' the SC/CS point sits at x = X < L, solved so the arc length 0..X equals L.
+' tan(theta) = x^2/(2*R*L), so the turning angle at SC is atan(X^2/(2RL)), slightly LESS
+' than a clothoid's L/(2R) (0.75 arcsec at R=2500/L=95). Pinned to real data (Red Line
+' setting-out drawing, 39 spiral curves); see the docstring in src/smt/alignment.py. Do not
+' change the denominator back to X.
+' Mirrors src/smt/alignment.py (_cubic_dydx, _cubic_arc_length,
+' calculate_cubic_parabola_tangent_length, _cubic_solve_x, _cubic_point) and
+' reference/gsheet/GS_Alignment.gs (verified there against the Python engine).
+' ============================================================
+
+Private Function SMT_CubicDydx(x As Double, length As Double, r As Double) As Double
+    ' dy/dx = tan(heading) at tangent-projected distance x. Sign follows r (+ right turn).
+    SMT_CubicDydx = x * x / (2# * r * length)
+End Function
+
+Private Function SMT_CubicArcLength(x As Double, length As Double, r As Double, _
+                                     Optional nSeg As Long = SMT_SPIRAL_STEPS) As Double
+    ' s(x) = integral[0..x] sqrt(1+(dy/dt)^2) dt  via Simpson: true arc length from the straight end.
+    Dim h As Double, total As Double, xi As Double
+    Dim i As Long, w As Long
+    If x = 0# Then
+        SMT_CubicArcLength = 0#
+        Exit Function
+    End If
+    h = x / CDbl(nSeg)
+    total = 0#
+    For i = 0 To nSeg
+        xi = CDbl(i) * h
+        If i = 0 Or i = nSeg Then
+            w = 1
+        ElseIf (i Mod 2) = 1 Then
+            w = 4
+        Else
+            w = 2
+        End If
+        total = total + CDbl(w) * Sqr(1# + SMT_CubicDydx(xi, length, r) ^ 2#)
+    Next i
+    SMT_CubicArcLength = total * h / 3#
+End Function
+
+Public Function SMT_CalcCubicParabolaTangentLength(length As Double, r As Double) As Double
+    ' X = tangent-projected abscissa of the SC/CS point: the x at which the cubic parabola has arc
+    ' length exactly L (60-iteration bisection; X < L). Public so it can be called directly from a
+    ' worksheet cell for the Excel verification checklist.
+    Dim lo As Double, hi As Double, mid As Double, rAbs As Double
+    Dim iter As Long
+    rAbs = Abs(r)
+    hi = length
+    lo = length / Sqr(1# + (length / (2# * rAbs)) ^ 2#)
+    For iter = 1 To 60
+        mid = (lo + hi) / 2#
+        If SMT_CubicArcLength(mid, length, rAbs) < length Then
+            lo = mid
+        Else
+            hi = mid
+        End If
+    Next iter
+    SMT_CalcCubicParabolaTangentLength = (lo + hi) / 2#
+End Function
+
+Private Function SMT_CubicSolveX(d As Double, length As Double, r As Double) As Double
+    ' Solve s(x) = d for x by Newton. s is convex and increasing with s(d) >= d, so starting at
+    ' x = d the iteration approaches the root monotonically from above.
+    Dim x As Double, stepSize As Double
+    Dim iter As Long
+    x = d
+    For iter = 1 To 30
+        stepSize = (SMT_CubicArcLength(x, length, r) - d) / Sqr(1# + SMT_CubicDydx(x, length, r) ^ 2#)
+        x = x - stepSize
+        If Abs(stepSize) < 0.0000000000001 Then Exit For
+    Next iter
+    SMT_CubicSolveX = x
+End Function
+
+Private Function SMT_CubicPoint(d As Double, bigX As Double, r As Double, length As Double) As Variant
+    ' CUBIC canonical (SPIN) form. Returns Variant array: (0)=x  (1)=y  (2)=theta (rad).
+    ' d==length short-circuits to x = X (same 1e-9 threshold as Python).
+    Dim x As Double
+    Dim res(2) As Double
+    If Abs(d - length) < 0.000000001 Then
+        x = bigX
+    Else
+        x = SMT_CubicSolveX(d, length, r)
+    End If
+    res(0) = x
+    res(1) = x * x * x / (6# * r * length)
+    res(2) = Atn(SMT_CubicDydx(x, length, r))
+    SMT_CubicPoint = res
+End Function
+
+' ============================================================
 ' Private: position and tangent azimuth at arc distance d from element start
 ' Returns Variant Array: (0)=N  (1)=E  (2)=tangentAzimuth(rad)
 '
@@ -225,7 +346,7 @@ Private Function SMT_PointOnElement(n0 As Double, e0 As Double, az0 As Double, _
     Dim s As Double, th As Double
     Dim ca As Double, sa As Double, x As Double, y As Double
     Dim lenEl As Double, rr As Double, bigX As Double
-    Dim ptSine As Variant
+    Dim ptSine As Variant, ptCub As Variant
     Dim xLocal As Double, yLocal As Double, thLocal As Double
     Dim xEnd As Double, yEnd As Double, thTotal As Double
     Dim xG As Double, yG As Double, thG As Double
@@ -266,6 +387,38 @@ Private Function SMT_PointOnElement(n0 As Double, e0 As Double, az0 As Double, _
             xEnd = ptSine(0): yEnd = ptSine(1): thTotal = ptSine(2)
             ptSine = SMT_SineHalfwavePoint(lenEl - d, bigX, rr, lenEl)
             xG = ptSine(0): yG = ptSine(1): thG = ptSine(2)
+            dxs = xEnd - xG
+            dys = yEnd - yG
+            xLocal = dxs * Cos(thTotal) + dys * Sin(thTotal)
+            yLocal = dxs * Sin(thTotal) - dys * Cos(thTotal)
+            thLocal = thTotal - thG
+        End If
+        ca = Cos(az0)
+        sa = Sin(az0)
+        res(0) = n0 + xLocal * ca - yLocal * sa
+        res(1) = e0 + xLocal * sa + yLocal * ca
+        res(2) = SMT_NormalizeAngle(az0 + thLocal)
+
+    ElseIf UCase(Trim(transition)) = "CUBIC" And ((kIn = 0#) <> (kOut = 0#)) Then
+        ' CUBIC (cubic parabola) pure SPIN/SPOUT closed form -- mirrors alignment.py
+        ' calculate_point_on_element (CUBIC branch) and GS_Alignment.gs. Separate from the COSINE
+        ' branch above. A CUBIC spiral between two curved ends never reaches here: the row readers
+        ' reject it through SMT_ElementSupported instead of letting it fall into the clothoid path.
+        lenEl = L
+        If kIn = 0# Then
+            ' SPIN: curvature 0 -> 1/R, canonical form used directly
+            rr = 1# / kOut
+            bigX = SMT_CalcCubicParabolaTangentLength(lenEl, rr)
+            ptCub = SMT_CubicPoint(d, bigX, rr, lenEl)
+            xLocal = ptCub(0): yLocal = ptCub(1): thLocal = ptCub(2)
+        Else
+            ' SPOUT: curvature 1/R -> 0, mirror canonical form via s <-> L-d
+            rr = 1# / kIn
+            bigX = SMT_CalcCubicParabolaTangentLength(lenEl, rr)
+            ptCub = SMT_CubicPoint(lenEl, bigX, rr, lenEl)
+            xEnd = ptCub(0): yEnd = ptCub(1): thTotal = ptCub(2)
+            ptCub = SMT_CubicPoint(lenEl - d, bigX, rr, lenEl)
+            xG = ptCub(0): yG = ptCub(1): thG = ptCub(2)
             dxs = xEnd - xG
             dys = yEnd - yG
             xLocal = dxs * Cos(thTotal) + dys * Sin(thTotal)
@@ -464,6 +617,10 @@ Private Function SMT_SolveForward(sta As Double, offset As Double, _
             kIn = 0#
             kOut = 0#
             SMT_GetCurvatures typStr, radius, kIn, kOut
+            If Not SMT_ElementSupported(typStr, transStr, kIn, kOut) Then
+                SMT_SolveForward = CVErr(xlErrName)   ' unknown/unsupported Transition: never a silent clothoid
+                Exit Function
+            End If
             L = staEnd - staStart
             d = sta - staStart
             If d < 0# Then d = 0#  ' clamp tolerance overshoot at element start
@@ -518,6 +675,10 @@ Private Function SMT_SolveInverse(pN As Double, pE As Double, _
         kIn = 0#
         kOut = 0#
         SMT_GetCurvatures typStr, radius, kIn, kOut
+        If Not SMT_ElementSupported(typStr, transStr, kIn, kOut) Then
+            SMT_SolveInverse = CVErr(xlErrName)   ' unknown/unsupported Transition: never a silent clothoid
+            Exit Function
+        End If
         L = staEnd - staStart
         pr = SMT_ProjectOnElement(staStart, staEnd, n0, e0, az0, _
                                    kIn, kOut, L, transStr, pN, pE)
@@ -677,4 +838,20 @@ End Function
 '   session_logs/plan_vba_wcbatsta_delegate_fix.md for the full 17-point
 '   Excel verification (3 COSINE + 10 BLOSS/SINE mid-curve + 1 boundary +
 '   3 T/C/CLOTHOID spot-checks), all confirmed 2026-07-12.
+' ============================================================
+
+' ============================================================
+' CUBIC (cubic parabola) verification -- one-row test table (StaStart=0, StaEnd=95, N=0, E=0,
+' Azimuth=0, Radius=2500, Type=SPIN, Transition=CUBIC). Expected values come from the Python
+' engine (src/smt/alignment.py):
+'   SMT_StaToN(95, 0, SMT_Elements) = 94.996571290281   (X, tangent-projected length)
+'   SMT_StaToE(95, 0, SMT_Elements) = 0.601601523533    (y at the end)
+'   SMT_WCBatSta(95, SMT_Elements)  = 1.088410291399    (theta, degrees; a CLOTHOID gives 1.088619810749)
+'   =SMT_CalcCubicParabolaTangentLength(95, 2500)       = 94.996571290281
+' With Transition changed to CUBICC (typo) every lookup must show #NAME? instead of a number.
+'
+' Run so far: the module text was executed in LibreOffice's VBA-compatible Basic against 343
+' cases built from the Python engine (right and left CUBIC spirals incl. offsets, inverse lookups,
+' CLOTHOID/BLOSS/SINE/COSINE/blank regressions, typo -> error): all within 1e-11 of Python.
+' NOT yet confirmed in real Excel -- type the cells above after importing this module.
 ' ============================================================
