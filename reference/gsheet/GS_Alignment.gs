@@ -618,6 +618,133 @@ function GS_CUBIC_TOTAL_Y(length, r) {
   return st.e;   // az=0, n=0, e=0 -> rotation is identity, so st.e IS the local y
 }
 
+// ============================================================
+// Element-table lookup functions for cells -- same arguments and meaning as the Excel
+// functions SMT_StaToN / SMT_StaToE / SMT_CoordToSta / SMT_CoordToOffset / SMT_WCBatSta in
+// reference/vba/SMT_Alignment.bas.  They run on the SAME engine as the web app (GS_Alignment),
+// so every transition shape incl. CUBIC is supported and an unknown Transition name is an
+// error, never a silent clothoid.
+//
+// `table` = a range of 8 columns, in the order the web app writes its result_..._Elements tab:
+//   StaStart | StaEnd | N | E | Azimuth (decimal degrees) | Radius (signed, + right) |
+//   Type (T / C / SPIN / SPOUT) | Transition (blank = CLOTHOID)
+// e.g. =GS_STA_TO_N(1000, 0, result_Sheet1_Elements!A2:H6) or a named range.
+// A first row holding the header text is skipped; blank rows are skipped.
+// offset: + right of travel / - left.  A station or point outside the alignment is an error.
+// ============================================================
+
+function gsNum_(v, what, rowNo) {
+  var x = (typeof v === 'number') ? v : Number(String(v).replace(/,/g, '').trim());
+  if (v === '' || v === null || v === undefined || !isFinite(x)) {
+    throw new Error('ตารางแถวที่ ' + rowNo + ': ' + what + ' ไม่ใช่ตัวเลข (' + v + ')');
+  }
+  return x;
+}
+
+function gsElementsFromRange_(table) {
+  if (!Array.isArray(table) || table.length === 0 || !Array.isArray(table[0])) {
+    throw new Error('ตารางต้องเป็นช่วงเซลล์ 8 คอลัมน์: StaStart, StaEnd, N, E, Azimuth, Radius, Type, Transition');
+  }
+  var els = [];
+  for (var i = 0; i < table.length; i++) {
+    var row = table[i], rowNo = i + 1;
+    var allBlank = true;
+    for (var c = 0; c < row.length; c++) if (row[c] !== '' && row[c] !== null && row[c] !== undefined) { allBlank = false; break; }
+    if (allBlank) continue;
+    if (els.length === 0 && typeof row[0] === 'string' && isNaN(Number(row[0].replace(/,/g, '').trim()))) continue;   // header row
+    if (row.length < 7) throw new Error('ตารางแถวที่ ' + rowNo + ' มีไม่ครบ 7-8 คอลัมน์');
+    var type = String(row[6]).trim().toUpperCase();
+    if (['T', 'C', 'SPIN', 'SPOUT'].indexOf(type) < 0) {
+      throw new Error('ตารางแถวที่ ' + rowNo + ": Type '" + row[6] + "' ไม่ถูกต้อง (ใช้ T / C / SPIN / SPOUT)");
+    }
+    var radius = (row[5] === '' || row[5] === null || row[5] === undefined) ? 0 : gsNum_(row[5], 'Radius', rowNo);
+    var trans = (row.length > 7) ? row[7] : '';
+    els.push(GS_Alignment.makeElement(type,
+      gsNum_(row[0], 'StaStart', rowNo), gsNum_(row[1], 'StaEnd', rowNo),
+      gsNum_(row[2], 'N', rowNo), gsNum_(row[3], 'E', rowNo), gsNum_(row[4], 'Azimuth', rowNo),
+      radius, undefined, trans));
+  }
+  if (els.length === 0) throw new Error('ตารางไม่มีแถวข้อมูล');
+  return els;
+}
+
+function gsOffset_(offset) {
+  return (offset === '' || offset === null || offset === undefined) ? 0 : gsNum_(offset, 'offset', 0);
+}
+
+/**
+ * Northing at a station (and optional offset) on the alignment in `table`.
+ * @param {number} sta Station (m).
+ * @param {number} offset Offset from the centre line (m), + right / - left; blank = 0.
+ * @param {Array<Array>} table 8-column element table (see header comment).
+ * @return {number} Northing (m).
+ * @customfunction
+ */
+function GS_STA_TO_N(sta, offset, table) {
+  return GS_Alignment.stationToCoord(gsElementsFromRange_(table), gsNum_(sta, 'station', 0), gsOffset_(offset)).n;
+}
+
+/**
+ * Easting at a station (and optional offset) on the alignment in `table`.
+ * @param {number} sta Station (m).
+ * @param {number} offset Offset from the centre line (m), + right / - left; blank = 0.
+ * @param {Array<Array>} table 8-column element table (see header comment).
+ * @return {number} Easting (m).
+ * @customfunction
+ */
+function GS_STA_TO_E(sta, offset, table) {
+  return GS_Alignment.stationToCoord(gsElementsFromRange_(table), gsNum_(sta, 'station', 0), gsOffset_(offset)).e;
+}
+
+function gsCoordToStation_(n, e, table) {
+  var els = gsElementsFromRange_(table);
+  try {
+    return GS_Alignment.coordToStation(els, gsNum_(n, 'N', 0), gsNum_(e, 'E', 0));
+  } catch (err) {
+    throw new Error('จุด (' + n + ', ' + e + ') ไม่มีจุดตั้งฉากบน element ใดของแนวนี้');
+  }
+}
+
+/**
+ * Station of the point on the alignment closest (perpendicular foot) to the coordinate.
+ * @param {number} n Northing (m).
+ * @param {number} e Easting (m).
+ * @param {Array<Array>} table 8-column element table (see header comment).
+ * @return {number} Station (m).
+ * @customfunction
+ */
+function GS_COORD_TO_STA(n, e, table) {
+  return gsCoordToStation_(n, e, table).sta;
+}
+
+/**
+ * Signed perpendicular offset of a coordinate from the alignment centre line, + right / - left.
+ * @param {number} n Northing (m).
+ * @param {number} e Easting (m).
+ * @param {Array<Array>} table 8-column element table (see header comment).
+ * @return {number} Offset (m).
+ * @customfunction
+ */
+function GS_COORD_TO_OFFSET(n, e, table) {
+  return gsCoordToStation_(n, e, table).offset;
+}
+
+/**
+ * Azimuth (whole-circle bearing, decimal degrees in [0, 360)) of the centre-line tangent at a station.
+ * @param {number} sta Station (m).
+ * @param {Array<Array>} table 8-column element table (see header comment).
+ * @return {number} Azimuth (degrees).
+ * @customfunction
+ */
+function GS_WCB_AT_STA(sta, table) {
+  var els = gsElementsFromRange_(table);
+  var s = gsNum_(sta, 'station', 0);
+  var i = GS_Alignment.findElementIndex(els, s);
+  if (i < 0) throw new Error('station ' + s + ' อยู่นอกแนวเส้นทาง');
+  var st = GS_Alignment.pointOnElement(els[i], Math.max(0, s - els[i].staStart));
+  return FPMath.radToDeg(FPMath.normalizeAngle(st.az));
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports.GS_COSINE_TANGENT_LENGTH = GS_COSINE_TANGENT_LENGTH;
   module.exports.GS_COSINE_THETA_DEG = GS_COSINE_THETA_DEG;
@@ -625,6 +752,12 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports.GS_CUBIC_TANGENT_LENGTH = GS_CUBIC_TANGENT_LENGTH;
   module.exports.GS_CUBIC_THETA_DEG = GS_CUBIC_THETA_DEG;
   module.exports.GS_CUBIC_TOTAL_Y = GS_CUBIC_TOTAL_Y;
+  module.exports.GS_STA_TO_N = GS_STA_TO_N;
+  module.exports.GS_STA_TO_E = GS_STA_TO_E;
+  module.exports.GS_COORD_TO_STA = GS_COORD_TO_STA;
+  module.exports.GS_COORD_TO_OFFSET = GS_COORD_TO_OFFSET;
+  module.exports.GS_WCB_AT_STA = GS_WCB_AT_STA;
+  module.exports.gsElementsFromRange_ = gsElementsFromRange_;   // for tests only
 }
 
 // ============================================================
