@@ -2592,3 +2592,22 @@
 - หมายเหตุ: ยังไม่ได้ทดสอบกรณีพิมพ์ผิด (Transition = CUBICC) ในเว็บแอป (ต้องขึ้น error ภาษาไทย) และใน Excel
   (ต้องขึ้น #NAME?) | คอมเมนต์ท้ายไฟล์ SMT_Alignment.bas ยังเขียนว่า "NOT yet confirmed in real Excel" ซึ่ง
   ล้าสมัยแล้ว (แก้ได้รอบหน้า) | ส่งออก LandXML (แพตช์ landxml_cubic.patch) ยังพักไว้
+
+## [2026-10-05] feat(gas): สูตร Google Sheets เทียบเท่า Excel (สถานี↔พิกัด) + ยืนยัน deploy
+- ทำ: เพิ่มสูตรในเซลล์ 5 ตัวใน reference/gsheet/GS_Alignment.gs (commit b5f263c): GS_STA_TO_N / GS_STA_TO_E (sta,
+  offset, ตาราง) , GS_COORD_TO_STA / GS_COORD_TO_OFFSET (n, e, ตาราง) , GS_WCB_AT_STA (sta, ตาราง) อาร์กิวเมนต์และ
+  ความหมายเหมือน SMT_StaToN ฯลฯ ของ Excel ตารางคือช่วง 8 คอลัมน์ (StaStart, StaEnd, N, E, Azimuth, Radius, Type,
+  Transition) ตรงกับแท็บ result_..._Elements ของเว็บแอป ใช้เอนจินเดียวกับเว็บแอป (รองรับ CUBIC) Type ผิด /
+  Transition ไม่รู้จัก / สถานีนอกแนว = error ไฟล์ตรวจ reference/gsheet/verify_sheet_udfs.js (1222 ข้อ เทียบ Python)
+  deploy: GS_Alignment.js 42,355 ไบต์ hash acd3325898bb... ตรงกับ repo แล้ว clasp push -f
+- คำสั่ง: certutil -hashfile ; clasp status ; clasp push -f ; พิมพ์สูตรทดสอบในสเปรดชีต SMT_COGO_Builder_DEMO
+  (แท็บ Sheet1 มีตาราง 5 แถว ชื่อ range smt_cubic) ทั้งกรณีปกติและกรณี error
+- ผล: ยืนยันแล้วในเครื่องจริง 2026-10-05 : ที่สถานี 25 / 850 / 1000 ได้ N,E ตรงค่า Python ถึงทศนิยมตำแหน่งที่ 6
+  (เช่น สถานี 1000 ได้ 996.685473 / 27.46537164) WCB(1000) = 21.0862144 เยื้องขวา 5 ม. ได้ 994.8866114 /
+  32.13057227 และย้อนกลับจากพิกัดได้สถานี 999.9999995 offset 4.999999893 | กรณี error ผ่านทั้งสองข้อ:
+  Transition = CUBICC ได้ #ERROR! พร้อมข้อความ "ไม่รู้จัก transition 'CUBICC' ..." (ทุกสูตรของตารางนั้น) และ
+  สถานี 5000 ได้ #ERROR! พร้อมข้อความ "station 5000 อยู่นอกแนวเส้นทาง"
+- commit: b5f263c (push แล้ว 31d460e..b5f263c main -> main)
+- หมายเหตุ: สูตรกำหนดเองใช้ได้เฉพาะในสเปรดชีตที่สคริปต์ผูกอยู่ (SMT_COGO_Builder_DEMO) ไม่ใช่ไฟล์ข้อมูลอย่าง
+  TEST_CUBIC ต้องวางค่าหรือ IMPORTRANGE ตารางเข้ามา | ข้อความ error ของ transition มีวลีเชิงประวัติ (ย่อได้รอบเก็บกวาด)
+  | ส่งออก LandXML (แพตช์ landxml_cubic.patch) ยังพักไว้
